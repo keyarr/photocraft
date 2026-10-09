@@ -28,6 +28,7 @@
 
 pub mod abr_map;
 mod adjust_map;
+#[cfg(feature = "affinity")]
 pub mod affinity;
 pub mod annotations_map;
 pub mod blocks;
@@ -42,6 +43,7 @@ pub mod pattern_map;
 pub mod pixels;
 mod psd_export;
 mod psd_import;
+#[cfg(feature = "raw")]
 pub mod raw;
 pub mod slices_map;
 pub mod smart_map;
@@ -79,6 +81,7 @@ pub enum IoError {
     #[error("pcraft: {0}")]
     Pcraft(#[from] photocraft_format::FormatError),
     /// Camera raw decode failure.
+    #[cfg(feature = "raw")]
     #[error("{0}")]
     Raw(#[from] photocraft_raw::RawError),
     /// An SVG that does not parse (or is too large to rasterise).
@@ -197,9 +200,11 @@ fn import_stages(name: &str, bytes: &[u8], ctl: &photocraft_raster::Interrupt) -
         text_import::prepare(&mut document);
         return Ok(ImportResult { document, warnings, source_read_only: false, preview_only: false });
     }
+    #[cfg(feature = "affinity")]
     if affinity::is_affinity(bytes) || affinity::has_extension(name) {
         return affinity::import(name, bytes);
     }
+    #[cfg(feature = "raw")]
     if raw::is_raw(bytes) {
         return raw::import_raw(name, bytes);
     }
@@ -221,6 +226,7 @@ fn has_extension(name: &str, expected: &str) -> bool {
 /// bare extension).
 pub fn export(doc: &Document, name_or_ext: &str, opts: &ExportOptions) -> Result<ExportResult, IoError> {
     let ext = extension(name_or_ext);
+    #[cfg(feature = "affinity")]
     if affinity::EXTENSIONS.contains(&ext.as_str()) {
         return Err(IoError::Unsupported("Affinity export is not implemented; save a new PSD, PNG or .pcraft copy".into()));
     }

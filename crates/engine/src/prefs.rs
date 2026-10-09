@@ -1285,6 +1285,7 @@ impl Session {
             st.history.trim(&st.doc);
         }
         photocraft_compose::set_effect_cache_budget(budget << 20);
+        #[cfg(feature = "plugins")]
         crate::plugin_cmds::sync_prefs(self);
     }
 

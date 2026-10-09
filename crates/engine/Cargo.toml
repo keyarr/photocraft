@@ -10,6 +10,9 @@ workspace = true
 [features]
 # Real-file corpus tests (opt-in; `cargo xtask test-corpus`). Fail when the corpus is missing.
 corpus = []
+# Sandboxed wasm filter plug-ins via photocraft-plugins (wasmi). Off on phones.
+default = ["plugins"]
+plugins = ["dep:photocraft-plugins"]
 
 [dependencies]
 photocraft-geom = { workspace = true }
@@ -30,7 +33,7 @@ photocraft-vector = { workspace = true }
 photocraft-io = { workspace = true }
 photocraft-psd = { workspace = true }
 photocraft-format = { workspace = true }
-photocraft-plugins = { workspace = true }
+photocraft-plugins = { workspace = true, optional = true }
 blake3 = { version = "1.8", default-features = false, features = ["pure"] }
 photocraft-codecs = { workspace = true }
 flate2 = { workspace = true }

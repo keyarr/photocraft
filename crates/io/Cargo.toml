@@ -10,6 +10,12 @@ rust-version.workspace = true
 workspace = true
 
 [features]
+default = ["affinity", "raw"]
+# Affinity documents (.afphoto/.afdesign) via photocraft-affinity. Off on phones:
+# OPEN_EXTS has no affinity exts, import() reports unsupported instead.
+affinity = ["dep:photocraft-affinity"]
+# Camera raws via photocraft-raw. Off on phones, same as above.
+raw = ["dep:photocraft-raw"]
 # Real-file corpus tests (opt-in; `cargo xtask test-corpus`). Fail when the corpus is missing.
 corpus = []
 # HEIC/HEIF decode (forwarded to photocraft-codecs; see its `heif` feature).
@@ -25,8 +31,8 @@ photocraft-compose = { workspace = true }
 photocraft-algo = { workspace = true }
 photocraft-psd = { workspace = true }
 photocraft-codecs = { workspace = true }
-photocraft-raw = { workspace = true }
-photocraft-affinity = { workspace = true }
+photocraft-raw = { workspace = true, optional = true }
+photocraft-affinity = { workspace = true, optional = true }
 photocraft-text = { workspace = true }
 photocraft-paint = { workspace = true }
 photocraft-vector = { workspace = true }
@@ -38,8 +44,12 @@ blake3 = { version = "1.8", default-features = false, features = ["pure"] }
 flate2 = { workspace = true }
 # SVG import (svg.rs): usvg parses, resvg rasterises what the shape model can't hold. Both are
 # already in the tree through the UI's icon loader; text shaping needs the fonts feature set.
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# system-fonts scans the OS fonts: desktop only, phones use the bundled fonts.
+[target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "android")))'.dependencies]
 resvg = { version = "0.45", default-features = false, features = ["text", "system-fonts", "raster-images"] }
+
+[target.'cfg(all(not(target_arch = "wasm32"), target_os = "android"))'.dependencies]
+resvg = { version = "0.45", default-features = false, features = ["text", "raster-images"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 resvg = { version = "0.45", default-features = false, features = ["text", "raster-images"] }
