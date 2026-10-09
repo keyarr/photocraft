@@ -95,8 +95,9 @@ fn host_file_dialog() -> Option<photocraft_ui_egui::FileDialogFn> {
                 let dialog = dialog.add_filter("All Formats", OPEN_EXTS);
                 if multiple {
                     let picked = dialog.pick_files();
-                    Box::pin(async move { picked.await.map(|files| FileDialogAnswer::Paths(files.iter().map(|f| f.path().to_string_lossy().into_owned()).collect())) })
-                        as std::pin::Pin<Box<dyn std::future::Future<Output = Option<FileDialogAnswer>> + Send>>
+                    Box::pin(async move {
+                        picked.await.map(|files| FileDialogAnswer::Paths(files.iter().map(|f| f.path().to_string_lossy().into_owned()).collect()))
+                    }) as std::pin::Pin<Box<dyn std::future::Future<Output = Option<FileDialogAnswer>> + Send>>
                 } else {
                     let picked = dialog.pick_file();
                     Box::pin(async move { picked.await.map(|file| FileDialogAnswer::Paths(vec![file.path().to_string_lossy().into_owned()])) })

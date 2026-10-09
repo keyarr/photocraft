@@ -440,10 +440,7 @@ mod tests {
         let surf = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap();
         let blacks = (0..40).flat_map(|x| (0..30).map(move |y| (x, y))).filter(|&(x, y)| surf.rgba(x, y)[0] < 0.01).count();
         assert!(blacks > 300 && blacks < 900, "{blacks}");
-        assert!((0..40).all(|x| {
-            let v = surf.rgba(x, 3)[0];
-            v < 0.01 || v > 0.99
-        }));
+        assert!((0..40).all(|x| { !(0.01..=0.99).contains(&surf.rgba(x, 3)[0]) }));
     }
 
     #[test]
