@@ -44,6 +44,24 @@ pub fn display_name(path: &str) -> String {
 }
 
 impl PhotocraftApp {
+    /// File › Open from a button (Home screen, brush import): starts the dialog and
+    /// reports real failures in the status bar. A cancelled picker stays silent, as
+    /// backing out is the user's choice; a build with no picker (Android before the
+    /// SAF bridge) says so instead of swallowing the tap.
+    pub fn open_interactive(&mut self) {
+        if let Err(e) = self.open_dialog_file() {
+            if self.services.file_dialog.is_none() {
+                // English-only on purpose: a temporary build-gap notice, like the
+                // engine's error strings, not a permanent UI sentence for the catalogs.
+                self.ui.status = "Opening files needs the system picker, which isn't wired up on this build yet".into();
+                self.ui.status_error = true;
+            } else if e != crate::file_dialog::CANCELLED {
+                self.ui.status = e;
+                self.ui.status_error = true;
+            }
+        }
+    }
+
     /// Open `bytes` read from the file at `path`: the document is named after the file, keeps
     /// `path` for File › Save unless it is a derivative preview, and `path` goes to the top of Open Recent. Returns the import
     /// warnings (also shown to the user).

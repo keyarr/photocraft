@@ -7,6 +7,13 @@ license.workspace = true
 [lints]
 workspace = true
 
+# Screen-reader bridge (eframe/accesskit) is default-on for desktop/web; the
+# Android shell disables defaults (eframe only supports accesskit with
+# game-activity, and NativeActivity needs no Java at all).
+[features]
+default = ["accesskit"]
+accesskit = ["eframe/accesskit"]
+
 [dependencies]
 photocraft-geom = { workspace = true }
 photocraft-color = { workspace = true }
@@ -29,7 +36,7 @@ photocraft-format = { workspace = true }
 photocraft-codecs = { workspace = true }
 egui = { workspace = true }
 egui_extras = { version = "0.36", default-features = false, features = ["svg"] }
-eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit"] }
+eframe = { workspace = true, features = ["default_fonts", "wgpu"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }

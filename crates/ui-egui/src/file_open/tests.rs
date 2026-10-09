@@ -153,6 +153,28 @@ fn cancelling_file_open_opens_nothing() {
 }
 
 #[test]
+fn open_buttons_say_so_without_a_picker_instead_of_silence() {
+    // Android before the SAF bridge: no file_dialog service. The Home-screen and
+    // brush-import buttons used to swallow the tap (`let _ = ...`); they now
+    // explain, without panicking.
+    let (mut app, _) = app_with(vec![None]);
+    app.services.file_dialog = None;
+    app.open_interactive();
+    assert!(app.session.documents().is_empty());
+    assert!(app.ui.status_error);
+    assert!(app.ui.status.contains("system picker"), "says what is missing: {}", app.ui.status);
+}
+
+#[test]
+fn open_buttons_stay_silent_on_cancel_with_a_picker() {
+    let (mut app, _) = app_with(vec![None]);
+    app.open_interactive();
+    answer(&mut app);
+    assert!(app.session.documents().is_empty());
+    assert!(!app.ui.status_error, "Cancel is not an error");
+}
+
+#[test]
 fn the_web_hands_over_contents_rather_than_paths() {
     let (mut app, _) = app_with(vec![Some(FileDialogAnswer::Contents("cat.png".into(), b"x".to_vec()))]);
     menus::invoke(&mut app, &egui::Context::default(), "file.open", json!({})).unwrap();

@@ -1,0 +1,6 @@
+# xbuild packaging config (read from the package root). The activity, intent
+# filter and version come from the crate itself; only the application id needs
+# pinning, or updates install next to a `com.example.*` placeholder.
+android:
+  manifest:
+    package: ai.storyteller.photocraft.android

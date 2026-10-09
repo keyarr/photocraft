@@ -86,7 +86,7 @@ pub fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, picks: Vec<Pick>) {
                 }
             }
             Pick::Import => {
-                let _ = app.open_dialog_file();
+                app.open_interactive();
             }
         }
     }

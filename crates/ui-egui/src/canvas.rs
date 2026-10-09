@@ -1951,7 +1951,9 @@ fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // File › Open Recent, newest first (on the web there are no paths to reopen).
     let recent: Vec<String> = if cfg!(target_arch = "wasm32") { Vec::new() } else { app.ui.recent_files.iter().take(HOME_RECENT).cloned().collect() };
     let recent_h = if recent.is_empty() { 0.0 } else { 34.0 + recent.len() as f32 * HOME_RECENT_ROW };
-    let card = Rect::from_center_size(area.center(), egui::vec2(460.0, 330.0 + recent_h));
+    // On a phone the fixed 460 pt card would run off the screen; shrink it instead.
+    let card_w = (area.width() - 32.0).clamp(280.0, 460.0);
+    let card = Rect::from_center_size(area.center(), egui::vec2(card_w, 330.0 + recent_h));
     let new_label = crate::shortcuts::command_label(app, "New document…", "file.new");
     let open_label = crate::shortcuts::command_label(app, "Open…", "file.open");
     ui.scope_builder(egui::UiBuilder::new().max_rect(card), |ui| {
@@ -1969,34 +1971,51 @@ fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             ui.add_space(6.0);
             ui.label(egui::RichText::new(tl!("Create a new document or open an existing file.")).color(t.text_dim).size(14.0));
             ui.add_space(22.0);
-            ui.horizontal(|ui| {
-                ui.add_space(((card.width() - 2.0 * 190.0 - 12.0) / 2.0).max(0.0));
-                ui.spacing_mut().item_spacing.x = 12.0;
-                if crate::widgets::primary_button(ui, &new_label, 190.0).clicked() {
+            // Narrow card: stack the buttons full-width instead of squeezing them side by side.
+            if card_w < 420.0 {
+                if crate::widgets::primary_button(ui, &new_label, card_w - 32.0).clicked() {
                     let fields = app.new_document_fields();
                     app.ui.open_dialog(crate::state::DialogKind::NewDocument, fields);
                 }
-                if crate::widgets::secondary_button(ui, &open_label, 190.0).clicked() {
-                    let _ = app.open_dialog_file();
+                ui.add_space(8.0);
+                if crate::widgets::secondary_button(ui, &open_label, card_w - 32.0).clicked() {
+                    app.open_interactive();
                 }
-            });
+            } else {
+                ui.horizontal(|ui| {
+                    ui.add_space(((card.width() - 2.0 * 190.0 - 12.0) / 2.0).max(0.0));
+                    ui.spacing_mut().item_spacing.x = 12.0;
+                    if crate::widgets::primary_button(ui, &new_label, 190.0).clicked() {
+                        let fields = app.new_document_fields();
+                        app.ui.open_dialog(crate::state::DialogKind::NewDocument, fields);
+                    }
+                    if crate::widgets::secondary_button(ui, &open_label, 190.0).clicked() {
+                        app.open_interactive();
+                    }
+                });
+            }
             ui.add_space(22.0);
-            ui.horizontal(|ui| {
-                let msg = start_screen_drop_hint(app);
-                let g = ui.painter().layout_no_wrap(msg.to_string(), egui::FontId::proportional(12.5), t.text_faint);
-                ui.add_space(((card.width() - g.size().x - 24.0) / 2.0).max(0.0));
-                let (r, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), Sense::hover());
-                crate::icons::paint(ui, r, "image", 15.0, t.text_faint);
-                ui.label(egui::RichText::new(msg).color(t.text_faint));
-            });
+            // A phone can't drop files and has no room for promo: keep just the actions.
+            if card_w >= 420.0 {
+                ui.horizontal(|ui| {
+                    let msg = start_screen_drop_hint(app);
+                    let g = ui.painter().layout_no_wrap(msg.to_string(), egui::FontId::proportional(12.5), t.text_faint);
+                    ui.add_space(((card.width() - g.size().x - 24.0) / 2.0).max(0.0));
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), Sense::hover());
+                    crate::icons::paint(ui, r, "image", 15.0, t.text_faint);
+                    ui.label(egui::RichText::new(msg).color(t.text_faint));
+                });
+            }
             if !recent.is_empty() {
                 ui.add_space(22.0);
                 home_recent(app, ui, &recent);
             }
-            ui.add_space(26.0);
-            crate::links::discord_button(app, ui, 190.0);
-            ui.add_space(10.0);
-            crate::links::link_row(app, ui);
+            if card_w >= 420.0 {
+                ui.add_space(26.0);
+                crate::links::discord_button(app, ui, 190.0);
+                ui.add_space(10.0);
+                crate::links::link_row(app, ui);
+            }
         });
     });
 }
@@ -2018,7 +2037,7 @@ const HOME_RECENT_ROW: f32 = 30.0;
 /// The Home screen's "Recent" list: file name, its folder on the right, click to open.
 fn home_recent(app: &mut PhotocraftApp, ui: &mut egui::Ui, recent: &[String]) {
     let t = crate::theme::Tokens::get(ui.ctx());
-    let width = 380.0;
+    let width = 380.0_f32.min(ui.available_width() - 16.0).max(200.0);
     ui.horizontal(|ui| {
         // Line the heading up with the file icons.
         ui.add_space(((ui.available_width() - width) / 2.0).max(0.0) + 8.0);
@@ -2388,6 +2407,32 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         }
     }
 
+    // Touch screens: two fingers pan and pinch the view, and never paint. A second finger
+    // landing mid-stroke drops that stroke, so the gesture leaves no mark behind.
+    let touch = crate::mobile_ui::two_finger(&ctx, rect);
+    if let Some(m) = touch {
+        if m.zoom_delta.is_finite() && m.zoom_delta > 0.0 && m.zoom_delta != 1.0 {
+            let nz = crate::zoom_levels::clamp(view.zoom * m.zoom_delta, view.doc_size);
+            if nz != view.zoom {
+                zoom_about(&mut view, &xf, m.center_pos, nz, false);
+            }
+        }
+        if m.translation_delta != egui::Vec2::ZERO {
+            let d = xf.unmap_vec(m.translation_delta) / view.zoom;
+            if d.x.is_finite() && d.y.is_finite() {
+                view.center[0] -= d.x;
+                view.center[1] -= d.y;
+            }
+        }
+        if app.drag.is_some() {
+            app.drag = None;
+            app.live_stroke = None;
+            app.press_stroke = false;
+            app.trail = None;
+        }
+    }
+    let touch_nav = touch.is_some();
+
     // Pen pressure/tilt for this frame's tool events (mouse = 1.0), unless Preferences › Tools ›
     // Use Tablet Pressure is off; the pen's eraser end selects the Eraser.
     app.stylus.use_pressure = app.session.prefs().tools.use_tablet_pressure;
@@ -2461,16 +2506,20 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             crate::color_range_ui::canvas_eyedropper(app, &ctx, p, press);
         }
     }
-    if tool == Tool::Hand && response.dragged() {
+    if tool == Tool::Hand && !touch_nav && response.dragged() {
         let d = xf.unmap_vec(response.drag_delta()) / view.zoom;
         view.center[0] -= d.x;
         view.center[1] -= d.y;
-    } else if primary {
+    } else if primary && !touch_nav {
         let mods = ui.input(|i| i.modifiers);
         // Tools follow the left button; the right one opens the Brush Preset picker or erases
         // (Preferences › Tools, `paint_mouse`).
         crate::paint_mouse::sync_tool_brush(app);
         let mut buttons = crate::paint_mouse::canvas_buttons(app, &response, tool);
+        // A two-finger gesture is navigation: it must not start, move or end a tool gesture.
+        if touch_nav {
+            buttons = crate::paint_mouse::Buttons::default();
+        }
         // The Crop tool's frame is edited from the press (before egui's drag threshold), so the
         // pixels past the canvas show at once, as in Photoshop.
         if tool == Tool::Crop && response.is_pointer_button_down_on() && ui.input(|i| i.pointer.primary_down()) && crate::crop_ui::press(app) {
@@ -2555,6 +2604,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         // distance: the first dab shows at once. The drag recognised later continues that stroke,
         // and a click (or a long press that never moved) just ends it.
         if strokes_live(tool)
+            && !touch_nav
             && app.drag.is_none()
             && response.is_pointer_button_down_on()
             && ui.input(|i| i.pointer.primary_pressed())

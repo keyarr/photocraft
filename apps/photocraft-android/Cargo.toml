@@ -1,0 +1,53 @@
+[package]
+name = "photocraft-android"
+description = "PhotoCraft for Android: touch-first eframe shell, CPU canvas first"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "photocraft_android"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "photocraft-android"
+path = "src/main.rs"
+
+# Second isolated `unsafe` spot in the workspace (the first is crates/tablet):
+# `android_main` must be unmangled for android-activity's glue to resolve it.
+# Only `src/android.rs` allows it, for that one linking attribute; every other
+# file keeps deny, and the function body is safe Rust.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+
+[dependencies]
+photocraft-doc = { workspace = true }
+photocraft-codecs = { workspace = true }
+photocraft-format = { workspace = true }
+photocraft-io = { workspace = true }
+photocraft-engine = { workspace = true }
+photocraft-ui-egui = { path = "../../crates/ui-egui", default-features = false }
+eframe = { workspace = true, features = ["default_fonts", "wgpu", "android-native-activity"] }
+egui = { workspace = true }
+log = { workspace = true }
+
+# Host dev-loop only (`cargo check/test` on Linux need a winit backend; on
+# Android these are no-ops and must stay off).
+[target.'cfg(not(target_os = "android"))'.dependencies]
+eframe = { workspace = true, features = ["wayland", "x11"] }
+# Host file dialogs so `cargo run -p photocraft-android` can open and save;
+# on-device SAF lands through `push_bytes` instead.
+rfd = { workspace = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+# Pinned exactly like the desktop Linux winit (same Cargo.lock entry). Defaults
+# stay on: `default-features = false` would strip x11/wayland from the unified
+# host build too (feature unification ignores the target gate).
+winit = "=0.30.13"
+android_logger = "0.15"

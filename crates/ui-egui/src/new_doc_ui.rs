@@ -330,6 +330,30 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
     let t = Tokens::get(ui.ctx());
     let cat = get_s(f, "__category", "Recent");
     // Category tabs.
+    let narrow = ui.available_width() < 600.0;
+    if narrow {
+        egui::ScrollArea::horizontal().id_salt("nd-cats").show(ui, |ui| tabs(ui, &t, f, &cat));
+    } else {
+        tabs(ui, &t, f, &cat);
+    }
+    ui.add_space(6.0);
+    widgets::hairline(ui);
+    ui.add_space(8.0);
+    let presets = CATEGORIES.iter().find(|c| c.0 == cat).map_or(CATEGORIES[0].1, |c| c.1);
+    // The clipboard image's size comes first among the Recent presets.
+    let presets: Vec<Preset> = clipboard_preset(f).filter(|_| cat == CATEGORIES[0].0).into_iter().chain(presets.iter().copied()).collect();
+    let chosen = get_s(f, "__preset", "");
+    if narrow {
+        // Phone: the two-column content scrolls sideways; Create stays put.
+        // Keep single-level scrolls: nesting this inside a vertical scroll
+        // broke the Create/Close hit-testing.
+        egui::ScrollArea::horizontal().id_salt("nd-wide").show(ui, |ui| columns(app, ui, &t, f, &presets, &chosen, &cat));
+        return;
+    }
+    columns(app, ui, &t, f, &presets, &chosen, &cat);
+}
+
+fn tabs(ui: &mut egui::Ui, t: &Tokens, f: &mut Map<String, Value>, cat: &str) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 18.0;
         for name in CATEGORIES.iter().map(|c| c.0).chain(["Saved"]) {
@@ -344,13 +368,9 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
             }
         }
     });
-    ui.add_space(6.0);
-    widgets::hairline(ui);
-    ui.add_space(8.0);
-    let presets = CATEGORIES.iter().find(|c| c.0 == cat).map_or(CATEGORIES[0].1, |c| c.1);
-    // The clipboard image's size comes first among the Recent presets.
-    let presets: Vec<Preset> = clipboard_preset(f).filter(|_| cat == CATEGORIES[0].0).into_iter().chain(presets.iter().copied()).collect();
-    let chosen = get_s(f, "__preset", "");
+}
+
+fn columns(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, t: &Tokens, f: &mut Map<String, Value>, presets: &[Preset], chosen: &str, cat: &str) {
     ui.horizontal_top(|ui| {
         // Left: preset grid.
         ui.vertical(|ui| {
@@ -382,7 +402,7 @@ pub fn body(app: &mut crate::PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<Strin
                         if on {
                             ui.painter().rect_stroke(r, t.radius, Stroke::new(1.5, t.accent), StrokeKind::Inside);
                         }
-                        page_icon(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 34.0), vec2(40.0, 40.0)), p.1, p.2, &t);
+                        page_icon(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 34.0), vec2(40.0, 40.0)), p.1, p.2, t);
                         let title = card_title(ui.painter(), tl!(p.0), card.x - 12.0, t.text);
                         let elided = title.elided;
                         ui.painter().galley(pos2(r.center().x, r.top() + 70.0 - title.size().y / 2.0), title, t.text);
@@ -952,6 +972,25 @@ mod tests {
             click_at(&mut h, egui::pos2(label.right() + gap + 12.0, label.center().y));
             enter(&mut h);
             assert_eq!(created(&h), (256, 512, 72.0));
+        }
+
+        /// Phone widths (360 pt): the dialog fits the window with Create reachable.
+        /// The 800 pt desktop layout pushed details and Create off-screen there.
+        #[test]
+        fn narrow_dialog_keeps_create_on_screen_and_clickable() {
+            let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+            let size = egui::vec2(360.0, 800.0);
+            let mut h = Harness::builder().with_size(size).build_ui_state(|ui, app| crate::dialogs::show(app, ui.ctx()), app);
+            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+            h.state_mut().ui.open_dialog(DialogKind::NewDocument, UiState::new_document_fields());
+            h.run_steps(3);
+            for label in ["New Document", "Create", "Close"] {
+                let r = h.get_by_label(label).rect();
+                assert!(r.left() >= 0.0 && r.right() <= size.x && r.top() >= 0.0 && r.bottom() <= size.y, "{label} at {r:?} outside {size:?}");
+            }
+            h.get_by_label("Create").click();
+            h.run_steps(3);
+            assert_eq!(created(&h), (1920, 1080, 72.0));
         }
     }
 }

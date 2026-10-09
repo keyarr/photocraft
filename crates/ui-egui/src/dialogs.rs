@@ -112,13 +112,19 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         // Photoshop doesn't dim the window behind dialogs: previews must be judged at true contrast.
         let modal = modal.show(ctx, |ui| {
             sizing = ui.is_sizing_pass();
-            ui.set_min_width(380.0);
+            // Phone screens are ~360 pt wide: an 800 pt New Document dialog would push
+            // Preset Details and Create off-screen (device screenshot). Clamp to the window,
+            // leaving room for the modal frame so the buttons stay inside. `set_min_width`
+            // only grows, so the generic 380 pt minimum must not run for New Document.
+            let narrow_max = (ctx.content_rect().width() - 48.0).clamp(280.0, 800.0);
             let wide = crate::prefs_ui::width(&d.fields);
-            if let Some(w) = wide {
-                ui.set_min_width(w.min(460.0));
-            }
             if d.kind == DialogKind::NewDocument {
-                ui.set_min_width(800.0);
+                ui.set_min_width(narrow_max.min(800.0));
+            } else {
+                ui.set_min_width(380.0);
+                if let Some(w) = wide {
+                    ui.set_min_width(w.min(460.0));
+                }
             }
             // The About window: room for the contributor table, the same width on every tab.
             let about_tabs = d.kind == DialogKind::About && d.fields.get("systemInfo").and_then(Value::as_bool) != Some(true);
@@ -126,7 +132,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 ui.set_min_width(700.0);
             }
             ui.set_max_width(wide.unwrap_or(if d.kind == DialogKind::NewDocument {
-                800.0
+                narrow_max
             } else if about_tabs {
                 700.0
             } else if d.kind == DialogKind::LayerStyle || d.fields.contains_key("__export") || crate::color_picker_ui::owns(&d.fields) {

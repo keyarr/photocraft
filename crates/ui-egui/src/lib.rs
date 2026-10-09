@@ -89,6 +89,7 @@ pub mod mask_thumbs_ui;
 pub mod menu_catalog;
 pub mod menu_nav;
 pub mod menus;
+pub mod mobile_ui;
 pub mod monitor_status;
 pub mod move_mods;
 pub mod move_ui;
@@ -1191,26 +1192,43 @@ impl eframe::App for PhotocraftApp {
         if !chrome && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
             let _ = menus::invoke(self, &ctx, "view.screenMode.standard", serde_json::json!({}));
         }
-        if chrome {
-            panels::title_bar(self, ui);
-        }
-        if chrome && self.ui.panels.options_bar {
-            panels::options_bar(self, ui);
-        }
-        if chrome && self.ui.panels.status_bar {
-            panels::status_bar(self, ui);
-        }
-        if chrome && self.ui.panels.toolbar {
-            panels::toolbar(self, ui);
-        }
-        if chrome && self.ui.panels.dock {
-            panels::right_dock(self, ui);
+        // Narrow windows (phones) get the compact touch chrome instead of the desktop
+        // toolbar + dock, which would squeeze the canvas to nothing.
+        let mobile = chrome && crate::mobile_ui::is_mobile(&ctx);
+        if mobile {
+            crate::mobile_ui::header(self, ui);
+            if self.ui.panels.options_bar {
+                crate::mobile_ui::options_strip(self, ui);
+            }
+            // Bottom panels stack upward in declaration order: the tool bar stays at the
+            // screen edge, the panel sheet opens above it.
+            crate::mobile_ui::tool_bar(self, ui);
+            crate::mobile_ui::sheet(self, ui);
+        } else {
+            if chrome {
+                panels::title_bar(self, ui);
+            }
+            if chrome && self.ui.panels.options_bar {
+                panels::options_bar(self, ui);
+            }
+            if chrome && self.ui.panels.status_bar {
+                panels::status_bar(self, ui);
+            }
+            if chrome && self.ui.panels.toolbar {
+                panels::toolbar(self, ui);
+            }
+            if chrome && self.ui.panels.dock {
+                panels::right_dock(self, ui);
+            }
         }
         let t = theme::Tokens::get(&ctx);
         let backdrop = if chrome { prefs_ui::pasteboard_color(self).unwrap_or(t.canvas) } else { egui::Color32::BLACK };
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(backdrop)).show(ui, |ui| {
             canvas::document_area(self, ui);
         });
+        if mobile {
+            crate::mobile_ui::tool_sheet(self, &ctx);
+        }
         panels::properties_window(self, &ctx);
         brush_panel::window(self, &ctx);
         preset_panels::windows(self, &ctx);
