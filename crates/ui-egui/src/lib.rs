@@ -105,8 +105,6 @@ pub mod parity;
 pub mod patch_preview;
 pub mod perspective_ui;
 pub mod pixel_grid;
-#[cfg(feature = "plugins")]
-pub mod plugin_ui;
 pub mod point_curve;
 pub mod prefs_ui;
 pub mod preset_files_ui;
@@ -848,9 +846,6 @@ impl PhotocraftApp {
         // Edit › Color Settings policies apply on open; mismatches can ask what to do.
         // No path yet: a bare name isn't a location to save back to (`open_file` sets the path).
         let (_, color) = self.session.open_document(doc, None);
-        if let Some(st) = self.session.active_mut() {
-            st.source_read_only = photocraft_io::affinity::is_affinity(bytes);
-        }
         self.sync_views();
         self.ui.status = format!("Opened {name}");
         self.ui.status_error = false;
@@ -896,9 +891,6 @@ impl PhotocraftApp {
         let (doc, warnings) = import(name, bytes)?;
         // The caller records the path it read from.
         self.session.add_document(doc, None);
-        if let Some(st) = self.session.active_mut() {
-            st.source_read_only = photocraft_io::affinity::is_affinity(bytes);
-        }
         self.sync_views();
         self.ui.status = format!("Opened {name}");
         self.ui.status_error = false;

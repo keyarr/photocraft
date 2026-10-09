@@ -173,11 +173,6 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
     if let Some(r) = crate::timeline_ui::menu(app, id, &params) {
         return r;
     }
-    // Filter › Plug-ins (installed WebAssembly plug-ins, Install Plug-in…).
-    #[cfg(feature = "plugins")]
-    if let Some(r) = crate::plugin_ui::menu(app, id, &params) {
-        return r;
-    }
     if id == "window.panel.brushes" {
         // Window › Brushes opens the Brush Settings window on its presets tab.
         app.ui.panels.brush_settings = true;
@@ -529,10 +524,6 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
     if let Some(e) = crate::view_cmds::is_enabled(app, id) {
         return e;
     }
-    #[cfg(feature = "plugins")]
-    if let Some(e) = crate::plugin_ui::is_enabled(app, id) {
-        return e;
-    }
     if let Some(e) = crate::transform_tool::is_enabled(app, id) {
         return e;
     }
@@ -776,8 +767,6 @@ pub fn menu_items(app: &PhotocraftApp) -> Vec<MenuItem> {
             items.insert(at, e);
         }
     }
-    #[cfg(feature = "plugins")]
-    crate::plugin_ui::insert_menu_items(app, &mut items);
     // The File quick-export command uses the format selected in Export Preferences.
     // On the web it intentionally downloads PNG until the quick-export service supports
     // the other formats; the Layer quick-export command also always produces PNG.

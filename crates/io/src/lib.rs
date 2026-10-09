@@ -15,9 +15,6 @@
 //!   layer; unsupported raw variants fall back to the embedded JPEG preview.
 //! * Layered TIFFs (Photoshop layer data in tags 37724 and 34377) open with their
 //!   layers through the PSD path and are written back the same way; see `tiff_layers`.
-//! * Affinity documents (`.af`, `.afdesign`, `.afphoto`, `.afpub`) open natively
-//!   with no source save path, what isn't imported listed in the warnings; a file
-//!   whose native data can't be read opens as its embedded preview; see `affinity`.
 //! * Every other format goes through `photocraft-codecs` as a single
 //!   "Background" layer (depth and Gray/RGB/CMYK model preserved).
 //!
@@ -28,8 +25,6 @@
 
 pub mod abr_map;
 mod adjust_map;
-#[cfg(feature = "affinity")]
-pub mod affinity;
 pub mod annotations_map;
 pub mod blocks;
 mod channel_map;
@@ -43,7 +38,6 @@ pub mod pattern_map;
 pub mod pixels;
 mod psd_export;
 mod psd_import;
-#[cfg(feature = "raw")]
 pub mod raw;
 pub mod slices_map;
 pub mod smart_map;
@@ -81,7 +75,6 @@ pub enum IoError {
     #[error("pcraft: {0}")]
     Pcraft(#[from] photocraft_format::FormatError),
     /// Camera raw decode failure.
-    #[cfg(feature = "raw")]
     #[error("{0}")]
     Raw(#[from] photocraft_raw::RawError),
     /// An SVG that does not parse (or is too large to rasterise).
@@ -165,7 +158,7 @@ pub fn is_psd(bytes: &[u8]) -> bool {
     bytes.starts_with(b"8BPS")
 }
 
-/// Imports a file. PSD/PSB, Affinity containers and camera raws are detected by magic; everything
+/// Imports a file. PSD/PSB and camera raws are detected by magic; everything
 /// else is decoded with `photocraft-codecs`.
 pub fn import(name: &str, bytes: &[u8]) -> Result<ImportResult, IoError> {
     import_with(name, bytes, &photocraft_raster::Interrupt::NONE)
@@ -200,11 +193,6 @@ fn import_stages(name: &str, bytes: &[u8], ctl: &photocraft_raster::Interrupt) -
         text_import::prepare(&mut document);
         return Ok(ImportResult { document, warnings, source_read_only: false, preview_only: false });
     }
-    #[cfg(feature = "affinity")]
-    if affinity::is_affinity(bytes) || affinity::has_extension(name) {
-        return affinity::import(name, bytes);
-    }
-    #[cfg(feature = "raw")]
     if raw::is_raw(bytes) {
         return raw::import_raw(name, bytes);
     }
@@ -226,10 +214,6 @@ fn has_extension(name: &str, expected: &str) -> bool {
 /// bare extension).
 pub fn export(doc: &Document, name_or_ext: &str, opts: &ExportOptions) -> Result<ExportResult, IoError> {
     let ext = extension(name_or_ext);
-    #[cfg(feature = "affinity")]
-    if affinity::EXTENSIONS.contains(&ext.as_str()) {
-        return Err(IoError::Unsupported("Affinity export is not implemented; save a new PSD, PNG or .pcraft copy".into()));
-    }
     if ext == photocraft_format::EXTENSION {
         let previews = photocraft_format::SaveOptions {
             thumbnail: Some(photocraft_compose::thumbnail(doc, 256)),

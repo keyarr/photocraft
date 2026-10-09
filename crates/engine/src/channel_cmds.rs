@@ -559,7 +559,6 @@ pub fn follows_target(id: &str) -> bool {
 /// Commands whose target follows the Channels panel.
 fn routed(id: &str) -> bool {
     id.starts_with("filter.")
-        || id == "plugin.run"
         || id.starts_with("image.adjustments.")
         || matches!(id, "paint.stroke" | "paint.pencil" | "paint.bucket" | "paint.gradient" | "paint.mixerBrush" | "edit.fill" | "image.applyImage")
         || crate::fill_key_cmds::IDS.contains(&id)

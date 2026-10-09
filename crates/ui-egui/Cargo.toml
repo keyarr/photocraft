@@ -11,11 +11,8 @@ workspace = true
 # Android shell disables defaults (eframe only supports accesskit with
 # game-activity, and NativeActivity needs no Java at all).
 [features]
-default = ["accesskit", "plugins"]
+default = ["accesskit"]
 accesskit = ["eframe/accesskit"]
-# Wasm filter plug-ins UI (Filter > Plug-ins). Off on phones.
-# Forwards to the engine commands so `plugin.run` exists wherever the menu does.
-plugins = ["dep:photocraft-plugins", "photocraft-engine/plugins"]
 
 [dependencies]
 photocraft-geom = { workspace = true }
@@ -25,9 +22,8 @@ photocraft-raster = { workspace = true }
 photocraft-doc = { workspace = true }
 photocraft-compose = { workspace = true }
 photocraft-gpu = { workspace = true }
-photocraft-engine = { path = "../engine", default-features = false }
+photocraft-engine = { workspace = true }
 photocraft-io = { workspace = true }
-photocraft-plugins = { workspace = true, optional = true }
 photocraft-algo = { workspace = true }
 photocraft-text = { workspace = true }
 photocraft-vector = { workspace = true }

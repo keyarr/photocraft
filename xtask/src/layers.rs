@@ -42,10 +42,7 @@ pub const TABLE: &[(&str, Class)] = &[
     // Optional HEIF/HEIC decoder (heic-rs), used only by `codecs` behind its `heif` feature.
     ("heif", Class::Standalone),
     ("raw", Class::Standalone),
-    ("affinity", Class::Standalone),
     ("adobe-assets", Class::Standalone),
-    // Pen tablet input (the one isolated `unsafe` helper: AppKit interop on macOS).
-    ("tablet", Class::Standalone),
     ("doc", Class::Layer(1)),
     ("ops", Class::Layer(2)),
     ("paint", Class::Layer(2)),
@@ -59,17 +56,12 @@ pub const TABLE: &[(&str, Class)] = &[
     ("tools", Class::Layer(4)),
     ("viewport", Class::Layer(4)),
     ("ml", Class::Layer(4)),
-    ("plugins", Class::Layer(4)),
     ("engine", Class::Layer(5)),
     ("ui-egui", Class::Layer(6)),
-    ("automation", Class::Layer(6)),
     ("platform", Class::Layer(6)),
     ("testkit", Class::Testkit),
     // L7 apps and tooling
-    ("photocraft", Class::Exempt),
     ("android", Class::Exempt),
-    ("cli", Class::Exempt),
-    ("web", Class::Exempt),
     ("xtask", Class::Exempt),
 ];
 
@@ -278,7 +270,7 @@ mod tests {
             c("photocraft-doc", &[("photocraft-geom", Normal, true)]),
             c("photocraft-engine", &[("photocraft-doc", Normal, true), ("photocraft-testkit", Dev, true)]),
             c("photocraft-ui-egui", &[("photocraft-engine", Normal, true), ("egui", Normal, false)]),
-            c("photocraft-cli", &[("photocraft-ui-egui", Normal, true)]),
+            c("photocraft-android", &[("photocraft-ui-egui", Normal, true)]),
         ];
         assert!(check(&g).is_empty(), "{:?}", check(&g));
     }
@@ -373,7 +365,7 @@ mod tests {
 
     #[test]
     fn apps_and_xtask_exempt() {
-        for app in ["photocraft", "photocraft-cli", "photocraft-web", "photocraft-android", "xtask"] {
+        for app in ["photocraft-android", "xtask"] {
             assert!(check(&[c(app, &[("egui", Normal, false), ("photocraft-ui-egui", Normal, true)])]).is_empty());
         }
     }

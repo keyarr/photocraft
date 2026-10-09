@@ -1168,8 +1168,6 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::jobs::specs());
     v.extend(crate::wia_cmds::specs());
     v.extend(crate::variables_cmds::specs());
-    #[cfg(feature = "plugins")]
-    v.extend(crate::plugin_cmds::specs());
     v.extend(crate::group_view_cmds::specs());
     v.extend(crate::fx_view_cmds::specs());
     v.extend(crate::fx_visibility_cmds::specs());

@@ -26,10 +26,9 @@ const CRITICAL: &[&str] = &[
     "crates/gpu/",
     "crates/text/",
     "crates/format/",
-    "crates/affinity/",
     "crates/raw/",
 ];
-/// `cargo xtask corpus [--all | --pngsuite | --download | --psd | --psd-tools | --heif | --exr | --pixls | --affinity | --photoshop [--local]] [--update-manifest]`
+/// `cargo xtask corpus [--all | --pngsuite | --download | --psd | --psd-tools | --heif | --exr | --pixls | --photoshop [--local]] [--update-manifest]`
 pub fn cmd(args: &[&str]) -> Result<(), String> {
     let update = args.contains(&"--update-manifest");
     let mut did = false;
@@ -58,10 +57,6 @@ pub fn cmd(args: &[&str]) -> Result<(), String> {
     }
     if args.contains(&"--exr") {
         corpus_pins::EXR.fetch(update)?;
-        did = true;
-    }
-    if args.contains(&"--affinity") {
-        corpus_pins::AFFINITY.fetch(update)?;
         did = true;
     }
     if args.contains(&"--photoshop") {
@@ -139,8 +134,6 @@ fn list() {
                      pillow-heif@{} (BSD-3-Clause), manifest xtask/heif-corpus.sha256. Fetch: --heif
   corpus/exr/        [{}] the deep OpenEXR test images (BSD-3-Clause), openexr@{}
                      manifest xtask/exr-corpus.sha256. Fetch: --exr
-  corpus/affinity/   [{}] 21 public Affinity 1–3 documents (CC0, MIT): vector-art, AFDesignLoad,
-                     Jac21/Branding, AssetStoreTemplate; manifest xtask/affinity-corpus.sha256. Fetch: --affinity
   corpus/pngsuite/   [{}] PngSuite (public domain), {PNGSUITE_URL}. Fetch: --pngsuite
   corpus/pixls/      [opt-in] real camera raws from raw.pixls.us (public domain), one per decode
                      path plus the known-unsupported packed ORF. Fetch: --pixls (opt-in)
@@ -157,7 +150,6 @@ Pins: xtask/src/corpus_pins.rs. Moving one: change it, then --<name> --update-ma
         &PILLOW_HEIF_COMMIT[..12],
         status(corpus_pins::EXR.is_current()),
         &OPENEXR_COMMIT[..12],
-        status(corpus_pins::AFFINITY.is_current()),
         status(png_ok),
     );
 }

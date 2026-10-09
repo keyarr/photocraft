@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*", "apps/*", "xtask"]
-default-members = ["crates/*", "apps/photocraft", "apps/photocraft-cli", "xtask"]
+default-members = ["crates/*", "apps/photocraft-android", "xtask"]
 
 [workspace.package]
 version = "0.5.0"
@@ -20,7 +20,6 @@ photocraft-ops = { path = "crates/ops" }
 photocraft-psd = { path = "crates/psd" }
 photocraft-codecs = { path = "crates/codecs" }
 photocraft-raw = { path = "crates/raw" }
-photocraft-affinity = { path = "crates/affinity" }
 photocraft-compose = { path = "crates/compose" }
 photocraft-gpu = { path = "crates/gpu" }
 photocraft-paint = { path = "crates/paint" }
@@ -29,12 +28,9 @@ photocraft-io = { path = "crates/io" }
 photocraft-text = { path = "crates/text" }
 photocraft-vector = { path = "crates/vector" }
 photocraft-format = { path = "crates/format" }
-photocraft-automation = { path = "crates/automation" }
-photocraft-plugins = { path = "crates/plugins" }
 photocraft-engine = { path = "crates/engine" }
 photocraft-ui-egui = { path = "crates/ui-egui" }
 photocraft-testkit = { path = "crates/testkit" }
-photocraft-tablet = { path = "crates/tablet" }
 
 # external
 thiserror = "2"

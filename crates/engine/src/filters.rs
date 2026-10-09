@@ -173,11 +173,6 @@ pub fn apply_filter_to_surface(
     if let Some(kind) = id.strip_prefix("image.adjustments.") {
         return crate::adjust_cmds::adjust_as_filter(kind, params, surf);
     }
-    // WebAssembly plug-in smart filters (plugin_cmds).
-    #[cfg(feature = "plugins")]
-    if id == crate::plugin_cmds::RUN {
-        return crate::plugin_cmds::apply_to_surface(id, params, surf, selection, canvas);
-    }
     let fp = params_for(id, params)?;
     let sel_bounds = selection.map(photocraft_raster::Surface::content_bounds);
     let content = surf.content_bounds();
