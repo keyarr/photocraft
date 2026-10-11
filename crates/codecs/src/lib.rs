@@ -21,6 +21,7 @@ mod image;
 mod options;
 pub mod orientation;
 pub mod resolution;
+mod thumbnail;
 pub mod web;
 
 pub use crate::codecs::png::encode_indexed as encode_png_indexed;
@@ -33,6 +34,7 @@ pub use crate::image::{ChannelLayout, DecodeWarning, DeepChannel, DeepImage, Ima
 pub use crate::options::{DecodeOptions, EncodeOptions, ExrCompression, Limits, PngCompression, TiffCompression};
 pub use crate::orientation::{exif_orientation, upright_exif, upright_xmp};
 pub use crate::resolution::{exif_resolution, export_exif, export_xmp, photoshop_resolution, xmp_resolution};
+pub use crate::thumbnail::exif_thumbnail;
 pub use half::f16;
 
 use crate::codecs::{exr, heif, jpeg, png, pnm, tiff, via_image, webp};

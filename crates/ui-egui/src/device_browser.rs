@@ -6,6 +6,14 @@
 //! `open_interactive`): desktop and web keep their own dialogs. Folders and
 //! photos share one grid: folders get an icon, photos a thumbnail.
 //!
+//! The grid stays usable in camera folders with thousands of photos because it
+//! never does filesystem or image work on the UI thread beyond one cached
+//! listing per folder: the listing is built once per navigation (not every
+//! frame), only the visible rows are laid out (`ScrollArea::show_rows`), and
+//! thumbnails decode on one background thread while the UI only uploads the
+//! finished 192 px textures. Stale decodes from the previous folder are
+//! skipped by generation, never uploaded.
+//!
 //! The access verdict comes from `Services::storage_has_access` when the shell
 //! provides it (Android's JNI bridge: media/all-files grants); otherwise a
 //! write probe stands in (host tests). The gate's buttons fire
@@ -35,9 +43,27 @@ const MAX_CACHED_THUMBS: usize = 150;
 /// Files bigger than this get a placeholder icon instead of a thumbnail: the
 /// file still opens on tap, it just isn't decoded for the grid.
 const MAX_THUMB_BYTES: u64 = 32 * 1024 * 1024;
-/// How many missing thumbnails one frame decodes: a folder of RAWs must not
-/// stall the scroll, the rest resolve over the next frames.
+/// Inline decodes per frame, fallback only (wasm builds and a dead worker):
+/// a folder of RAWs must not stall the scroll, the rest resolve over the next
+/// frames. Native builds decode on the worker thread instead and never block
+/// the UI on image bytes.
 const THUMB_BUDGET: usize = 4;
+/// Native: queued-but-undecoded thumbnails. Scrolling fast through DCIM fills
+/// this with stale requests that the worker skips; the visible cells retry on
+/// later frames with a fresh generation.
+const MAX_QUEUED_THUMBS: usize = 64;
+/// Native: worker results uploaded per frame. One upload is ~150 KB, so this
+/// never approaches a frame budget while still filling the grid in a couple
+/// of frames after a scroll settles.
+const RESULTS_PER_FRAME: usize = 8;
+
+/// Grid cell geometry: an 88 pt image box with the name and size underneath.
+const CELL_IMG: f32 = 88.0;
+const CELL_TEXT_H: f32 = 30.0;
+const CELL_W: f32 = CELL_IMG + 8.0;
+const CELL_H: f32 = CELL_IMG + CELL_TEXT_H;
+const GRID_GAP_X: f32 = 4.0;
+const GRID_GAP_Y: f32 = 8.0;
 
 /// Transient browser state (never persisted: `#[serde(skip)]` on `UiState`).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -46,8 +72,13 @@ pub struct Browser {
     error: Option<String>,
     /// All-files verdict, probed on open and on demand (`None` = probe now).
     access: Option<bool>,
+    /// Listing of `dir`, built once per navigation. Re-listing (read_dir plus a
+    /// stat per file plus the sort) every frame froze the open animation on
+    /// big folders; `None` means "list on the next show".
+    cached: Option<(PathBuf, Result<Listing, String>)>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 struct Entry {
     name: String,
     path: PathBuf,
@@ -57,6 +88,7 @@ struct Entry {
     fingerprint: u64,
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
 struct Listing {
     dirs: Vec<Entry>,
     files: Vec<Entry>,
@@ -84,7 +116,7 @@ fn start_dir() -> PathBuf {
 
 /// File › Open without a system picker: show the browser modal.
 pub fn open(app: &mut PhotocraftApp) {
-    app.ui.device_browser = Some(Browser { dir: start_dir(), error: None, access: None });
+    app.ui.device_browser = Some(Browser { dir: start_dir(), error: None, access: None, cached: None });
 }
 
 /// What File › Open shows: exactly what `import` opens
@@ -104,10 +136,11 @@ fn list(dir: &Path) -> Result<Listing, String> {
         if name.starts_with('.') {
             continue;
         }
-        if e.file_type().is_ok_and(|t| t.is_symlink()) {
+        let file_type = e.file_type().ok();
+        if file_type.is_some_and(|t| t.is_symlink()) {
             continue;
         }
-        let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
+        let is_dir = file_type.is_some_and(|t| t.is_dir());
         if !is_dir && !is_supported(&name) {
             continue;
         }
@@ -115,8 +148,11 @@ fn list(dir: &Path) -> Result<Listing, String> {
             truncated = true;
             break;
         }
-        let size = if is_dir { None } else { e.metadata().map(|m| m.len()).ok() };
-        let fingerprint = e.metadata().ok().map(|m| fingerprint_of(&m, size)).unwrap_or(0);
+        // One stat per file: the size and the thumbnail fingerprint come from
+        // the same metadata, and both are cached with the listing.
+        let meta = e.metadata().ok();
+        let size = if is_dir { None } else { meta.as_ref().map(|m| m.len()) };
+        let fingerprint = meta.as_ref().map(|m| fingerprint_of(m, size)).unwrap_or(0);
         let entry = Entry { name, path: e.path(), is_dir, size, fingerprint };
         if is_dir {
             dirs.push(entry);
@@ -130,8 +166,13 @@ fn list(dir: &Path) -> Result<Listing, String> {
     Ok(Listing { dirs, files, truncated })
 }
 
-fn fingerprint_of(meta: &std::fs::Metadata, size: Option<u64>) -> u64 {
-    let (secs, nanos) =
+/// The grid's `i`-th cell: folders first, then files, matching the old
+/// chained-iterator order.
+fn entry_at(l: &Listing, i: usize) -> &Entry {
+    if i < l.dirs.len() { &l.dirs[i] } else { &l.files[i - l.dirs.len()] }
+}
+
+fn fingerprint_of(meta: &std::fs::Metadata, size: Option<u64>) -> u64 {    let (secs, nanos) =
         meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| (d.as_secs(), d.subsec_nanos())).unwrap_or((0, 0));
     secs.wrapping_mul(31).wrapping_add(u64::from(nanos)).wrapping_mul(31).wrapping_add(size.unwrap_or(0))
 }
@@ -167,7 +208,34 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
         return;
     }
+    // The listing is built once per navigation, never per frame: on a camera
+    // folder the read_dir plus the sort alone froze the open animation, and
+    // the first frame's synchronous thumbnail decodes added seconds on top.
+    if b.cached.as_ref().is_none_or(|(d, _)| *d != b.dir) {
+        b.cached = Some((b.dir.clone(), list(&b.dir)));
+        // The worker may still hold decodes of the old folder: skip them by
+        // generation instead of uploading thumbnails into the wrong grid.
+        #[cfg(not(target_arch = "wasm32"))]
+        ctx.data_mut(|d| {
+            let w = d.get_temp_mut_or_default::<ThumbWorker>(thumb_worker_id());
+            w.generation.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            w.inflight.clear();
+            w.outstanding = 0;
+            if w.usable {
+                let rx = w.rx.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                while rx.try_recv().is_ok() {}
+            }
+        });
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    poll_thumb_results(ctx);
+    if let Some((_, Err(e))) = &b.cached {
+        b.error = Some(e.clone());
+    } else {
+        b.error = None;
+    }
     let mut picked: Option<String> = None;
+    let mut navigated_to: Option<PathBuf> = None;
     let mut closed = false;
     let mut budget = THUMB_BUDGET;
     let mut pending = false;
@@ -188,51 +256,69 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 go_up = crate::widgets::secondary_button(ui, tl!("Up"), 64.0).clicked();
             });
             if go_up && let Some(parent) = b.dir.parent().map(Path::to_path_buf) {
-                b.dir = parent;
-                b.error = None;
+                navigated_to = Some(parent);
             }
             ui.label(egui::RichText::new(b.dir.display().to_string()).small().weak());
         });
         if let Some(err) = b.error.as_deref() {
             ui.label(err);
         }
-        match list(&b.dir) {
-            Err(e) => b.error = Some(e),
-            Ok(l) => {
-                b.error = None;
-                if l.dirs.is_empty() && l.files.is_empty() {
-                    ui.label(egui::RichText::new(tl!("Empty folder")).weak());
-                }
-                egui::ScrollArea::vertical().id_salt("device-browser-list").auto_shrink([false, false]).max_height(400.0).show(ui, |ui| {
-                    let cols = ((ui.available_width() / 100.0).floor() as usize).clamp(2, 4);
-                    egui::Grid::new("device-browser-grid").spacing([4.0, 8.0]).show(ui, |ui| {
-                        for (i, e) in l.dirs.iter().chain(l.files.iter()).enumerate() {
+        let Some((_, Ok(l))) = &b.cached else { return };
+        if l.dirs.is_empty() && l.files.is_empty() {
+            ui.label(egui::RichText::new(tl!("Empty folder")).weak());
+            return;
+        }
+        // Only the visible rows exist: laying out thousands of cells every
+        // frame is what made DCIM/Camera unusable. `cols` is fixed for the
+        // frame so the row math matches the grid below it.
+        let cols = ((ui.available_width() / 100.0).floor() as usize).clamp(2, 4);
+        let total = l.dirs.len() + l.files.len();
+        // `show_rows` adds the UI's item spacing to the row height, while the
+        // grid uses its own gap: net them so rows land exactly on the cells.
+        let row_h = CELL_H + GRID_GAP_Y - ui.spacing().item_spacing.y;
+        egui::ScrollArea::vertical()
+            .id_salt("device-browser-list")
+            .auto_shrink([false, false])
+            .max_height(400.0)
+            .show_rows(ui, row_h, total.div_ceil(cols), |ui, row_range| {
+                egui::Grid::new("device-browser-grid").spacing([GRID_GAP_X, GRID_GAP_Y]).show(ui, |ui| {
+                    for row in row_range {
+                        for c in 0..cols {
+                            let i = row * cols + c;
+                            if i >= total {
+                                break;
+                            }
+                            let e = entry_at(l, i);
                             let tex = if e.is_dir { None } else { thumb(ui, e, &mut budget, &mut pending) };
-                            if cell(ui, e, tex).clicked() {
+                            // Stable id per file: virtualized rows shift auto
+                            // ids while scrolling, which would eat taps.
+                            let resp = ui.push_id(&e.path, |ui| cell(ui, e, tex)).inner;
+                            if resp.clicked() {
                                 if e.is_dir {
-                                    b.dir = e.path.clone();
+                                    navigated_to = Some(e.path.clone());
                                 } else {
                                     picked = Some(e.path.to_string_lossy().into_owned());
                                 }
                             }
-                            if i % cols == cols - 1 {
-                                ui.end_row();
-                            }
                         }
-                    });
+                        ui.end_row();
+                    }
                 });
-                if pending {
-                    ui.ctx().request_repaint();
-                }
-                if l.truncated {
-                    let n = MAX_ENTRIES.to_string();
-                    ui.label(egui::RichText::new(crate::i18n::fmt(tl!("First {n} entries shown"), &[("n", &n)])).small().weak());
-                }
-            }
+            });
+        if pending {
+            ui.ctx().request_repaint();
+        }
+        if l.truncated {
+            let n = MAX_ENTRIES.to_string();
+            ui.label(egui::RichText::new(crate::i18n::fmt(tl!("First {n} entries shown"), &[("n", &n)])).small().weak());
         }
     });
     if let Some(path) = picked {
         app.open_paths(&[path]);
+    } else if let Some(dir) = navigated_to {
+        b.dir = dir;
+        b.error = None;
+        app.ui.device_browser = Some(b);
     } else if !closed {
         app.ui.device_browser = Some(b);
     }
@@ -289,6 +375,12 @@ fn decode_thumb(path: &Path, name: &str, size: Option<u64>) -> Option<egui::Colo
             Some(shrink(&img.to_rgba8(), img.width(), img.height()))
         }
         ThumbKind::Flat => {
+            // Phone JPEGs/TIFFs carry a tiny IFD1 preview: decode that
+            // (tens of KB) instead of the 12 MP main image, falling back to
+            // the full decode when there is none.
+            if let Some(img) = photocraft_codecs::exif_thumbnail(&bytes) {
+                return Some(shrink(&img.to_rgba8(), img.width(), img.height()));
+            }
             let limits =
                 photocraft_codecs::Limits { max_width: 12_000, max_height: 12_000, max_pixels: 64 * 1024 * 1024, max_alloc: 256 * 1024 * 1024 };
             let img = photocraft_codecs::decode_with(&bytes, &photocraft_codecs::DecodeOptions { limits, keep_orientation: false }).ok()?;
@@ -316,10 +408,11 @@ fn shrink(px: &[u8], w: u32, h: u32) -> egui::ColorImage {
     egui::ColorImage::from_rgba_unmultiplied([ow, oh], &out)
 }
 
-/// The cached thumbnail, decoding at most `*budget` missing ones this frame.
-/// `pending` stays true while a file still waits for its turn, so the grid
-/// repaints until every thumb resolved. Anything without a thumbnail (folders,
-/// PSDs, failures) is `None`: the cell draws its icon instead.
+/// The cached thumbnail. Native builds queue the decode on the background
+/// worker and return `None` (the icon) until its result is uploaded;
+/// `pending` stays true while a visible file still waits, so the grid
+/// repaints until every visible thumb resolved. Anything without a thumbnail
+/// (folders, PSDs, failures) is `None`: the cell draws its icon instead.
 fn thumb(ui: &egui::Ui, e: &Entry, budget: &mut usize, pending: &mut bool) -> Option<egui::TextureHandle> {
     if e.is_dir || thumb_kind(&e.name) == ThumbKind::None || e.size.is_some_and(|n| n == 0 || n > MAX_THUMB_BYTES) {
         return None;
@@ -331,31 +424,24 @@ fn thumb(ui: &egui::Ui, e: &Entry, budget: &mut usize, pending: &mut bool) -> Op
     if ui.ctx().data(|d| d.get_temp::<std::collections::HashSet<egui::Id>>(thumb_failed_id()).is_some_and(|s| s.contains(&key))) {
         return None;
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    if request_thumb(ui, e, key, pending) {
+        return None;
+    }
+    decode_inline(ui, e, key, budget, pending)
+}
+
+/// Decodes at most `*budget` missing thumbnails inline this frame. Only a
+/// fallback for builds without the worker thread (wasm) and for a worker that
+/// failed to start; the grid prefers [`request_thumb`].
+fn decode_inline(ui: &egui::Ui, e: &Entry, key: egui::Id, budget: &mut usize, pending: &mut bool) -> Option<egui::TextureHandle> {
     if *budget == 0 {
         *pending = true;
         return None;
     }
     *budget -= 1;
     match decode_thumb(&e.path, &e.name, e.size) {
-        Some(img) => {
-            let options = egui::TextureOptions { mipmap_mode: Some(egui::TextureFilter::Linear), ..egui::TextureOptions::LINEAR };
-            let tex = ui.ctx().load_texture(format!("device-thumb-{}-{}", e.fingerprint, e.name), img, options);
-            ui.ctx().data_mut(|d| {
-                d.insert_temp(key, tex.clone());
-                let evicted = {
-                    let order = d.get_temp_mut_or_default::<Vec<egui::Id>>(thumb_order_id());
-                    if !order.contains(&key) {
-                        order.push(key);
-                    }
-                    let cut = order.len().saturating_sub(MAX_CACHED_THUMBS);
-                    order.drain(..cut).collect::<Vec<_>>()
-                };
-                for old in evicted {
-                    d.remove::<egui::TextureHandle>(old);
-                }
-            });
-            Some(tex)
-        }
+        Some(img) => Some(insert_thumb(ui.ctx(), key, format!("device-thumb-{}-{}", e.fingerprint, e.name), img)),
         None => {
             ui.ctx().data_mut(|d| {
                 let set = d.get_temp_mut_or_default::<std::collections::HashSet<egui::Id>>(thumb_failed_id());
@@ -365,6 +451,226 @@ fn thumb(ui: &egui::Ui, e: &Entry, budget: &mut usize, pending: &mut bool) -> Op
                 set.insert(key);
             });
             None
+        }
+    }
+}
+
+/// Uploads a decoded thumbnail and tracks it for the LRU eviction, shared by
+/// the inline fallback and the worker results.
+fn insert_thumb(ctx: &egui::Context, key: egui::Id, label: String, img: egui::ColorImage) -> egui::TextureHandle {
+    let options = egui::TextureOptions { mipmap_mode: Some(egui::TextureFilter::Linear), ..egui::TextureOptions::LINEAR };
+    let tex = ctx.load_texture(label, img, options);
+    ctx.data_mut(|d| {
+        d.insert_temp(key, tex.clone());
+        let evicted = {
+            let order = d.get_temp_mut_or_default::<Vec<egui::Id>>(thumb_order_id());
+            if !order.contains(&key) {
+                order.push(key);
+            }
+            let cut = order.len().saturating_sub(MAX_CACHED_THUMBS);
+            order.drain(..cut).collect::<Vec<_>>()
+        };
+        for old in evicted {
+            d.remove::<egui::TextureHandle>(old);
+        }
+    });
+    tex
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn thumb_worker_id() -> egui::Id {
+    egui::Id::new("device-browser-thumb-worker")
+}
+
+/// One file waiting for (or under) the background decode.
+#[cfg(not(target_arch = "wasm32"))]
+struct ThumbJob {
+    key: egui::Id,
+    path: PathBuf,
+    name: String,
+    size: Option<u64>,
+    generation: u64,
+    label: String,
+}
+
+/// A finished decode, uploaded by [`poll_thumb_results`].
+#[cfg(not(target_arch = "wasm32"))]
+struct ThumbResult {
+    key: egui::Id,
+    generation: u64,
+    label: String,
+    image: Option<egui::ColorImage>,
+}
+
+/// The grid's background decoder, kept in the egui temp data (one per
+/// context). The UI thread only queues jobs and uploads finished textures;
+/// file reads and full-resolution decodes happen on the worker. `gen` is
+/// bumped on every navigation so queued decodes of the old folder are
+/// skipped, never uploaded into the new grid.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone)]
+struct ThumbWorker {
+    tx: std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Sender<ThumbJob>>>,
+    rx: std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Receiver<ThumbResult>>>,
+    generation: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    usable: bool,
+    outstanding: usize,
+    inflight: std::collections::HashSet<egui::Id>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Default for ThumbWorker {
+    /// Broken by construction: both channel halves are already disconnected,
+    /// so every use falls back to the inline decode until `spawn` replaces it.
+    fn default() -> Self {
+        let (tx, _) = std::sync::mpsc::channel::<ThumbJob>();
+        let (_, rx) = std::sync::mpsc::channel::<ThumbResult>();
+        Self {
+            tx: std::sync::Arc::new(std::sync::Mutex::new(tx)),
+            rx: std::sync::Arc::new(std::sync::Mutex::new(rx)),
+            generation: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            usable: false,
+            outstanding: 0,
+            inflight: std::collections::HashSet::new(),
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl ThumbWorker {
+    fn spawn(ctx: &egui::Context) -> Self {
+        let (job_tx, job_rx) = std::sync::mpsc::channel::<ThumbJob>();
+        let (res_tx, res_rx) = std::sync::mpsc::channel::<ThumbResult>();
+        let generation = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let worker = Self {
+            tx: std::sync::Arc::new(std::sync::Mutex::new(job_tx)),
+            rx: std::sync::Arc::new(std::sync::Mutex::new(res_rx)),
+            generation: generation.clone(),
+            usable: true,
+            outstanding: 0,
+            inflight: std::collections::HashSet::new(),
+        };
+        let paint = ctx.clone();
+        let spawned = std::thread::Builder::new()
+            .name("device-browser-thumbs".into())
+            .spawn(move || {
+                for job in job_rx {
+                    // Dropped while queued behind a navigation: the grid moved
+                    // on, nobody waits for this file any more.
+                    if job.generation != generation.load(std::sync::atomic::Ordering::Relaxed) {
+                        continue;
+                    }
+                    let image = decode_thumb(&job.path, &job.name, job.size);
+                    if job.generation != generation.load(std::sync::atomic::Ordering::Relaxed) {
+                        continue;
+                    }
+                    if res_tx.send(ThumbResult { key: job.key, generation: job.generation, label: job.label, image }).is_err() {
+                        break;
+                    }
+                    paint.request_repaint();
+                }
+            });
+        if spawned.is_err() {
+            return Self::default();
+        }
+        worker
+    }
+}
+
+/// Queues `e` on the worker when it isn't already on the way. True when the
+/// request is queued or in flight (the icon stands in meanwhile); false when
+/// the worker is broken and the caller should decode inline instead.
+#[cfg(not(target_arch = "wasm32"))]
+fn request_thumb(ui: &egui::Ui, e: &Entry, key: egui::Id, pending: &mut bool) -> bool {
+    ui.ctx().data_mut(|d| {
+        let w = d.get_temp_mut_or_default::<ThumbWorker>(thumb_worker_id());
+        if !w.usable {
+            *w = ThumbWorker::spawn(ui.ctx());
+            if !w.usable {
+                return false;
+            }
+        }
+        if w.inflight.contains(&key) {
+            *pending = true;
+            return true;
+        }
+        if w.outstanding >= MAX_QUEUED_THUMBS {
+            // Scrolling fast: the queue is full of files the user already
+            // scrolled past. Retry on a later frame instead of growing it.
+            *pending = true;
+            return true;
+        }
+        let job = ThumbJob {
+            key,
+            path: e.path.clone(),
+            name: e.name.clone(),
+            size: e.size,
+            generation: w.generation.load(std::sync::atomic::Ordering::Relaxed),
+            label: format!("device-thumb-{}-{}", e.fingerprint, e.name),
+        };
+        match w.tx.lock().unwrap_or_else(std::sync::PoisonError::into_inner).send(job) {
+            Ok(()) => {
+                w.inflight.insert(key);
+                w.outstanding += 1;
+                *pending = true;
+                true
+            }
+            Err(_) => {
+                w.usable = false;
+                w.inflight.clear();
+                w.outstanding = 0;
+                false
+            }
+        }
+    })
+}
+
+/// Uploads finished worker results (bounded per frame) once per frame, before
+/// the grid draws. Stale generations (decoded across a navigation) and
+/// failures are dropped into the icon path, never uploaded.
+#[cfg(not(target_arch = "wasm32"))]
+fn poll_thumb_results(ctx: &egui::Context) {
+    let mut done = Vec::new();
+    ctx.data_mut(|d| {
+        let w = d.get_temp_mut_or_default::<ThumbWorker>(thumb_worker_id());
+        if !w.usable {
+            return;
+        }
+        let rx = w.rx.clone();
+        let rx = rx.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        for _ in 0..RESULTS_PER_FRAME {
+            match rx.try_recv() {
+                Ok(r) => {
+                    w.outstanding = w.outstanding.saturating_sub(1);
+                    w.inflight.remove(&r.key);
+                    if r.generation == w.generation.load(std::sync::atomic::Ordering::Relaxed) {
+                        done.push(r);
+                    }
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    w.usable = false;
+                    w.inflight.clear();
+                    w.outstanding = 0;
+                    break;
+                }
+            }
+        }
+    });
+    for r in done {
+        match r.image {
+            Some(img) => {
+                let _ = insert_thumb(ctx, r.key, r.label, img);
+            }
+            None => {
+                ctx.data_mut(|d| {
+                    let set = d.get_temp_mut_or_default::<std::collections::HashSet<egui::Id>>(thumb_failed_id());
+                    if set.len() > 512 {
+                        set.clear();
+                    }
+                    set.insert(r.key);
+                });
+            }
         }
     }
 }
@@ -382,25 +688,24 @@ fn truncate(name: &str, n: usize) -> String {
 /// size underneath. The accessible label keeps the old list text (folders with
 /// their trailing slash), so tapping a photo still opens it.
 fn cell(ui: &mut egui::Ui, e: &Entry, tex: Option<egui::TextureHandle>) -> egui::Response {
-    const S: f32 = 88.0;
     let t = crate::theme::Tokens::get(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(egui::vec2(S + 8.0, S + 30.0), egui::Sense::click());
+    let (r, resp) = ui.allocate_exact_size(egui::vec2(CELL_W, CELL_H), egui::Sense::click());
     let label = if e.is_dir { format!("{}/", e.name) } else { e.name.clone() };
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label.clone()));
-    let box_r = egui::Rect::from_min_size(r.min + egui::vec2(4.0, 0.0), egui::vec2(S, S));
+    let box_r = egui::Rect::from_min_size(r.min + egui::vec2(4.0, 0.0), egui::vec2(CELL_IMG, CELL_IMG));
     ui.painter().rect_filled(box_r, 6.0, t.field);
     if e.is_dir {
         crate::icons::paint(ui, box_r, "folder", 30.0, t.icon);
     } else if let Some(tex) = tex {
         let (w, h) = (tex.size()[0] as f32, tex.size()[1] as f32);
-        let k = (S / w.max(h).max(1.0)).min(1.0);
+        let k = (CELL_IMG / w.max(h).max(1.0)).min(1.0);
         let fitted = egui::Rect::from_center_size(box_r.center(), egui::vec2(w * k, h * k));
         ui.painter().image(tex.id(), fitted, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)), egui::Color32::WHITE);
     } else {
         crate::icons::paint(ui, box_r, "image", 28.0, t.text_faint);
     }
     ui.painter().text(
-        box_r.left_center() + egui::vec2(0.0, S / 2.0 + 10.0),
+        box_r.left_center() + egui::vec2(0.0, CELL_IMG / 2.0 + 10.0),
         egui::Align2::LEFT_CENTER,
         truncate(&e.name, 14),
         egui::FontId::proportional(12.0),
@@ -408,7 +713,7 @@ fn cell(ui: &mut egui::Ui, e: &Entry, tex: Option<egui::TextureHandle>) -> egui:
     );
     if !e.is_dir {
         ui.painter().text(
-            box_r.left_center() + egui::vec2(0.0, S / 2.0 + 24.0),
+            box_r.left_center() + egui::vec2(0.0, CELL_IMG / 2.0 + 24.0),
             egui::Align2::LEFT_CENTER,
             size_text(e.size),
             egui::FontId::proportional(10.5),
@@ -585,7 +890,57 @@ mod tests {
             std::fs::write(dir.join(name), bytes).unwrap();
         }
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        app.ui.device_browser = Some(Browser { dir: dir.clone(), error: None, access: Some(true) });
+        app.ui.device_browser = Some(Browser { dir: dir.clone(), error: None, access: Some(true), cached: None });
+        let mut h = Harness::builder().with_size(egui::vec2(360.0, 800.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                show(app, ui.ctx());
+            },
+            app,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.run_steps(2);
+        assert!(h.query_all_by_label_contains("red.png").next().is_some(), "photo cell renders");
+        assert!(h.query_all_by_label_contains("green.png").next().is_some(), "photo cell renders");
+        assert!(h.query_all_by_label_contains("sub/").next().is_some(), "dir cell renders");
+        // Thumbs arrive from the worker thread: pump frames until both are
+        // uploaded (or the deadline passes), instead of assuming a step count.
+        for name in ["red.png", "green.png"] {
+            let p = dir.join(name);
+            let m = std::fs::metadata(&p).unwrap();
+            let key = thumb_key(&p, fingerprint_of(&m, Some(m.len())));
+            let mut cached = false;
+            for _ in 0..200 {
+                h.run_steps(1);
+                if h.ctx.data(|d| d.get_temp::<egui::TextureHandle>(key).is_some()) {
+                    cached = true;
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            assert!(cached, "{name} thumb cached");
+        }
+        assert!(h.state().ui.device_browser.is_some(), "modal stays open");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn grid_only_lays_out_the_visible_rows() {
+        use egui_kittest::Harness;
+        use egui_kittest::kittest::Queryable;
+        let dir = std::env::temp_dir().join(format!("photocraft-grid-big-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // 300 unsupported-but-listed files would previously build 300 cells a
+        // frame; PSDs keep the icon path, so no worker thread is involved and
+        // the assertion below is deterministic.
+        for i in 0..300 {
+            std::fs::write(dir.join(format!("img{i:03}.psd")), b"x").unwrap();
+        }
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.ui.device_browser = Some(Browser { dir: dir.clone(), error: None, access: Some(true), cached: None });
         let mut h = Harness::builder().with_size(egui::vec2(360.0, 800.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -597,15 +952,8 @@ mod tests {
         );
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
-        assert!(h.query_all_by_label_contains("red.png").next().is_some(), "photo cell renders");
-        assert!(h.query_all_by_label_contains("green.png").next().is_some(), "photo cell renders");
-        assert!(h.query_all_by_label_contains("sub/").next().is_some(), "dir cell renders");
-        for name in ["red.png", "green.png"] {
-            let p = dir.join(name);
-            let m = std::fs::metadata(&p).unwrap();
-            let key = thumb_key(&p, fingerprint_of(&m, Some(m.len())));
-            assert!(h.ctx.data(|d| d.get_temp::<egui::TextureHandle>(key).is_some()), "{name} thumb cached");
-        }
+        assert!(h.query_all_by_label_contains("img000").next().is_some(), "first row renders");
+        assert!(h.query_all_by_label_contains("img299").next().is_none(), "off-screen rows are virtualized away");
         assert!(h.state().ui.device_browser.is_some(), "modal stays open");
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -615,7 +963,7 @@ mod tests {
         use egui_kittest::kittest::Queryable;
         let t = TempDir::new();
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        app.ui.device_browser = Some(Browser { dir: t.dir.clone(), error: None, access: Some(true) });
+        app.ui.device_browser = Some(Browser { dir: t.dir.clone(), error: None, access: Some(true), cached: None });
         let mut h = Harness::builder().with_size(egui::vec2(360.0, 800.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
@@ -661,7 +1009,7 @@ mod tests {
         let t = TempDir::new();
         let services = crate::Services { storage_has_access: Some(Box::new(|| true)), ..Default::default() };
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-        app.ui.device_browser = Some(Browser { dir: t.dir.clone(), error: None, access: None });
+        app.ui.device_browser = Some(Browser { dir: t.dir.clone(), error: None, access: None, cached: None });
         let mut h = gate_harness(app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
@@ -674,7 +1022,7 @@ mod tests {
         use egui_kittest::kittest::Queryable;
         let t = TempDir::new();
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), hooked_services());
-        app.ui.device_browser = Some(Browser { dir: t.dir.clone(), error: None, access: None });
+        app.ui.device_browser = Some(Browser { dir: t.dir.clone(), error: None, access: None, cached: None });
         let mut h = gate_harness(app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
