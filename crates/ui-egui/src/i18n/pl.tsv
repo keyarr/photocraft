@@ -3305,6 +3305,9 @@ cameraRaw	Roughness	Chropowatość
 	Up	Do góry
 	Empty folder	Pusty folder
 	First {n} entries shown	Wyświetlono pierwszych {n} wpisów
+	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft potrzebuje dostępu do plików na tym urządzeniu, aby je otwierać. Zezwól tutaj na dostęp do zdjęć albo otwórz Ustawienia dla pozostałych plików (PSD, .pcraft).
 	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft potrzebuje uprawnienia „Dostęp do wszystkich plików”, aby otwierać pliki na tym urządzeniu.
 	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Otwórz Ustawienia > Aplikacje > PhotoCraft i włącz „Dostęp do wszystkich plików”, a następnie wróć tutaj.
+	Allow access	Zezwól na dostęp
+	Open Settings	Otwórz ustawienia
 	Check again	Sprawdź

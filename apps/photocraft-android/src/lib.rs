@@ -199,6 +199,17 @@ fn android_services_in(dir: Option<PathBuf>) -> (Services, Inbox) {
         // No control TCP server, no screen picker, no open_url on a phone.
         ..Default::default()
     };
+    // Storage permission hooks for the on-device browser's gate: the runtime
+    // dialog plus the Settings screen, through the JNI bridge (`android.rs`).
+    // Host builds keep `None` and the probe fallback (their picker exists).
+    #[cfg(target_os = "android")]
+    let mut services = services;
+    #[cfg(target_os = "android")]
+    {
+        services.storage_has_access = Some(Box::new(crate::android::storage_has_access));
+        services.storage_request = Some(Box::new(crate::android::storage_request));
+        services.storage_settings = Some(Box::new(crate::android::storage_settings));
+    }
     (services, inbox)
 }
 
@@ -302,5 +313,17 @@ mod tests {
         let back: Option<String> = services.load_prefs.as_mut().and_then(|load| load());
         assert_eq!(back.as_deref(), Some("{\"theme\":\"pro\"}"));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Host builds have no activity to ask: the hooks stay `None` and the
+    /// browser keeps its probe fallback (which the host never reaches: its
+    /// picker service exists).
+    #[cfg(not(target_os = "android"))]
+    #[test]
+    fn host_build_has_no_storage_hooks() {
+        let (services, _) = android_services();
+        assert!(services.storage_has_access.is_none());
+        assert!(services.storage_request.is_none());
+        assert!(services.storage_settings.is_none());
     }
 }

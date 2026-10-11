@@ -3392,6 +3392,9 @@ fontWeight	Thin	Πολύ λεπτά
 	Up	Πάνω
 	Empty folder	Άδειος φάκελος
 	First {n} entries shown	Εμφανίζονται οι πρώτες {n} καταχωρίσεις
+	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Το PhotoCraft χρειάζεται πρόσβαση στα αρχεία αυτής της συσκευής για να τα ανοίγει. Επιτρέψτε εδώ την πρόσβαση στις φωτογραφίες ή ανοίξτε τις Ρυθμίσεις για κάθε είδος αρχείου (PSD, .pcraft).
 	PhotoCraft needs the "All files access" permission to open files from this device.	Το PhotoCraft χρειάζεται το δικαίωμα «Πρόσβαση σε όλα τα αρχεία» για να ανοίγει αρχεία από αυτήν τη συσκευή.
 	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Άνοιξε Ρυθμίσεις > Εφαρμογές > PhotoCraft και ενεργοποίησε το «Πρόσβαση σε όλα τα αρχεία», μετά γύρνα εδώ.
+	Allow access	Επιτρέψτε την πρόσβαση
+	Open Settings	Ανοίξτε τις Ρυθμίσεις
 	Check again	Έλεγξε

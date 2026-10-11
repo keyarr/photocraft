@@ -20,7 +20,7 @@ cargo xtask stats                      # tests and lines per crate
 cargo xtask parity                     # Photoshop menu coverage -> docs/parity.md
 ```
 
-The debug APK is huge (hundreds of MB of debug info in the `.so`); install `--release` on hardware. Image code is slow at `opt-level 0`, so the workspace profile builds dependencies at `opt-level 2`. Device files open through the on-device browser as paths once all-files access is granted (`MANAGE_EXTERNAL_STORAGE` in `apps/photocraft-android/manifest.yaml`); the inbox (`push_bytes`) stays for a future SAF bridge, and the JNI half (`getFilesDir`) is still open (see `apps/photocraft-android/src/lib.rs`).
+The debug APK is huge (hundreds of MB of debug info in the `.so`); install `--release` on hardware. Image code is slow at `opt-level 0`, so the workspace profile builds dependencies at `opt-level 2`. Device files open through the on-device browser as paths: its gate asks for photo access with the runtime dialog and jumps to the all-files Settings screen itself (permissions in `apps/photocraft-android/manifest.yaml`, JNI bridge in `apps/photocraft-android/src/android.rs`); the inbox (`push_bytes`) stays for a future SAF bridge, and prefs persistence through `getFilesDir` is still open (see `apps/photocraft-android/src/lib.rs`).
 
 ## Fonts (craft-fonts)
 

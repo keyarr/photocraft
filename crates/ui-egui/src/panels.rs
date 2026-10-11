@@ -56,7 +56,7 @@ fn slot_tool(ui: &egui::Ui, current: Tool, slot: &[Tool], key: egui::Id) -> Tool
 /// slot keeps only its visible tools, so its flyout lists just those; a slot with none left is
 /// dropped, and so is a section with no slots. Each slot carries its index in `TOOL_SECTIONS`,
 /// so its remembered tool and flyout stay put when other slots are hidden.
-fn visible_sections(hidden: &[String]) -> Vec<Vec<(usize, Vec<Tool>)>> {
+pub(crate) fn visible_sections(hidden: &[String]) -> Vec<Vec<(usize, Vec<Tool>)>> {
     let hidden: Vec<Tool> = hidden.iter().map(String::as_str).filter_map(Tool::from_name).collect();
     let mut index = 0usize;
     let mut sections = Vec::new();

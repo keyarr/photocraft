@@ -4,7 +4,15 @@
 android:
   manifest:
     package: ai.storyteller.photocraft.android
-    # All-files access for the on-device browser (`device_browser`): granted by
-    # hand in Settings, sideload-only (Play policy forbids it for editors).
+    # On-device browser (`device_browser`): photos come through the runtime
+    # dialog (media on new devices, storage on old), anything else shared
+    # (a PSD or .pcraft in Download is not "media") through the all-files
+    # Settings screen the gate now opens itself. All-files stays sideload-only
+    # (Play policy forbids it for editors).
     uses_permission:
+      - name: android.permission.READ_EXTERNAL_STORAGE
+        max_sdk_version: 32
+      - name: android.permission.WRITE_EXTERNAL_STORAGE
+        max_sdk_version: 28
+      - name: android.permission.READ_MEDIA_IMAGES
       - name: android.permission.MANAGE_EXTERNAL_STORAGE

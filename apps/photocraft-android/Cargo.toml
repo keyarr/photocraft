@@ -51,3 +51,6 @@ rfd = { workspace = true }
 # host build too (feature unification ignores the target gate).
 winit = "=0.30.13"
 android_logger = "0.15"
+# Storage permission bridge (`src/android.rs`): JNI calls on the NativeActivity
+# object, same version android-activity already uses. No Java in the build.
+jni = "0.22"

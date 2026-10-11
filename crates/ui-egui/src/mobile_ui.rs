@@ -7,7 +7,7 @@
 //! commands, tools and panel bodies as the desktop layout: nothing is a mock and nothing
 //! hides a feature, it is just packed for touch.
 
-use egui::{Align2, RichText, vec2};
+use egui::{Align2, Rect, RichText, Sense, pos2, vec2};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -42,6 +42,8 @@ pub struct MobileUi {
     pub panel: Option<crate::dock::Group>,
     /// The full tool grid is open over the canvas.
     pub tools_open: bool,
+    /// Filter text for the tool list (cleared whenever the sheet opens or a tool is picked).
+    pub tools_filter: String,
 }
 
 /// A two-finger gesture over the canvas: pan and pinch it, never paint with it. Returns the
@@ -107,13 +109,24 @@ fn menu_item(ui: &mut egui::Ui, app: &mut PhotocraftApp, label: &str, id: &str, 
     }
 }
 
-/// The active tool's options, horizontally scrollable: the same controls as the desktop
-/// options bar, so every tool keeps its settings on a phone.
+/// The active tool's name plus its options, horizontally scrollable: the same controls
+/// as the desktop options bar, so every tool keeps its settings on a phone. The name
+/// stays visible because touch has no hover for the icon tooltip.
 pub fn options_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     egui::Panel::top("mobile_options").exact_size(48.0).frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(8, 0))).show(ui, |ui| {
-        egui::ScrollArea::horizontal().id_salt("mobile-options-scroll").auto_shrink([false, false]).show(ui, |ui| {
-            crate::panels::options_content(app, ui);
+        ui.horizontal_centered(|ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            let tool = app.ui.tool;
+            let (ir, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
+            icons::paint(ui, ir, icons::tool_icon(tool), 16.0, t.icon);
+            let lw = (ui.available_width() - 200.0).clamp(90.0, 150.0);
+            ui.add_sized(vec2(lw, 32.0), egui::Label::new(RichText::new(tl!(tool.label())).size(12.5).strong().color(t.text)).truncate());
+            widgets::vline(ui, 22.0);
+            let rest = ui.available_width().max(80.0);
+            egui::ScrollArea::horizontal().id_salt("mobile-options-scroll").auto_shrink([false, false]).max_width(rest).show(ui, |ui| {
+                crate::panels::options_content(app, ui);
+            });
         });
     });
 }
@@ -131,6 +144,9 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 ui.spacing_mut().item_spacing.x = 4.0;
                 if icons::button_with_icon_size(ui, "grid-2x2", 44.0, 20.0, app.ui.mobile.tools_open, tl!("Tools")).clicked() {
                     app.ui.mobile.tools_open = !app.ui.mobile.tools_open;
+                    if app.ui.mobile.tools_open {
+                        app.ui.mobile.tools_filter.clear();
+                    }
                 }
                 // Fixed buttons after the scrolled row: grid, three panel shortcuts.
                 let rest = (ui.available_width() - 3.0 * 48.0 - 4.0).max(64.0);
@@ -141,10 +157,39 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         if !favs.contains(&app.ui.tool) {
                             favs.insert(0, app.ui.tool);
                         }
+                        let held_id = egui::Id::new("mobile-fav-held");
+                        if ui.input(|i| i.pointer.any_pressed()) {
+                            ui.data_mut(|d| d.remove::<Tool>(held_id));
+                        }
                         for tool in favs {
                             let tip = tl!(tool.label()).to_string();
-                            if icons::button_with_icon_size(ui, icons::tool_icon(tool), 44.0, 22.0, app.ui.tool == tool, &tip).clicked() {
+                            let resp = icons::button_with_icon_size(ui, icons::tool_icon(tool), 44.0, 22.0, app.ui.tool == tool, &tip);
+                            // Touch has no hover: a press-and-hold names the tool without selecting it.
+                            let held_for = resp.is_pointer_button_down_on().then(|| ui.input(|i| i.pointer.press_start_time().map(|t0| i.time - t0))).flatten();
+                            if let Some(seconds) = held_for
+                                && seconds < 0.35
+                            {
+                                ui.ctx().request_repaint_after(std::time::Duration::from_secs_f64(0.35 - seconds));
+                            }
+                            let long_press = held_for.is_some_and(|seconds| seconds >= 0.35);
+                            if long_press {
+                                ui.data_mut(|d| d.insert_temp(held_id, tool));
+                                ui.ctx().request_repaint();
+                            }
+                            if resp.clicked() && ui.data(|d| d.get_temp::<Tool>(held_id)) != Some(tool) {
                                 app.ui.tool = tool;
+                            }
+                            if ui.data(|d| d.get_temp::<Tool>(held_id)) == Some(tool) {
+                                egui::Area::new(egui::Id::new(("mobile-fav-tip", tool.label())))
+                                    .order(egui::Order::Tooltip)
+                                    .fixed_pos(resp.rect.left_top() + vec2(-4.0, -40.0))
+                                    .constrain(true)
+                                    .interactable(false)
+                                    .show(ui.ctx(), |ui| {
+                                        egui::Frame::popup(ui.style()).show(ui, |ui| {
+                                            ui.label(RichText::new(tl!(tool.label())).size(13.0).strong());
+                                        });
+                                    });
                             }
                         }
                     });
@@ -169,7 +214,10 @@ fn favourites() -> [Tool; 10] {
     [Move, RectMarquee, Lasso, Brush, Eraser, Gradient, CloneStamp, Type, Hand, Zoom]
 }
 
-/// The full tool grid over the canvas. Same tools as the desktop toolbar, 44 pt targets.
+/// The full tool list over the canvas: every tool with its name, in desktop-toolbar
+/// groups, with a filter. The old 6-column icon grid was unreadable on touch (no hover
+/// ever shows the tooltip), so each 48 pt row names its tool. No new `tl!` literals:
+/// everything here reuses strings the catalogs already translate.
 pub fn tool_sheet(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if !app.ui.mobile.tools_open {
         return;
@@ -192,24 +240,62 @@ pub fn tool_sheet(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 });
             });
             ui.add_space(4.0);
-            egui::ScrollArea::vertical().id_salt("mobile-tools-grid").auto_shrink([false, false]).max_height((screen.height() * 0.5).clamp(200.0, 420.0)).show(
+            ui.add(
+                egui::TextEdit::singleline(&mut app.ui.mobile.tools_filter).hint_text(tl!("Search commands, tools and panels…")).desired_width(f32::INFINITY),
+            );
+            ui.add_space(4.0);
+            egui::ScrollArea::vertical().id_salt("mobile-tools-list").auto_shrink([false, false]).max_height((screen.height() * 0.5).clamp(200.0, 420.0)).show(
                 ui,
                 |ui| {
-                    egui::Grid::new("mobile-tool-grid").num_columns(6).spacing(vec2(6.0, 6.0)).show(ui, |ui| {
-                        for (i, tool) in Tool::ALL.iter().enumerate() {
-                            let tip = tl!(tool.label()).to_string();
-                            if icons::button_with_icon_size(ui, icons::tool_icon(*tool), 44.0, 22.0, app.ui.tool == *tool, &tip).clicked() {
-                                app.ui.tool = *tool;
-                                app.ui.mobile.tools_open = false;
-                            }
-                            if i % 6 == 5 {
-                                ui.end_row();
-                            }
+                    let q = app.ui.mobile.tools_filter.trim().to_lowercase();
+                    let sections = crate::panels::visible_sections(&app.session.prefs().toolbar.hidden);
+                    let mut shown = 0u32;
+                    for (si, section) in sections.iter().enumerate() {
+                        let tools: Vec<Tool> = section
+                            .iter()
+                            .flat_map(|(_, slot)| slot.iter().copied())
+                            .filter(|tool| q.is_empty() || tl!(tool.label()).to_lowercase().contains(&q))
+                            .collect();
+                        if tools.is_empty() {
+                            continue;
                         }
-                    });
+                        // Hairline between toolbar groups, like the desktop rail (text headers
+                        // would each need 15 translations, so groups stay divider-only).
+                        if si > 0 && q.is_empty() {
+                            let t = Tokens::get(ui.ctx());
+                            let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
+                            ui.painter().line_segment([r.left_center(), r.right_center()], egui::Stroke::new(1.0, t.separator));
+                            ui.add_space(2.0);
+                        }
+                        for tool in tools {
+                            shown += 1;
+                            tool_row(app, ui, tool);
+                        }
+                    }
+                    if shown == 0 {
+                        ui.label(RichText::new(tl!("No matching commands")).color(Tokens::get(ui.ctx()).text_faint));
+                    }
                 },
             );
         });
+}
+
+/// One 48 pt touch row: icon plus the tool's name (the tooltip alone never shows on touch).
+fn tool_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
+    let t = Tokens::get(ui.ctx());
+    let name = tl!(tool.label()).to_string();
+    let w = ui.available_width().max(200.0);
+    let (r, resp) = ui.allocate_exact_size(vec2(w, 48.0), Sense::click());
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, name.clone()));
+    let tint = icons::button_chrome(ui, r, app.ui.tool == tool, resp.hovered());
+    icons::paint(ui, Rect::from_center_size(pos2(r.left() + 28.0, r.center().y), vec2(28.0, 28.0)), icons::tool_icon(tool), 19.0, tint);
+    let fg = if app.ui.tool == tool { t.accent_text } else { t.text };
+    ui.painter().text(pos2(r.left() + 50.0, r.center().y), Align2::LEFT_CENTER, name, egui::FontId::proportional(13.5), fg);
+    if resp.clicked() {
+        app.ui.tool = tool;
+        app.ui.mobile.tools_open = false;
+        app.ui.mobile.tools_filter.clear();
+    }
 }
 
 /// The bottom sheet: one dock group at a time, with its own height cap and scrolling, so
@@ -454,6 +540,78 @@ mod tests {
             assert_eq!(h.query_all_by_label_contains("Discord").next().is_some(), promo, "{w} pt promo");
             assert_eq!(h.query_all_by_label_contains("GitHub").next().is_some(), promo, "{w} pt links");
         }
+    }
+
+    /// The tool sheet names every tool: touch has no hover, so the old icon-only grid
+    /// left 52 tools undescribed. Each row carries its tool label as its accessible name.
+    #[test]
+    fn tool_sheet_names_every_tool() {
+        use egui_kittest::kittest::Queryable;
+        let mut a = app();
+        a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        a.ui.tool = Tool::Brush;
+        a.ui.mobile.tools_open = true;
+        let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                let ctx = ui.ctx().clone();
+                tool_sheet(app, &ctx);
+            },
+            a,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.run_steps(8);
+        for probe in ["Brush Tool", "Clone Stamp Tool", "Horizontal Type Tool", "Zoom Tool"] {
+            assert!(h.query_all_by_label_contains(probe).next().is_some(), "the sheet names {probe}");
+        }
+    }
+
+    /// The sheet filter narrows the rows ("heal" keeps the healing tools, drops the brush).
+    #[test]
+    fn tool_sheet_filter_narrows_the_rows() {
+        use egui_kittest::kittest::Queryable;
+        let mut a = app();
+        a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        a.ui.mobile.tools_open = true;
+        a.ui.mobile.tools_filter = "heal".into();
+        let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                let ctx = ui.ctx().clone();
+                tool_sheet(app, &ctx);
+            },
+            a,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.run_steps(8);
+        assert!(h.query_all_by_label_contains("Healing Brush Tool").next().is_some(), "the filter keeps matches");
+        assert!(h.query_all_by_label("Brush Tool").next().is_none(), "the filter drops the rest");
+        assert!(h.query_all_by_label_contains("No matching commands").next().is_none(), "matches exist, so no empty state");
+    }
+
+    /// The options strip always shows the active tool's name (the icon tooltip never fires on touch).
+    #[test]
+    fn options_strip_shows_the_active_tool_name() {
+        use egui_kittest::kittest::Queryable;
+        let mut a = app();
+        a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        a.ui.tool = Tool::CloneStamp;
+        let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                options_strip(app, ui);
+            },
+            a,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.run_steps(6);
+        assert!(h.query_all_by_label_contains("Clone Stamp Tool").next().is_some(), "the strip names the active tool");
     }
 
     /// Two fingers over the canvas count as navigation, one (or none) does not.

@@ -3467,6 +3467,9 @@ cameraRaw	Whites	Witten
 	Up	Omhoog
 	Empty folder	Lege map
 	First {n} entries shown	Eerste {n} items weergegeven
+	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft heeft toegang tot de bestanden op dit apparaat nodig om ze te openen. Sta hier fototoegang toe, of open Instellingen voor alle bestandstypen (PSD, .pcraft).
 	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft heeft de toestemming "Toegang tot alle bestanden" nodig om bestanden op dit apparaat te openen.
 	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Open Instellingen > Apps > PhotoCraft en schakel "Toegang tot alle bestanden" in, en kom hier terug.
+	Allow access	Toegang toestaan
+	Open Settings	Instellingen openen
 	Check again	Controleren

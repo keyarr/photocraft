@@ -2555,6 +2555,9 @@ fontWeight	Italic	Курсив
 	Up	Вверх
 	Empty folder	Пустая папка
 	First {n} entries shown	Показаны первые {n} записей
+	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft нужен доступ к файлам на этом устройстве, чтобы открывать их. Разрешите здесь доступ к фото или откройте Настройки для остальных файлов (PSD, .pcraft).
 	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft нужно разрешение «Доступ ко всем файлам», чтобы открывать файлы на этом устройстве.
 	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Открой Настройки > Приложения > PhotoCraft и включи «Доступ ко всем файлам», затем вернись сюда.
+	Allow access	Разрешить доступ
+	Open Settings	Открыть настройки
 	Check again	Проверить

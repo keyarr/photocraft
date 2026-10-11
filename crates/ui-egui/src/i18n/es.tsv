@@ -2350,6 +2350,9 @@ fontWeight	Italic	Cursiva
 	Up	Subir
 	Empty folder	Carpeta vacía
 	First {n} entries shown	Primeras {n} entradas mostradas
+	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft necesita acceder a los archivos de este dispositivo para abrirlos. Permite aquí el acceso a las fotos, o abre Ajustes para todo tipo de archivo (PSD, .pcraft).
 	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft necesita el permiso "Acceso a todos los archivos" para abrir archivos de este dispositivo.
 	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Abre Ajustes > Apps > PhotoCraft y activa "Acceso a todos los archivos", y vuelve aquí.
+	Allow access	Permitir acceso
+	Open Settings	Abrir ajustes
 	Check again	Comprobar

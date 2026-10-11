@@ -3307,6 +3307,9 @@ fontWeight	Italic	斜体
 	Up	上へ
 	Empty folder	空のフォルダ
 	First {n} entries shown	最初の{n}件を表示
+	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	ファイルを開くには、PhotoCraftにこのデバイスのファイルへのアクセスが必要です。 ここで写真へのアクセスを許可するか、すべての形式 (PSD、.pcraft) 用に設定を開いてください。
 	PhotoCraft needs the "All files access" permission to open files from this device.	このデバイスのファイルを開くには、PhotoCraftに「すべてのファイルへのアクセス」権限が必要です。
 	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	設定 > アプリ > PhotoCraft を開いて「すべてのファイルへのアクセス」をオンにし、ここに戻ってください。
+	Allow access	アクセスを許可
+	Open Settings	設定を開く
 	Check again	再確認

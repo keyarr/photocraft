@@ -247,6 +247,12 @@ pub type OsEventsFn = Box<dyn FnMut() -> Vec<OsEvent>>;
 pub type QuitFn = Box<dyn FnMut()>;
 /// Where the OS pointer is now, in egui points within the window; `None` when unknown.
 pub type CursorPosFn = Box<dyn FnMut(&egui::Context) -> Option<egui::Pos2>>;
+/// Whether shared storage is readable on-device (see [`Services::storage_has_access`]).
+pub type StorageAccessFn = Box<dyn FnMut() -> bool>;
+/// Asks the OS for storage access without blocking (see [`Services::storage_request`]).
+pub type RequestStorageFn = Box<dyn FnMut()>;
+/// Opens the OS screen that grants storage access (see [`Services::storage_settings`]).
+pub type OpenStorageSettingsFn = Box<dyn FnMut()>;
 
 /// Platform services injected by the app binary (file dialogs, codecs), keeping this crate free of
 /// I/O dependencies.
@@ -317,6 +323,13 @@ pub struct Services {
     /// while AppKit's run loop is still going crashes or hangs Touch Bar Macs (#1575, #1458).
     /// Without one, eframe closes the window and the app ends with it.
     pub quit: Option<QuitFn>,
+    /// On-device storage permission for the file browser (`device_browser`):
+    /// whether shared storage reads as granted, the fire-and-forget runtime
+    /// request, and the Settings screen opener. All `None` off-device, where
+    /// the browser falls back to its write probe.
+    pub storage_has_access: Option<StorageAccessFn>,
+    pub storage_request: Option<RequestStorageFn>,
+    pub storage_settings: Option<OpenStorageSettingsFn>,
 }
 
 /// A document histogram being computed off the UI thread: (document, revision, receiver of

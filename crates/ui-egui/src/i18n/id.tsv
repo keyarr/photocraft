@@ -2690,6 +2690,9 @@ fontWeight	Italic	Miring
 	Up	Naik
 	Empty folder	Folder kosong
 	First {n} entries shown	{n} entri pertama ditampilkan
+	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft memerlukan akses ke file di perangkat ini untuk membukanya. Izinkan akses foto di sini, atau buka Pengaturan untuk semua jenis file (PSD, .pcraft).
 	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft memerlukan izin "Akses semua file" untuk membuka file dari perangkat ini.
 	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Buka Setelan > Aplikasi > PhotoCraft dan aktifkan "Akses semua file", lalu kembali ke sini.
+	Allow access	Izinkan akses
+	Open Settings	Buka Pengaturan
 	Check again	Periksa

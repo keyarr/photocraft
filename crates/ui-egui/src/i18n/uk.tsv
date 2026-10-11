@@ -3390,6 +3390,9 @@ cameraRaw	Masking	Маскування
 	Up	Вгору
 	Empty folder	Порожня папка
 	First {n} entries shown	Показано перші {n} записів
+	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft потрібен доступ до файлів на цьому пристрої, щоб відкривати їх. Дозвольте тут доступ до фото або відкрийте Налаштування для решти файлів (PSD, .pcraft).
 	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft потрібен дозвіл «Доступ до всіх файлів», щоб відкривати файли на цьому пристрої.
 	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Відкрий Налаштування > Застосунки > PhotoCraft і ввімкни «Доступ до всіх файлів», потім повернись сюди.
+	Allow access	Дозволити доступ
+	Open Settings	Відкрити налаштування
 	Check again	Перевірити
