@@ -2,45 +2,25 @@
 
 ## Prerequisites
 
-- Rust stable (1.95+). Add the web target with `rustup target add wasm32-unknown-unknown`.
-- macOS, Windows or Linux. Linux needs `libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev`.
-
-### Windows source builds
-
-Use the Rust MSVC toolchain and install Visual Studio or Microsoft C++ Build Tools with the
-**Desktop development with C++** workload. Follow Microsoft's
-[Rust setup guide](https://learn.microsoft.com/en-us/windows/dev-environment/rust/setup),
-then open a new terminal and check `cargo --version` and `rustc --version`.
-
-On Windows 11, Smart App Control can block Cargo, rustc or executables generated during a build.
-If a build reports `An Application Control policy has blocked this file. (os error 4551)`
-([#1585](https://github.com/storytold/photocraft/issues/1585)), check:
-
-- **Windows Security → App & browser control → Smart App Control settings** for its status.
-- **Event Viewer → Applications and Services Logs → Microsoft → Windows → CodeIntegrity →
-  Operational** for the blocked executable and policy, especially on managed machines.
-
-This error indicates an application-control restriction; moving `CARGO_TARGET_DIR` or
-reinstalling Rust does not establish that the blocked executable is trusted. See Microsoft's
-[Smart App Control FAQ](https://support.microsoft.com/en-us/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions)
-for the available controls; there is no per-app exception. On a managed device, ask your
-administrator about an approved development environment. If you only want to run PhotoCraft,
-use the [packaged Windows release](https://github.com/storytold/photocraft/releases) to avoid
-building locally; the downloaded app is still subject to Windows application-control checks.
+- Rust stable (1.95+), with the Android target: `rustup target add aarch64-linux-android`.
+- An Android SDK with platform-tools, build-tools and an NDK (`ANDROID_HOME` points at it), Java 17+, and `x` (xbuild: `cargo install xbuild`).
+- Linux needs nothing else: the host dev loop (`cargo run -p photocraft-android`) renders through the same eframe shell.
 
 ## Build and run
 
 ```sh
-cargo run --release -p photocraft -- path/to/image.psd      # desktop app
-cargo run --release -p photocraft -- --control 7878 --control-token-file .private/control.token \
-  --automation-read-root work --automation-write-root work
-cargo test --workspace                                     # everything
-cargo xtask ci                                             # fmt + clippy + tests + layers + wasm
-cargo xtask stats                                          # tests and lines per crate
-cargo xtask parity                                         # Photoshop menu coverage -> docs/parity.md
+cargo xtask android build              # debug APK, one command (checks SDK/NDK/target/linker first)
+cargo xtask android install --release  # release APK onto the attached device
+cargo xtask android log                # the app's log from the device
+cargo xtask android devices            # what adb and xbuild see
+cargo run -p photocraft-android        # host dev loop: same shell, same engine, host window
+cargo test --workspace                 # everything
+cargo xtask ci                         # fmt + clippy + tests + layers + wasm
+cargo xtask stats                      # tests and lines per crate
+cargo xtask parity                     # Photoshop menu coverage -> docs/parity.md
 ```
 
-Image code is slow at `opt-level 0`, so the workspace profile builds dependencies at `opt-level 2`. Use `--release` for anything interactive.
+The debug APK is huge (hundreds of MB of debug info in the `.so`); install `--release` on hardware. Image code is slow at `opt-level 0`, so the workspace profile builds dependencies at `opt-level 2`. Device files open through the on-device browser as paths once all-files access is granted (`MANAGE_EXTERNAL_STORAGE` in `apps/photocraft-android/manifest.yaml`); the inbox (`push_bytes`) stays for a future SAF bridge, and the JNI half (`getFilesDir`) is still open (see `apps/photocraft-android/src/lib.rs`).
 
 ## Fonts (craft-fonts)
 
@@ -59,41 +39,27 @@ CRAFT_FONTS_DIR="$PWD/../craft-fonts" cargo test --workspace     # runs the Japa
 - **UI:** the Japanese fonts (BIZ UDPGothic Regular first) are the first Japanese fallback in the lazy CJK loader (`crates/ui-egui/src/cjk_fonts.rs`), ahead of the system Japanese fonts and in the same locale script order, appended last to every egui family with the usual baseline alignment.
 - **Type tool:** the text engine registers them in `FontDb::new` (so also with no system fonts) and puts them first in the Japanese slot of the locale-ordered fallback list: BIZ UDPGothic for sans runs, Shippori Mincho / BIZ UDMincho for serif runs.
 - **Web:** the wasm32 build never embeds craft-fonts, even with `CRAFT_FONTS_DIR` set: measured on 2026-10-06, the UI face alone took the release wasm from 24.19 MB to 28.87 MB, over the 24 MiB gate in `packaging/web/package.sh`. Instead it loads fonts served next to it, on demand: `fonts/manifest.txt` beside `index.html`, in craft-fonts' manifest format (`crates/text/src/served.rs`; hosting: `packaging/web/README.md` › Fonts). `PHOTOCRAFT_WEB_FONTS_DIR="$PWD/../craft-fonts" packaging/web/package.sh` puts craft-fonts there. Served families are in the font menus and are fetched when picked or when a document's text needs them; they aren't in the script fallback list yet, so Japanese text set in a Latin font still needs a Japanese font picked (#1615).
-- Tests that need the fonts skip with a message when `CRAFT_FONTS` is empty; CI's Linux job runs the tests a second time with `CRAFT_FONTS_DIR` set. Desktop releases check out craft-fonts at the commit pinned in `.github/workflows/release.yml` (`CRAFT_FONTS_REF`; ci.yml pins the same commit) and ship each font's `OFL.txt` as `OFL-<family>.txt`.
+- Tests that need the fonts skip with a message when `CRAFT_FONTS` is empty; CI's Linux job runs the tests a second time with `CRAFT_FONTS_DIR` set. Release APK builds use the same craft-fonts checkout (the commit pinned as `ref:` in `.github/workflows/ci.yml`) and ship each font's `OFL.txt` as `OFL-<family>.txt`.
 
 ## Graphics startup and device loss
 
-`--safe-gpu` starts with the CPU renderer for one launch (no GPU canvas; a software adapter for the window where the platform has one: WARP on Windows, llvmpipe over GL on Linux). Before creating the wgpu device the app writes and locks `gpu-starting.json` in the config directory; it clears it once the first frames have rendered. A launch that finds an unlocked marker knows the previous start died inside the graphics driver (#4) and uses the next safer backend (Windows: Vulkan → DX12 → CPU; Linux: Vulkan → GL → CPU; macOS: Metal → CPU), remembering it in `performance.gpuBackend` (Preferences › Performance › GPU Backend, with **Reset GPU Backend**). With `auto`, Intel adapters on Windows use DX12. Help › System Info shows the adapter, backend, driver and fallback state.
-
-On DX12 the shader compiler is FXC (`d3dcompiler_47.dll`, part of Windows), or a `dxcompiler.dll` placed beside `photocraft.exe`, loaded by its full path. wgpu's default looks `dxcompiler.dll` up by name, which reaches the current directory and `PATH` and loaded other programs' incompatible builds (#712).
-
-Handled windowing and app initialization errors clear this launch's startup marker, restoring any
-prior crash evidence. For example, a Linux launch without `DISPLAY` or `WAYLAND_DISPLAY` does not
-change the next launch's graphics backend. Renderer initialization errors and driver crashes still
-keep the marker for recovery.
-
-If the device is lost while running (#243), every GPU entry point checks the device's health flag first, the canvas switches to the CPU compositor for the rest of the session and a notice says "GPU device was lost; using the CPU renderer." `ui.gpu.simulateLoss` triggers this path from the control channel.
+Phones render on the CPU compositor by default; `PHOTOCRAFT_ANDROID_GPU=1` opts into the wgpu canvas. If the device is lost while running (#243), every GPU entry point checks the device's health flag first, the canvas switches to the CPU compositor for the rest of the session and a notice says "GPU device was lost; using the CPU renderer."
 
 ## Logs
 
-The desktop app writes its `log` records to standard error and to `logs/photocraft.log` in the settings directory (Linux `~/.config/photocraft/logs/`, macOS `~/Library/Application Support/Photocraft/logs/`, Windows `%APPDATA%\Photocraft\logs\`, or under `PHOTOCRAFT_CONFIG_DIR` / the portable data folder). A start launched from a desktop menu or the Dock has no terminal, so this file is what to attach to a bug report: GPU startup fallbacks, a lost device and the crash guard's panic report all land there. Each launch moves the previous log to `photocraft.1.log` (and that one to `photocraft.2.log`), so the log of a run that crashed survives the next start. The file stops growing at 16 MiB. `--version` and command-line errors write no file.
+On device there is no log file: the app's `log` records go to logcat under the `photocraft-android` tag. `cargo xtask android log` tails exactly that (`adb logcat photocraft-android:I *:S`); attach it to a bug report. The host dev loop (`cargo run -p photocraft-android`) logs to standard error instead.
 
-By default PhotoCraft's own crates log at `info` and everything else at `warn`. `RUST_LOG` replaces that with env_logger-style directives, for example `RUST_LOG=debug`, `RUST_LOG=warn,photocraft_gpu=trace` or `RUST_LOG=info,wgpu_core=warn`; a directive ending in `*` covers every target starting with it (`photocraft*=debug`). The logger is `apps/photocraft/src/logging.rs`; the web build logs to the browser console instead.
+By default PhotoCraft's own crates log at `info` and everything else at `warn`. `RUST_LOG` replaces that with env_logger-style directives, for example `RUST_LOG=debug`, `RUST_LOG=warn,photocraft_gpu=trace` or `RUST_LOG=info,wgpu_core=warn`; a directive ending in `*` covers every target starting with it (`photocraft*=debug`).
 
 ## Environment variables
 
 | Variable | Effect |
 |---|---|
-| `PHOTOCRAFT_CONTROL_PORT` | Same as `--control <port>` |
-| `RUST_LOG` | Log levels for standard error and the log file (see [Logs](#logs)) |
-| `PHOTOCRAFT_CONTROL_TOKEN` | 64-hex bearer token for control TCP (avoid on shared systems where environment inspection is possible) |
-| `PHOTOCRAFT_CONTROL_TOKEN_FILE` | Read, or create for a server, the control bearer-token file |
-| `PHOTOCRAFT_AUTOMATION_READ_ROOT` | Desktop app only: automation read root. Headless CLI modes require the `--automation-read-root` flag |
-| `PHOTOCRAFT_AUTOMATION_WRITE_ROOT` | Desktop app only: automation write root. Headless CLI modes require the `--automation-write-root` flag |
+| `RUST_LOG` | Log levels for standard error and logcat (see [Logs](#logs)) |
+| `PHOTOCRAFT_ANDROID_GPU=1` | Use the wgpu canvas instead of the default CPU compositor |
+| `PHOTOCRAFT_ANDROID_DATA_DIR` | Private files dir (set from `Context.getFilesDir` on device; prefs + recovery stay off without it) |
+| `PHOTOCRAFT_INLINE_JOBS=1` | Run background-capable commands inline instead of on the job thread |
 | `PHOTOCRAFT_CPU_CANVAS=1` | Force the CPU canvas path instead of the wgpu shader canvas |
-| `PHOTOCRAFT_NATIVE_WAYLAND=1` | Linux: stay on native Wayland when a pen is attached (by default the window then opens through Xwayland, because Wayland gives the app no pen input; #639) |
-| `WGPU_BACKEND=dx12` | Pick the wgpu backend(s) (`vulkan`, `dx12`, `metal`, `gl`); overrides `performance.gpuBackend` and the startup fallback |
-| `WGPU_DX12_COMPILER=fxc` | DX12 shader compiler (`fxc`, `dxc`, `auto`); `dxc` and `auto` look `dxcompiler.dll` up through the DLL search path |
 | `PHOTOCRAFT_GPU_TILE=2048` | Force GPU canvas tiling (tests tile seams) |
 | `PHOTOCRAFT_FX_NOCACHE=1` | Bypass the CPU layer-effect map cache (`compose::effect_maps`) |
 | `PHOTOCRAFT_CPU_COMPOSE=1` | Keep the wgpu canvas but composite on the CPU (compare GPU vs CPU renders, e.g. with the snapshot example) |
@@ -109,39 +75,6 @@ By default PhotoCraft's own crates log at `info` and everything else at `warn`. 
 
 Keys are the field names of `theme::Tokens` (`crates/ui-egui/src/theme.rs`). Edit and save the file while the app runs to see changes immediately, with no recompile. This is compiled out of release builds.
 
-## Driving the app programmatically
-
-Start the app with a private token file. It then accepts authenticated JSON lines on `127.0.0.1:7878`:
-
-```sh
-TOKEN=$(tr -d '\r\n' < .private/control.token)
-printf '%s\n' "{\"id\":\"auth\",\"method\":\"auth\",\"params\":{\"token\":\"$TOKEN\"}}" \
-              '{"id":1,"method":"engine.execute","params":{"command":"layer.newAdjustmentLayer.hueSaturation","params":{"hue":30}}}' \
-              '{"id":2,"method":"ui.screenshot","params":{"path":"evidence/shot.png"}}' | nc 127.0.0.1 7878
-```
-
-See `docs/control-protocol.md` for every method. Tips:
-
-- **macOS does not render occluded windows.** `ui.screenshot` raises the window first (`focus: true` by default). Use `ui.focus` before other visual checks.
-- **Capture only our own window.** For native captures (to see the real title bar and traffic lights), capture by window id (`screencapture -l <CGWindowID>`), never a screen region, which can grab other apps.
-- **Pointer gestures:** `ui.pointer` takes events in *document* coordinates and runs them through the same tool state machine as the mouse.
-
-## Headless CLI
-
-`apps/photocraft-cli` builds the binary `photocraft-cli`:
-
-```sh
-cargo run -p photocraft-cli -- convert in.psd out.pcraft               # any supported format -> any
-cargo run -p photocraft-cli -- info out.pcraft                          # JSON: size, mode, depth, layer tree
-cargo run -p photocraft-cli -- run in.png --cmd layer.new.layer --params '{"name":"Ink"}' \
-                                          --cmd filter.blur.gaussianBlur --params '{"radius":3}' --out out.psd
-cargo run -p photocraft-cli -- run --new '{"width":800,"height":600}' --cmd document.inspect
-cargo run -p photocraft-cli -- batch --actions actions.json --in photos/ --out done/ --format jpg
-cargo run -p photocraft-cli -- commands --filter blur                    # the command registry
-```
-
-`actions.json` holds the steps of a recorded action: `[["<id>", {…}], …]`, `[{"command": "<id>", "params": {…}}, …]` or bare ids, as a list or wrapped in `{"actions": …}` or `{"steps": …}`; a droplet file works too. `batch` refuses an `--out` folder that is the `--in` folder, since the results would replace the originals, unless `--in-place` is given. `run` prints one JSON line per command result.
-
 ## Native format (.pcraft)
 
 `crates/format` defines the lossless native bundle. It is either a ZIP of STORE entries or a directory with the same layout:
@@ -150,72 +83,17 @@ cargo run -p photocraft-cli -- commands --filter blur                    # the c
 - `tiles/<blake3>.zst` and `blobs/<blake3>.zst`: zstd-compressed objects, content-addressed by the BLAKE3 hash of their uncompressed bytes.
 - `thumb.png` and `composite/preview.png`: previews.
 
-Keep one `PcraftWriter` per open document: re-saving then only compresses and writes tiles that changed. Directory bundles verify objects on first encounter in a folder; later saves reuse them while their file size and modification time are unchanged, and re-verify changed objects, repair missing or damaged objects, and garbage-collect unreferenced ones. `format::Autosaver` writes snapshots into a recovery directory on a background thread. `list_recovery` / `recover` / `discard_recovery` implement crash recovery, and `format::RecoveryStore` is the lifecycle the desktop app uses: new documents autosave under per-launch keys (document ids restart every launch, so they never overwrite an older entry), and a recovered document adopts the entry it came from. That entry is replaced in place by the next autosave and removed only when the document is saved or closed, never just because it was recovered, so a second crash loses nothing. The web build has no crash recovery (no autosave services).
+Keep one `PcraftWriter` per open document: re-saving then only compresses and writes tiles that changed. Directory bundles verify objects on first encounter in a folder; later saves reuse them while their file size and modification time are unchanged, and re-verify changed objects, repair missing or damaged objects, and garbage-collect unreferenced ones. `format::Autosaver` writes snapshots into a recovery directory on a background thread. `list_recovery` / `recover` / `discard_recovery` implement crash recovery, and `format::RecoveryStore` is the lifecycle the app uses once `PHOTOCRAFT_ANDROID_DATA_DIR` is set: new documents autosave under per-launch keys (document ids restart every launch, so they never overwrite an older entry), and a recovered document adopts the entry it came from. That entry is replaced in place by the next autosave and removed only when the document is saved or closed, never just because it was recovered, so a second crash loses nothing. Without a data dir there is no autosave and no recovery.
 
 `photocraft-io` routes `.pcraft` through this crate in `import`/`export`, detecting it by magic or by extension.
 
-## MCP (agents)
+## Agents
 
-`photocraft-cli mcp` serves MCP on stdio using `crates/automation`, which is built on `rmcp`:
-
-- **Headless:** `photocraft-cli mcp --automation-read-root <dir> --automation-write-root <dir>`. It drives an in-process engine session and has no file authority when a root is omitted.
-- **Live app:** start `photocraft --control 7878 --control-token-file <private-path> --automation-read-root <dir> --automation-write-root <dir>`, then run `photocraft-cli mcp --bridge 127.0.0.1:7878 --control-token-file <private-path>`. The desktop process owns the roots. See `docs/control-protocol.md#mcp-bridge`.
-
-For headless MCP clients, pass absolute paths to deliberately chosen trusted workspace directories in the launch arguments. Desktop `PHOTOCRAFT_AUTOMATION_READ_ROOT` and `PHOTOCRAFT_AUTOMATION_WRITE_ROOT` environment variables do **not** grant headless CLI access. Omitting a root flag deliberately denies that direction of access.
-
-Tools:
-
-- `session_list`
-- `doc_open`, `doc_new`, `doc_save`, `doc_export`, `doc_inspect`, `doc_render_preview` (returns a PNG image), `doc_select`, `doc_close`
-- `command_list`, `command_run`, `command_batch` (several commands per call)
-- `jobs_list` (running background jobs with progress, then recently finished ones with their result or error), `jobs_cancel` (one job by id, or every running job)
-- bridge only: `ui_inspect`, `ui_screenshot`, `ui_pointer`, `ui_menu_invoke`, `ui_set`, `control_call`
-
-Claude Code (`.mcp.json` in the repo root, or `claude mcp add`):
-
-```json
-{
-  "mcpServers": {
-    "photocraft": {
-      "command": "/path/to/photocraft/target/release/photocraft-cli",
-      "args": ["mcp", "--automation-read-root", "/absolute/path/to/trusted/workspace", "--automation-write-root", "/absolute/path/to/trusted/workspace"]
-    },
-    "photocraft-live": {
-      "command": "/path/to/photocraft/target/release/photocraft-cli",
-      "args": ["mcp", "--bridge", "127.0.0.1:7878", "--control-token-file", "/private/path/photocraft-control.token"]
-    }
-  }
-}
-```
-
-```sh
-cargo build --release -p photocraft-cli
-mkdir -p "$PWD/photocraft-work"
-claude mcp add photocraft -- "$PWD/target/release/photocraft-cli" mcp \
-  --automation-read-root "$PWD/photocraft-work" \
-  --automation-write-root "$PWD/photocraft-work"
-```
-
-`doc_inspect` (and the engine command `document.inspect`) reports the layer tree with kinds,
+Every menu item, tool and dialog runs an engine command (`Session::execute`) with a stable id, so agents drive the app through the same paths the touch UI uses. `document.inspect` reports the layer tree with kinds,
 bounds, masks, selection, effects (`effects.items[].kind`), smart filters (`smartFilters[]`), smart
-object sources (`smartSource`: `embedded` with its file name, or `linked` with a file path or, for a
-PSD placed layer, the `Idnt` uuid its duplicates share), type
+object sources, type
 text, adjustment settings, channels and history, so agents can verify what they did without a
-screenshot. `crates/automation/tests/agent_tasks.rs` is the reference: ten realistic edit tasks
-(title card, colour grade, undo/redo, editable smart blur, masks, saved selections, align,
-capability-scoped export, resize/crop, CMYK + native save) driven purely over MCP.
-
-Without MCP, `photocraft-cli serve [--port N]` keeps a headless session open and answers JSON lines
-(see `docs/control-protocol.md#headless-server`).
-
-A typical agent loop (place inputs under the configured read root and outputs under the write root):
-
-1. `doc_open {path}`
-2. `command_list {filter:"blur"}`
-3. `command_run {id:"filter.blur.gaussianBlur", params:{radius:4}}`
-4. `doc_render_preview` to check the result
-5. `doc_save {path:"out.pcraft"}`
-
+screenshot. `crates/engine/tests/` holds scripted edit tasks (title card, colour grade, undo/redo, masks, align, resize/crop, CMYK + native save) driven purely through commands.
 ## Colour management
 
 `crates/cms` is our own pure-Rust ICC engine (v2/v4 parsing, matrix/TRC and LUT profiles, all four
@@ -319,41 +197,6 @@ release build of the benches alone takes longer than PR CI should. To give the n
 its own baseline, run the workflow by hand with `update_baseline` and commit the `perf-baseline`
 artifact as `perf/baseline.json`.
 
-## Web build
-
-`apps/photocraft-web` runs the same `PhotocraftApp` in the browser through eframe's web runner. The renderer is wgpu: WebGPU where the browser has it, WebGL2 otherwise. It is Rust only. The only JavaScript is the glue that wasm-bindgen generates.
-
-```sh
-brew install trunk                 # or: cargo install trunk --locked
-cd apps/photocraft-web
-trunk build --release              # writes ../../dist/web (index.html, .js glue, .wasm)
-trunk serve --release              # dev server on http://127.0.0.1:8765
-```
-
-Any static file server works for `dist/web`, for example `python3 -m http.server 8765` run inside that directory. Trunk downloads the matching `wasm-bindgen` and `wasm-opt` itself. `trunk build --release` uses the `wasm-release` Cargo profile (`data-cargo-profile` in `index.html`: fat LTO, opt-level "s" except the pixel crates). The `.wasm` is about 18.8 MiB raw, 7.8 MiB gzipped and 5.6 MiB with Brotli; serve it with compression. Keep it under 24 MiB (`packaging/web/package.sh` enforces this; Cloudflare's per-file cap is 25 MiB). The web build never embeds craft-fonts (see Fonts above). To see where the bytes go, run `twiggy top -n 40` on `target/wasm32-unknown-unknown/wasm-release/photocraft-web.wasm` (before wasm-opt strips the names).
-
-URL flags: `?webgl` forces the WebGL2 backend, and `?cpu` forces the CPU canvas path.
-
-To build and serve the web app entirely in Docker, run from the repository root:
-
-```sh
-docker build --load -t photocraft-web:local .
-docker run --rm -p 8080:8080 photocraft-web:local
-```
-
-Open http://localhost:8080/. See [Docker hosting](../packaging/web/README.md#docker) for
-HTTPS/reverse-proxy deployment and browser limitations.
-
-How the web shell (`apps/photocraft-web/src/web.rs`) differs from desktop:
-
-- **Open** uses `rfd::AsyncFileDialog`. The bytes arrive asynchronously in `Services::inbox`, which the app drains every frame.
-- **Save / Save As / Export** trigger a browser download of the encoded bytes. The shell does this with a Blob, an object URL and a temporary `<a download>`, all created from Rust. There is no save dialog, so the suggested name becomes the download name.
-- **Drag-and-drop:** `WebShell` takes the frame's `dropped_files` before the app sees them. It reads each file with `DroppedFile::bytes_async` and pushes the bytes into the inbox.
-- **Startup failures:** `index.html` shows "Loading PhotoCraft…" until the app removes it, or replaces it with the error when the web runner fails to start. If the `.wasm` never downloads or doesn't match the page's `.js` (a stale cached `index.html` after a deploy), no Rust runs at all, so the page itself (CSS only, no script) adds a hint with a Reload link after 20 seconds.
-- **No control server:** browsers can't listen on TCP. To automate the web build, drive headless Chrome with `--remote-debugging-port`. `Page.setInterceptFileChooserDialog` plus `DOM.setFileInputFiles` covers Open, `Input.dispatchDragEvent` with `files` covers drops, and `Browser.setDownloadBehavior` captures downloads.
-- Headless Chrome on macOS (`--headless=new --enable-unsafe-webgpu`) gets a real WebGPU adapter.
-
-
 ## Indexed Color timings
 
 `cargo run --release -p photocraft-engine --example indexed_color_perf -- image.png` measures
@@ -369,18 +212,16 @@ It alternates linear/accelerated lookup order and checks identical indices and p
 For the 2026-10-09 local timings both binaries used `CARGO_PROFILE_RELEASE_LTO=false` and
 `CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16`; compare binaries built with the same settings.
 
-On native desktop sessions, Indexed Color live previews calculate and flatten on one worker.
+On native sessions, Indexed Color live previews calculate and flatten on one worker.
 The last preview remains visible while dragging; intermediate settings are coalesced, and only
 a result matching the current document revision, active layer, dialog and parameters is uploaded.
-GPU upload/display conversion still run on the UI thread. Web and `PHOTOCRAFT_INLINE_JOBS=1`
+GPU upload/display conversion still run on the UI thread. `PHOTOCRAFT_INLINE_JOBS=1`
 sessions retain synchronous previews. Closing the dialog invalidates its result; an already
 running calculation finishes without editing the session.
 
 ## Offscreen UI snapshots (no window)
 
-Render the full UI headlessly with the real wgpu canvas, e.g. for design reviews or when the app
-window would be occluded (macOS doesn't render occluded windows, so live `ui.screenshot` must raise
-the window and steal focus):
+Render the full UI headlessly with the real wgpu canvas, e.g. for design reviews:
 
 ```sh
 cargo run --release -p photocraft-ui-egui --example snapshot -- \
@@ -388,7 +229,7 @@ cargo run --release -p photocraft-ui-egui --example snapshot -- \
     --script '[["ui.set", {"tool": "type"}], ["ui.menu.invoke", {"id": "image.canvasSize"}]]'
 ```
 
-`--script` is a list of control-protocol calls (`[method, params]`), applied in order.
+`--script` is a list of UI automation calls (`[method, params]`), applied in order.
 Input calls (`ui.key`, `ui.type`, `ui.click`) now reply only after the app has processed the events,
 so a following `ui.inspect` observes their effect.
 

@@ -158,6 +158,45 @@ pub fn is_psd(bytes: &[u8]) -> bool {
     bytes.starts_with(b"8BPS")
 }
 
+/// Every extension File › Open accepts (lowercase, without dot): native
+/// `.pcraft`, PSD/PSB, SVG, camera raws and every codec readable in this
+/// build (HEIF only with the `heif` feature, AVIF never: encode-only).
+/// Single source of truth for the Android browser (`device_browser.rs`) and
+/// the host `rfd` dialog, so a format `import` opens never hides again.
+pub fn open_extensions() -> Vec<&'static str> {
+    let mut exts: Vec<&'static str> = Vec::new();
+    exts.push(photocraft_format::EXTENSION);
+    exts.extend(["psd", "psb", "svg", "svgz"]);
+    exts.extend(photocraft_raw::EXTENSIONS.iter().copied());
+    for format in photocraft_codecs::Format::ALL {
+        if format.caps().read {
+            exts.extend(format.extensions().iter().copied());
+        }
+    }
+    exts.sort_unstable();
+    exts.dedup();
+    exts
+}
+
+/// `true` when `name` names a file File › Open shows (extension match,
+/// case-insensitive; contents still decide by magic in [`import`]).
+pub fn is_openable_file(name: &str) -> bool {
+    if has_extension(name, photocraft_format::EXTENSION) {
+        return true;
+    }
+    for ext in ["psd", "psb", "svg", "svgz"] {
+        if has_extension(name, ext) {
+            return true;
+        }
+    }
+    for ext in photocraft_raw::EXTENSIONS {
+        if has_extension(name, ext) {
+            return true;
+        }
+    }
+    photocraft_codecs::from_extension(name).is_some_and(|f| f.caps().read)
+}
+
 /// Imports a file. PSD/PSB and camera raws are detected by magic; everything
 /// else is decoded with `photocraft-codecs`.
 pub fn import(name: &str, bytes: &[u8]) -> Result<ImportResult, IoError> {
@@ -275,4 +314,25 @@ pub fn merged_composite(file: &PsdFile) -> Result<Vec<[f32; 4]>, IoError> {
     let l = doc.layers.first().ok_or_else(|| IoError::Unsupported("no merged image".into()))?;
     let s = l.surface().ok_or_else(|| IoError::Unsupported("no merged image".into()))?;
     Ok(photocraft_compose::surface_to_buffer(s, doc.bounds()).px)
+}
+
+#[cfg(test)]
+mod open_set_tests {
+    use super::*;
+
+    #[test]
+    fn open_set_covers_what_import_opens() {
+        let exts = open_extensions();
+        for must in ["pcraft", "psd", "psb", "png", "jpg", "jpeg", "tif", "tiff", "webp", "gif", "bmp", "svg", "svgz", "dng", "cr2", "nef", "arw", "exr", "hdr", "qoi"] {
+            assert!(exts.contains(&must), "open set misses {must}: {exts:?}");
+        }
+        assert!(!exts.contains(&"avif"), "AVIF is encode-only, not an open target: {exts:?}");
+        assert!(!exts.contains(&"txt"));
+        for name in ["a.PNG", "b.psd", "c.tif", "d.dng", "e.svg", "/sdcard/DCIM/IMG_001.jpg"] {
+            assert!(is_openable_file(name), "{name} should be openable");
+        }
+        for name in ["c.txt", "noext"] {
+            assert!(!is_openable_file(name), "{name} should stay hidden");
+        }
+    }
 }

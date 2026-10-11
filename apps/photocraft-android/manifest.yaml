@@ -4,3 +4,7 @@
 android:
   manifest:
     package: ai.storyteller.photocraft.android
+    # All-files access for the on-device browser (`device_browser`): granted by
+    # hand in Settings, sideload-only (Play policy forbids it for editors).
+    uses_permission:
+      - name: android.permission.MANAGE_EXTERNAL_STORAGE

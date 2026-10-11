@@ -61,11 +61,13 @@ fn android_linker(sdk: &std::path::Path) -> Option<PathBuf> {
         .max()
 }
 
-/// The newest debug/release `.apk` xbuild left under the app dir, if any.
+/// The newest debug/release `.apk` xbuild left behind, if any: under the app
+/// dir for a standalone package, under the workspace `target/x` when the app
+/// belongs to a workspace (xbuild keeps its own output dir there).
 fn freshest_apk(release: bool) -> Option<PathBuf> {
     let want = if release { "release" } else { "debug" };
     let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
-    let mut stack = vec![app_dir().join("target")];
+    let mut stack = vec![app_dir().join("target"), root().join("target")];
     while let Some(dir) = stack.pop() {
         let Ok(rd) = std::fs::read_dir(&dir) else { continue };
         for e in rd.flatten() {

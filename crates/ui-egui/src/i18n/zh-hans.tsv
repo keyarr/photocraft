@@ -2287,3 +2287,9 @@ fontWeight	Italic	斜体
 	Color to Alpha…	颜色转为 Alpha…
 	Transparency Threshold	透明度阈值
 	Opacity Threshold	不透明度阈值
+	Up	向上
+	Empty folder	空文件夹
+	First {n} entries shown	显示前 {n} 个条目
+	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft 需要“所有文件访问”权限才能打开此设备上的文件。
+	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	打开“设置”>“应用”> PhotoCraft 并开启“所有文件访问”，然后回到这里。
+	Check again	重新检查

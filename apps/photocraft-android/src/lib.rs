@@ -6,12 +6,14 @@
 //! the web shell's async inbox (`apps/photocraft-web/src/web.rs`). No clipboard,
 //! no control server, no `open`/reveal yet: every one of those is `None`, which
 //! the app treats as "cancelled"/unavailable, never a crash
-//! (`ui-egui/src/file_dialog.rs:92`). No file dialog on-device until the JNI half
-//! lands either; on a host run (`cargo run -p photocraft-android`) rfd dialogs
-//! are wired so the dev loop can open and save.
+//! (`ui-egui/src/file_dialog.rs:92`). No system picker on-device (its results
+//! can't reach a NativeActivity without Java in the build): File › Open gets
+//! the on-device browser (`ui-egui/src/device_browser.rs`) once all-files
+//! access is granted; on a host run (`cargo run -p photocraft-android`) rfd
+//! dialogs are wired so the dev loop can open and save.
 //!
 //! GPU is opt-in (`PHOTOCRAFT_ANDROID_GPU=1`); default is the CPU compositor.
-//! The JNI half (SAF intents, `getFilesDir`, ClipboardManager) is still open:
+//! The JNI half (`getFilesDir`, ClipboardManager) is still open:
 //! its seam is `shared_inbox`/`push_bytes` + `data_dir` below, both safe Rust
 //! with no new unsafe.
 
@@ -29,10 +31,10 @@ use photocraft_ui_egui::{Inbox, PhotocraftApp, Services};
 #[cfg(target_os = "android")]
 pub mod android;
 
-/// Mobile open set: PNG/JPEG for photos, PSD/PSB to round-trip desktop work,
-/// `.pcraft` native. The full desktop list stays in `apps/photocraft`; SAF
-/// mime filters derive from this when the JNI half lands.
-const OPEN_EXTS: &[&str] = &["pcraft", "psd", "psb", "png", "jpg", "jpeg", "webp"];
+// Mobile open set lives with the importer (`photocraft_io::open_extensions`):
+// PNG/JPEG photos, TIFF, PSD/PSB, `.pcraft`, SVG, camera raws and the rest
+// `import` opens. The full list stays in one place so the browser
+// (`ui-egui/src/device_browser.rs`) and the host dialog below never drift.
 
 /// Where private files live: set by the Java side from `Context.getFilesDir`
 /// before `android_main` runs (`PHOTOCRAFT_ANDROID_DATA_DIR` on a host run).
@@ -92,7 +94,7 @@ fn host_file_dialog() -> Option<photocraft_ui_egui::FileDialogFn> {
                 if let Some(dir) = initial_dir {
                     dialog = dialog.set_directory(dir);
                 }
-                let dialog = dialog.add_filter("All Formats", OPEN_EXTS);
+                let dialog = dialog.add_filter("All Formats", &photocraft_io::open_extensions());
                 if multiple {
                     let picked = dialog.pick_files();
                     Box::pin(async move {
@@ -177,8 +179,8 @@ fn android_services_in(dir: Option<PathBuf>) -> (Services, Inbox) {
             opts.xmp = if settings.xmp_all { photocraft_io::XmpEmbed::All } else { photocraft_io::XmpEmbed::None };
             photocraft_io::export(doc, path, &opts).map(|r| (r.bytes, r.warnings)).map_err(|e| e.to_string())
         })),
-        // No SAF dialog on-device until the JNI half lands (`push_bytes` is the
-        // seam); a host run gets rfd dialogs so the dev loop can open and save.
+        // No system picker on-device (File › Open gets the on-device browser);
+        // a host run gets rfd dialogs so the dev loop can open and save.
         file_dialog: host_file_dialog(),
         write: Some(Box::new(|path: &str, bytes: &[u8]| photocraft_format::atomic_write(std::path::Path::new(path), bytes).map_err(|e| e.to_string()))),
         encode_png: Some(Box::new(|w, h, rgba| {
@@ -219,7 +221,7 @@ fn maybe_enable_gpu(app: &mut PhotocraftApp, cc: &eframe::CreationContext) {
 
 /// Run on host (`main.rs`) or from `android_main` (`src/android.rs`).
 pub fn run(options: eframe::NativeOptions) -> eframe::Result {
-    log::info!("photocraft-android: open set: {}", OPEN_EXTS.join(","));
+    log::info!("photocraft-android: open set: {}", photocraft_io::open_extensions().join(","));
     eframe::run_native(
         "PhotoCraft",
         options,

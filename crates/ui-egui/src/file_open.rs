@@ -46,9 +46,16 @@ pub fn display_name(path: &str) -> String {
 impl PhotocraftApp {
     /// File › Open from a button (Home screen, brush import): starts the dialog and
     /// reports real failures in the status bar. A cancelled picker stays silent, as
-    /// backing out is the user's choice; a build with no picker (Android before the
-    /// SAF bridge) says so instead of swallowing the tap.
+    /// backing out is the user's choice; a build with no picker at all says so
+    /// instead of swallowing the tap.
     pub fn open_interactive(&mut self) {
+        // No picker service on a phone: the on-device browser (see
+        // `device_browser`) instead of the "not wired up" notice.
+        #[cfg(target_os = "android")]
+        if self.services.file_dialog.is_none() {
+            crate::device_browser::open(self);
+            return;
+        }
         if let Err(e) = self.open_dialog_file() {
             if self.services.file_dialog.is_none() {
                 // English-only on purpose: a temporary build-gap notice, like the

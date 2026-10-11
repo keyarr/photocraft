@@ -222,7 +222,9 @@ pub fn sheet(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let h = (screen.height() * 0.45).clamp(260.0, 420.0);
     let t = Tokens::get(ui.ctx());
     egui::Panel::bottom("mobile_sheet").exact_size(h).frame(egui::Frame::NONE.fill(t.dock).inner_margin(egui::Margin::symmetric(8, 6))).show(ui, |ui| {
-        ui.horizontal_centered(|ui| {
+        // One row tall: `horizontal_centered` allocates the whole sheet height and
+        // would leave the sub-tabs and the body below with nothing.
+        ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             let mut groups = vec![
                 (crate::dock::Group::Color, tl!("Color")),
@@ -234,22 +236,29 @@ pub fn sheet(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if app.ui.panels.character {
                 groups.push((crate::dock::Group::Character, tl!("Character")));
             }
-            for (g, label) in groups {
-                if widgets::pill_tab(ui, label, group == g).clicked() {
-                    app.ui.mobile.panel = if group == g { None } else { Some(g) };
-                }
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::button(ui, "x", 32.0, false, tl!("Close")).clicked() {
-                    app.ui.mobile.panel = None;
-                }
+            // The pills plus Close don't fit in 360 pt: scroll them instead of
+            // clipping Navigator and Close off-screen.
+            let rest = (ui.available_width() - 32.0 - ui.spacing().item_spacing.x).max(64.0);
+            egui::ScrollArea::horizontal().id_salt("mobile-sheet-groups").auto_shrink([false, false]).max_width(rest).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    for (g, label) in groups {
+                        if widgets::pill_tab(ui, label, group == g).clicked() {
+                            app.ui.mobile.panel = if group == g { None } else { Some(g) };
+                        }
+                    }
+                });
             });
+            if icons::button(ui, "x", 32.0, false, tl!("Close")).clicked() {
+                app.ui.mobile.panel = None;
+            }
         });
         // The group's own tabs (Layers | Channels | Paths, …), as in the desktop dock.
         let pro = Tokens::get(ui.ctx()).pro;
         let tabs = group.tabs(pro);
         let sel = tab_index(&app.ui.dock_tabs, group).min(tabs.len().saturating_sub(1));
-        ui.horizontal_centered(|ui| {
+        // Same as above: one row, so the body keeps the rest of the sheet.
+        ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             for (i, tab) in tabs.iter().enumerate() {
                 if widgets::pill_tab(ui, tab, sel == i).clicked() {
@@ -362,6 +371,37 @@ mod tests {
         let r = h.state().last_canvas_rect;
         assert!(r.width() >= 340.0, "the sheet never squeezes the width: {r:?}");
         assert!(r.height() > 200.0, "the canvas stays usable with the sheet open: {r:?}");
+    }
+
+    /// The sheet body renders inside the window: the group and sub-tab rows take
+    /// one row each, so the panel body keeps the rest of the sheet. (Both rows
+    /// used `horizontal_centered`, which allocates the whole sheet height and
+    /// pushed the body off-screen, leaving every tab empty.)
+    #[test]
+    fn sheet_body_stays_inside_the_window() {
+        use egui_kittest::kittest::Queryable;
+        let mut a = app();
+        a.run("file.new", json!({"width": 200, "height": 200})).unwrap();
+        a.ui.mobile.panel = Some(crate::dock::Group::Layers);
+        let chrome = |ui: &mut egui::Ui, app: &mut PhotocraftApp| {
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
+            let ctx = ui.ctx().clone();
+            header(app, ui);
+            options_strip(app, ui);
+            tool_bar(app, ui);
+            sheet(app, ui);
+            tool_sheet(app, &ctx);
+            crate::canvas::document_area(app, ui);
+        };
+        let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(chrome, a);
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.run_steps(8);
+        for probe in ["Opacity", "Background"] {
+            let n = h.query_all_by_label_contains(probe).next().unwrap_or_else(|| panic!("the layers body renders {probe}"));
+            assert!(n.rect().max.y <= 800.0, "{probe} is inside the window: {:?}", n.rect());
+        }
     }
 
     /// Opening and closing the sheet never touches the editing state.

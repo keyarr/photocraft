@@ -961,6 +961,10 @@ pub struct UiState {
     /// Compact phone chrome: which bottom-sheet panel is open, whether the tool grid is.
     #[serde(default)]
     pub mobile: crate::mobile_ui::MobileUi,
+    /// On-device file browser (Android File › Open without a system picker).
+    /// Transient: never persisted.
+    #[serde(skip)]
+    pub device_browser: Option<crate::device_browser::Browser>,
 }
 
 impl Default for UiState {
@@ -1028,6 +1032,7 @@ impl Default for UiState {
             camera_raw_scope: Default::default(),
             camera_raw_preview: Default::default(),
             mobile: Default::default(),
+            device_browser: None,
         }
     }
 }
