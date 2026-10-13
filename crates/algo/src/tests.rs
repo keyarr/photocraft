@@ -465,7 +465,8 @@ fn layer_filters_repeat_the_canvas_edge() {
 }
 
 /// `mix_selection` before #4533, one selection lookup per pixel: the oracle for the per-tile read.
-fn mix_selection_reference(data: &mut [f32], t: Rect, sel: &Surface, orig: &crate::image::Image, alpha: bool) {
+// Fork has no alpha-aware `mix_selection`: the oracle covers the shared path.
+fn mix_selection_reference(data: &mut [f32], t: Rect, sel: &Surface, orig: &crate::image::Image) {
     let w = t.width() as usize;
     for (i, px) in data.chunks_exact_mut(orig.ch.max(1)).enumerate() {
         let (x, y) = (t.x0 + (i % w) as i32, t.y0 + (i / w) as i32);
@@ -479,21 +480,6 @@ fn mix_selection_reference(data: &mut [f32], t: Rect, sel: &Surface, orig: &crat
             }
             continue;
         }
-        if alpha {
-            let a = px.len() - 1;
-            let original_alpha = orig.get(x, y, a);
-            let filtered_alpha = px[a];
-            if original_alpha != filtered_alpha {
-                let mixed_alpha = original_alpha + (filtered_alpha - original_alpha) * k;
-                let original_weight = original_alpha * (1.0 - k);
-                let filtered_weight = filtered_alpha * k;
-                for (c, v) in px[..a].iter_mut().enumerate() {
-                    *v = if mixed_alpha > 0.0 { (orig.get(x, y, c) * original_weight + *v * filtered_weight) / mixed_alpha } else { 0.0 };
-                }
-                px[a] = mixed_alpha;
-                continue;
-            }
-        }
         for (c, v) in px.iter_mut().enumerate() {
             let o = orig.get(x, y, c);
             *v = o + (*v - o) * k;
@@ -502,7 +488,7 @@ fn mix_selection_reference(data: &mut [f32], t: Rect, sel: &Surface, orig: &crat
 }
 
 /// Reading the selection once per tile gives exactly the per-pixel result (#4533): a soft
-/// selection with fully selected, unselected and partial pixels, with and without alpha, on a
+/// selection with fully selected, unselected and partial pixels on a
 /// tile that crosses the selection's tile boundaries.
 #[test]
 fn mix_selection_reads_the_selection_once_per_tile() {
@@ -522,13 +508,12 @@ fn mix_selection_reads_the_selection_once_per_tile() {
     sel.fill_rect(Rect::new(150, 150, 260, 250), &[1.0]);
     let soft = Rect::new(260, 150, 330, 250);
     sel.write_region(soft, &noise(5, (soft.width() * soft.height()) as usize));
-    for (alpha, fmt) in [(true, PixelFormat::RGBA8), (false, PixelFormat { alpha: false, ..PixelFormat::RGBA8 })] {
-        let ch = fmt.channels();
-        let orig = crate::image::Image { rect: t, ch, data: noise(1, n * ch) };
-        let filtered = noise(2, n * ch);
-        let (mut a, mut b) = (filtered.clone(), filtered);
-        mix_selection(&mut a, t, &sel, &orig, alpha);
-        mix_selection_reference(&mut b, t, &sel, &orig, alpha);
-        assert!(a.iter().zip(&b).all(|(x, y)| x.to_bits() == y.to_bits()), "alpha {alpha}: results differ");
-    }
+    let fmt = PixelFormat::RGBA8;
+    let ch = fmt.channels();
+    let orig = crate::image::Image { rect: t, ch, data: noise(1, n * ch) };
+    let filtered = noise(2, n * ch);
+    let (mut a, mut b) = (filtered.clone(), filtered);
+    mix_selection(&mut a, t, &sel, &orig);
+    mix_selection_reference(&mut b, t, &sel, &orig);
+    assert!(a.iter().zip(&b).all(|(x, y)| x.to_bits() == y.to_bits()), "results differ");
 }
