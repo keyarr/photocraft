@@ -115,24 +115,36 @@ pub fn fill_surface(s: &mut Surface, area: Rect, color: [f32; 4], selection: Opt
     s.write_region(area, &region);
 }
 
-/// Clear pixels (make transparent) within the selection.
+/// Clear pixels (make transparent) within the selection. Tiles the selection
+/// doesn't reach are left alone (shared with the history) instead of rewritten (#4517).
 pub fn clear_surface(s: &mut Surface, area: Rect, selection: Option<&Surface>) {
     let fmt = s.format();
     let n = fmt.channels();
     if !fmt.alpha {
         return;
     }
-    let mut region = s.read_region(area);
-    let w = area.width() as usize;
-    for (i, px) in region.chunks_exact_mut(n).enumerate() {
-        let k = selection.map_or(1.0, |sel| sel.sample_channel(area.x0 + (i % w) as i32, area.y0 + (i / w) as i32, 0));
-        px[n - 1] *= 1.0 - k;
-        // Fully cleared pixels become the empty pixel, so bounds and tile pruning see them as gone.
-        if px[n - 1] <= 0.0 {
-            px.fill(0.0);
+    for tc in area.tiles() {
+        let tr = tc.rect().intersect(&area);
+        if tr.is_empty() {
+            continue;
         }
+        let cov = selection.map(|sel| (sel.channels(), sel.read_region(tr)));
+        if let Some((sc, c)) = &cov
+            && c.chunks_exact((*sc).max(1)).all(|p| p[0] <= 0.0)
+        {
+            continue;
+        }
+        let mut region = s.read_region(tr);
+        for (i, px) in region.chunks_exact_mut(n).enumerate() {
+            let k = cov.as_ref().map_or(1.0, |(sc, c)| c.get(i * (*sc).max(1)).copied().unwrap_or(0.0));
+            px[n - 1] *= 1.0 - k;
+            // Fully cleared pixels become the empty pixel, so bounds and tile pruning see them as gone.
+            if px[n - 1] <= 0.0 {
+                px.fill(0.0);
+            }
+        }
+        s.write_region(tr, &region);
     }
-    s.write_region(area, &region);
     s.prune();
 }
 
