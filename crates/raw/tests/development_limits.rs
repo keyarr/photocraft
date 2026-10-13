@@ -21,25 +21,21 @@ fn checks_peak_live_buffers_instead_of_summing_disjoint_phases() {
 fn monochrome_and_rgb_linear_raw_preserve_output_and_memory_limits() {
     // Fork has no monochrome LinearRaw testgen (`DngSpec::monochrome`): cover RGB LinearRaw.
     let (w, h) = (32, 24);
-    for samples in [3] {
-        let data = (0..w * h).flat_map(|i| (0..samples).map(move |c| (i % w * 1000 + c * 5000) as u16)).collect();
-        let spec = DngSpec { samples, ..DngSpec::cfa(w, h, data) };
-        let sensor = decode(&spec.build(), &Limits::default()).unwrap();
-        assert!(sensor.cfa.is_none());
-        assert_eq!(sensor.samples, samples);
-        let expected = develop_sensor(&sensor, &DevelopOptions::default()).unwrap();
-        let mut opts = DevelopOptions::default();
-        opts.limits.max_alloc = 32 * 1024;
-        let got = develop_sensor(&sensor, &opts).unwrap();
-        assert_eq!(got.rgb, expected.rgb);
-        assert_eq!((got.width, got.height), (w as u32, h as u32));
-        if samples == 1 {
-            assert!(got.rgb.as_chunks::<3>().0.iter().all(|p| p[0] == p[1] && p[1] == p[2]));
-        }
-        // Even the encoded RGB output alone cannot fit this budget.
-        opts.limits.max_alloc = (expected.rgb.len() * 2 - 1) as u64;
-        assert!(matches!(develop_sensor(&sensor, &opts), Err(RawError::LimitExceeded(_))));
-    }
+    let samples = 3;
+    let data = (0..w * h).flat_map(|i| (0..samples).map(move |c| (i % w * 1000 + c * 5000) as u16)).collect();
+    let spec = DngSpec { samples, ..DngSpec::cfa(w, h, data) };
+    let sensor = decode(&spec.build(), &Limits::default()).unwrap();
+    assert!(sensor.cfa.is_none());
+    assert_eq!(sensor.samples, samples);
+    let expected = develop_sensor(&sensor, &DevelopOptions::default()).unwrap();
+    let mut opts = DevelopOptions::default();
+    opts.limits.max_alloc = 32 * 1024;
+    let got = develop_sensor(&sensor, &opts).unwrap();
+    assert_eq!(got.rgb, expected.rgb);
+    assert_eq!((got.width, got.height), (w as u32, h as u32));
+    // Even the encoded RGB output alone cannot fit this budget.
+    opts.limits.max_alloc = (expected.rgb.len() * 2 - 1) as u64;
+    assert!(matches!(develop_sensor(&sensor, &opts), Err(RawError::LimitExceeded(_))));
 }
 
 #[test]
