@@ -1,5 +1,7 @@
 use photocraft_codecs::{Image, decode, exif_orientation, upright_exif};
 
+mod common;
+
 fn classic_white_is_zero() -> Vec<u8> {
     let width = 4u16;
     let height = 1u16;
@@ -93,5 +95,29 @@ fn big_tiff_orientation_6_and_8_are_applied_to_decoded_pixels() {
         assert_eq!(exif_orientation(&upright_exif(&bytes)), 1);
         assert_eq!(image.dimensions(), (3, 2), "orientation {orientation}");
         assert_eq!(image.data(), &upright, "orientation {orientation}");
+    }
+}
+
+/// #4484: a TIFF saved with the default options must open in software that only reads
+/// baseline TIFF (embroidery and plotter tools, older readers). Like Photoshop's default, that
+/// means uncompressed strips with no predictor, classic offsets and unassociated alpha.
+#[test]
+fn default_tiff_is_baseline() {
+    use photocraft_codecs::{ChannelLayout, EncodeOptions, Format, SampleType, encode};
+    use std::io::Cursor;
+    use tiff::tags::Tag;
+
+    for layout in [ChannelLayout::Rgb, ChannelLayout::Rgba] {
+        let img = common::synth(33, 21, layout, SampleType::U8, 7, 0.4);
+        let bytes = encode(&img, Format::Tiff, &EncodeOptions::default()).expect("encode");
+        assert!(bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*"), "{layout:?}: not a classic TIFF");
+        let mut dec = tiff::decoder::Decoder::new(Cursor::new(&bytes[..])).expect("open");
+        assert_eq!(dec.get_tag_u32(Tag::Compression).ok(), Some(1), "{layout:?}: Compression");
+        assert_eq!(dec.find_tag(Tag::Predictor).ok().flatten().and_then(|v| v.into_u16().ok()).unwrap_or(1), 1, "{layout:?}: Predictor");
+        assert!(dec.find_tag(Tag::TileWidth).ok().flatten().is_none(), "{layout:?}: tiled");
+        assert_eq!(dec.get_tag_u32(Tag::PlanarConfiguration).ok().unwrap_or(1), 1, "{layout:?}: planar");
+        let extra = dec.find_tag(Tag::ExtraSamples).ok().flatten().and_then(|v| v.into_u16_vec().ok());
+        assert_eq!(extra, if layout == ChannelLayout::Rgba { Some(vec![2]) } else { None }, "{layout:?}: ExtraSamples");
+        assert_eq!(decode(&bytes).expect("decode").data(), img.data(), "{layout:?}: round trip");
     }
 }
