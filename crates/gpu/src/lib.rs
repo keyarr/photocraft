@@ -793,6 +793,26 @@ impl Compositor {
         self.fx.retain(|_, e| e.doc != doc);
     }
 
+    /// [`Self::forget_doc`] for every document `keep` rejects: what the compositor holds for
+    /// documents that were closed, however their canvas entry went (#4529).
+    pub fn retain_docs(&mut self, keep: impl Fn(DocId) -> bool) {
+        let mut gone: Vec<DocId> =
+            self.residents.values().map(|r| r.doc).chain(self.fx.values().map(|e| e.doc)).filter(|d| !keep(*d)).collect();
+        gone.sort_by_key(|d| d.0);
+        gone.dedup();
+        for d in gone {
+            self.forget_doc(d);
+        }
+    }
+
+    /// Documents the compositor holds pages or effect maps for.
+    pub fn held_docs(&self) -> Vec<DocId> {
+        let mut docs: Vec<DocId> = self.residents.values().map(|r| r.doc).chain(self.fx.values().map(|e| e.doc)).collect();
+        docs.sort_by_key(|d| d.0);
+        docs.dedup();
+        docs
+    }
+
     /// GPU memory held by cached effect maps (bytes).
     pub fn fx_cache_bytes(&self) -> usize {
         self.fx.values().map(FxEntry::bytes).sum()
