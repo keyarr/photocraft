@@ -49,6 +49,12 @@ pub(crate) fn candidate(data: &[u8], offset: usize, len: usize) -> Option<Previe
 
 /// The largest embedded JPEG preview of a raw file (TIFF-based raws, RAF and CR3).
 pub fn embedded_preview(bytes: &[u8]) -> Option<Preview<'_>> {
+    embedded_previews(bytes).into_iter().max_by_key(|p| u64::from(p.width) * u64::from(p.height))
+}
+
+/// Every embedded JPEG preview of a raw file (CR3 can carry a
+/// full-size and a smaller rendering of the same picture).
+pub fn embedded_previews(bytes: &[u8]) -> Vec<Preview<'_>> {
     let mut found: Vec<Preview> = Vec::new();
     if bytes.get(4..12) == Some(b"ftypcrx ") {
         found = crate::cr3::previews(bytes);
@@ -84,5 +90,5 @@ pub fn embedded_preview(bytes: &[u8]) -> Option<Preview<'_>> {
             }
         }
     }
-    found.into_iter().max_by_key(|p| u64::from(p.width) * u64::from(p.height))
+    found
 }

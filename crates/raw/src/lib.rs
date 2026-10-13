@@ -67,7 +67,7 @@ pub use crate::demosaic::Demosaic;
 pub use crate::develop::{DevelopOptions, Developed, RawInfo, WhiteBalance, develop_sensor};
 pub use crate::error::RawError;
 pub use crate::opcodes::GainMap;
-pub use crate::preview::{Preview, embedded_preview};
+pub use crate::preview::{Preview, embedded_preview, embedded_previews};
 pub use crate::sensor::{BlackLevels, Cfa, Rect, Sensor};
 
 use crate::tiff::{Tiff, tag};
