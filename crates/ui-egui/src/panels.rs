@@ -684,7 +684,10 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .exact_size(if t.pro { 36.0 } else { 42.0 })
         .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(10, 0)))
         .show(ui, |ui| {
-            options_content(app, ui);
+            let rest = ui.available_width().max(80.0);
+            egui::ScrollArea::horizontal().id_salt("options-bar-scroll").auto_shrink([false, false]).max_width(rest).show(ui, |ui| {
+                options_content(app, ui);
+            });
         });
 }
 
@@ -700,12 +703,6 @@ pub(crate) fn options_content(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     crate::chrome_ui::home_button(app, ui);
                     widgets::vline(ui, 22.0);
                 }
-                let _ = icons::button(ui, icons::tool_icon(app.ui.tool), if t.pro { 26.0 } else { 28.0 }, !t.pro, tl!(app.ui.tool.label()));
-                if t.pro {
-                    let (r, _) = ui.allocate_exact_size(vec2(10.0, 20.0), Sense::hover());
-                    icons::paint(ui, r, "chevron-down", 10.0, t.text_faint);
-                }
-                widgets::vline(ui, 22.0);
                 if app.ui.transform.is_some() {
                     crate::transform_tool::options_bar(app, ui);
                     return;
@@ -1611,7 +1608,10 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut actions: Vec<(String, Value)> = Vec::new();
 
     let t = Tokens::get(ui.ctx());
-    if t.pro {
+    // Touch hides the Kind + Lock/Fill rows behind a filter button; desktop keeps
+    // all three rows, as its tests and Photoshop parity expect.
+    let mobile = crate::mobile_ui::is_mobile(ui.ctx());
+    if t.pro && (!mobile || app.ui.show_layer_filters) {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 2.0;
             let (r, _) = ui.allocate_exact_size(vec2(64.0, 22.0), Sense::hover());
@@ -1643,14 +1643,21 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         // Photoshop greys blend mode, Opacity and Fill for the Background layer.
         let bg = crate::doc_props_ui::is_background(&doc, l);
         ui.horizontal(|ui| {
+            // Advanced rows (Kind, Lock + Fill) stay hidden on touch until the filter asks for them.
+            if mobile && icons::button(ui, "sliders-horizontal", 28.0, app.ui.show_layer_filters, tl!("Show layer filters")).clicked() {
+                app.ui.show_layer_filters = !app.ui.show_layer_filters;
+            }
             ui.add_enabled_ui(!bg, |ui| {
                 let mut m = l.blend;
                 // Leave room for the Opacity label and field: a translated label ("Непрозрачность:")
                 // can be much wider than the English one, and must not slide under the dropdown.
+                // The dropdown also gives back the row's item spacing: without it the RTL
+                // block ended one gap past the sheet edge on 360pt phones.
                 let opacity_label = if t.pro { tl!("Opacity:") } else { tl!("Opacity") };
-                let right = (body_text_width(ui, opacity_label) + LAYER_PCT_W + 2.0 * ui.spacing().item_spacing.x + 16.0).max(150.0);
-                let w = ui.available_width() - right;
-                let (chosen, hovered) = widgets::dropdown_hovered(ui, "blend", &mut m, &blend_options(l.is_group()), w.max(100.0));
+                let gap = ui.spacing().item_spacing.x;
+                let right = (body_text_width(ui, opacity_label) + LAYER_PCT_W + 2.0 * gap + 16.0).max(150.0);
+                let w = ui.available_width() - right - gap;
+                let (chosen, hovered) = widgets::dropdown_hovered(ui, "blend", &mut m, &blend_options(l.is_group()), w.max(80.0));
                 if chosen {
                     actions.push(("layer.setProps".into(), json!({"layer": l.id.0, "blend": m.label()})));
                 }
@@ -1668,6 +1675,7 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         });
         // Docks zero the item spacing: keep the Opacity and Fill fields apart (#155).
         ui.add_space((theme::ROW_GAP - ui.spacing().item_spacing.y).max(0.0));
+        if !mobile || app.ui.show_layer_filters {
         ui.horizontal(|ui| {
             let lock_label = if t.pro { tl!("Lock:") } else { tl!("Lock") };
             let fill_label = if t.pro { tl!("Fill:") } else { tl!("Fill") };
@@ -1711,13 +1719,17 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 })
             });
         });
+        }
         ui.add_space(2.0);
     }
 
     // Top of the stack first, groups above their contents, closed groups' contents hidden (#126).
     let rows = crate::layer_tree_ui::display_rows(&doc, !app.ui.layer_filter.is_empty());
     let ctx = ui.ctx().clone();
-    let footer = widgets::footer_height(ui) + ui.spacing().item_spacing.y;
+    // The touch footer is taller than the desktop bar (labeled 56pt cells plus dividers):
+    // reserve its full height here or the rows scroll starves it to ~12pt and the cells
+    // overflow the sheet.
+    let footer = if mobile { MOBILE_FOOTER_H } else { widgets::footer_height(ui) } + ui.spacing().item_spacing.y;
     let fill = ui.available_height() > footer + 60.0;
     let rows_h = if fill { ui.available_height() - footer } else { f32::INFINITY };
     egui::ScrollArea::vertical()
@@ -1795,6 +1807,84 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ctx.data_mut(|d| d.remove::<u64>(egui::Id::new("layer-drag")));
         ctx.data_mut(|d| d.remove::<FxDrag>(fx_drag_key()));
     }
+    if crate::mobile_ui::is_mobile(ui.ctx()) {
+        // Touch footer: the desktop panel_footer is a 30pt right-to-left bar, so the
+        // 56pt cells overflowed it onto the bottom nav and its direction hid buttons
+        // off the left edge. Own row instead: labeled cells left to right, the same
+        // visual order as desktop (Link first, Delete last), scrolling past 360pt.
+        widgets::hairline(ui);
+        ui.add_space(4.0);
+        // No scrollbar: when the cells overflow it painted a 1px strip across the
+        // group pills above the tabs. Touch scrolls by drag, wheels still scroll.
+        egui::ScrollArea::horizontal().id_salt("layer-footer-scroll").auto_shrink([true, true]).scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
+                // Photoshop's footer starts with Link Layers (enabled with two or more layers selected).
+                let can_link = app.session.is_enabled("layer.linkLayers");
+                if ui.add_enabled_ui(can_link, |ui| layer_footer_cell(ui, "link-2", tl!("Link"), tl!("Link layers"))).inner.clicked() {
+                    actions.push(("layer.linkLayers".into(), json!({})));
+                }
+                let fx = layer_footer_fx_cell(ui, tl!("FX"), tl!("Add a layer style"));
+                egui::Popup::menu(&fx).open_memory(footer_menu_right_click(&fx)).show(|ui| {
+                    ui.set_min_width(180.0);
+                    if ui.button(tl!("Blending Options…")).clicked() {
+                        crate::layer_style::open(app, None);
+                        ui.close();
+                    }
+                    ui.separator();
+                    for &(kind, label) in crate::layer_style::KINDS {
+                        if ui.button(format!("{}…", tl!(label))).clicked() {
+                            crate::layer_style::open(app, Some(kind));
+                            ui.close();
+                        }
+                    }
+                });
+                let mask_tip = crate::i18n::fmt(tl!("Add a mask  (from the selection; {key} inverts)"), &[("key", &crate::shortcuts::pretty("Alt"))]);
+                if layer_footer_cell(ui, "layer-mask", tl!("Mask"), &mask_tip).clicked() {
+                    let alt = ui.input(|i| i.modifiers.alt);
+                    actions.push((crate::layer_menu_ui::add_mask_command(doc.selection.is_some(), alt).into(), json!({})));
+                }
+                let adj = layer_footer_menu_cell(ui, "adjustment-layer", tl!("Adjust"), tl!("Create new fill or adjustment layer"));
+                egui::Popup::menu(&adj).open_memory(footer_menu_right_click(&adj)).show(|ui| {
+                    ui.set_min_width(190.0);
+                    for c in photocraft_engine::command_specs().iter().filter(|c| c.id.starts_with("layer.newAdjustmentLayer.")) {
+                        if ui.button(tl!(c.label).trim_end_matches('…')).clicked() {
+                            actions.push((c.id.into(), json!({})));
+                            ui.close();
+                        }
+                    }
+                    ui.separator();
+                    if ui.button(tl!("Solid Color…")).clicked() {
+                        actions.push(("layer.newFillLayer.solidColor".into(), json!({})));
+                        ui.close();
+                    }
+                    if ui.button(tl!("Gradient…")).clicked() {
+                        actions.push(("layer.newFillLayer.gradient".into(), json!({})));
+                        ui.close();
+                    }
+                });
+                let group = layer_footer_cell(ui, "folder", tl!("Group"), tl!("Create a new group"));
+                if group.clicked() {
+                    actions.push(("layer.new.group".into(), json!({})));
+                }
+                actions.extend(footer_drop(ui, &group, footer_drag, "layer.groupLayers"));
+                let new_layer = layer_footer_cell(ui, "square-plus", tl!("New"), &crate::shortcuts::tip_label(app, "Create a new layer", "layer.new.layer"));
+                if new_layer.clicked() {
+                    actions.push(("layer.new.layer".into(), json!({})));
+                }
+                actions.extend(footer_drop(ui, &new_layer, footer_drag, "layer.duplicate"));
+                let trash = layer_footer_cell(ui, "trash", tl!("Delete"), tl!("Delete layer"));
+                if trash.clicked() {
+                    actions.push(("layer.delete".into(), json!({})));
+                }
+                actions.extend(footer_drop(ui, &trash, footer_drag, "layer.delete"));
+            });
+        });
+        // Gap + divider before the app's bottom nav, so a footer tap never hits it.
+        ui.add_space(12.0);
+        widgets::hairline(ui);
+        ui.add_space(4.0);
+    } else {
     widgets::panel_footer(ui, |ui| {
         let trash = icons::button(ui, "trash", 26.0, false, tl!("Delete layer"));
         if trash.clicked() {
@@ -1863,6 +1953,7 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             actions.push(("layer.linkLayers".into(), json!({})));
         }
     });
+    }
     for (id, p) in actions {
         if id == "ui.maskTarget" {
             app.ui.mask_target = p.as_bool().unwrap_or(false);
@@ -1952,6 +2043,52 @@ fn fx_button(ui: &mut egui::Ui, size: f32, tip: &str) -> egui::Response {
     let g = ui.painter().layout_job(job);
     ui.painter().galley(r.center() - g.size() / 2.0, g, t.icon);
     footer_menu_arrow(ui, r);
+    resp.on_hover_text(tip)
+}
+
+/// Height the touch Layers footer reserves in the rows scroll: its hairlines, gaps
+/// and the 56pt cells. Must match the block in [`layers`] below.
+const MOBILE_FOOTER_H: f32 = 1.0 + 4.0 + 56.0 + 12.0 + 1.0 + 4.0;
+
+/// Touch footer cell: 56x56pt icon over a short label, so each of the 7 layer
+/// actions reads without a tooltip and never sits on the app's bottom nav.
+fn layer_footer_cell(ui: &mut egui::Ui, icon: &str, short: &str, tip: &str) -> egui::Response {
+    let t = Tokens::get(ui.ctx());
+    let (r, resp) = ui.allocate_exact_size(vec2(56.0, 56.0), Sense::click());
+    if resp.hovered() {
+        ui.painter().rect_filled(r, t.radius_sm, t.hover);
+    }
+    icons::paint(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 20.0), vec2(28.0, 28.0)), icon, 20.0, t.icon);
+    let mut job = egui::text::LayoutJob::simple_singleline(tl!(short).to_owned(), egui::FontId::proportional(11.0), t.text);
+    job.wrap = egui::text::TextWrapping::truncate_at_width(52.0);
+    let g = ui.painter().layout_job(job);
+    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 38.0), g, t.text);
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip.to_string()));
+    resp.on_hover_text(tip)
+}
+
+fn layer_footer_menu_cell(ui: &mut egui::Ui, icon: &str, short: &str, tip: &str) -> egui::Response {
+    let resp = layer_footer_cell(ui, icon, short, tip);
+    footer_menu_arrow(ui, resp.rect);
+    resp
+}
+
+fn layer_footer_fx_cell(ui: &mut egui::Ui, short: &str, tip: &str) -> egui::Response {
+    let t = Tokens::get(ui.ctx());
+    let (r, resp) = ui.allocate_exact_size(vec2(56.0, 56.0), Sense::click());
+    if resp.hovered() {
+        ui.painter().rect_filled(r, t.radius_sm, t.hover);
+    }
+    let mut job = egui::text::LayoutJob::default();
+    job.append("fx", 0.0, egui::TextFormat { font_id: egui::FontId::proportional(15.0), color: t.icon, italics: true, ..Default::default() });
+    let g = ui.painter().layout_job(job);
+    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 12.0), g, t.icon);
+    let mut job = egui::text::LayoutJob::simple_singleline(tl!(short).to_owned(), egui::FontId::proportional(11.0), t.text);
+    job.wrap = egui::text::TextWrapping::truncate_at_width(52.0);
+    let g = ui.painter().layout_job(job);
+    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 38.0), g, t.text);
+    footer_menu_arrow(ui, r);
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip.to_string()));
     resp.on_hover_text(tip)
 }
 
@@ -2562,6 +2699,11 @@ fn properties_body(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 }
 
 /// Photoshop's Adjustments panel: a grid of one-click adjustment layers.
+///
+/// Touch layout: 2-3 columns of stacked cells (icon over a short label) with a 48pt
+/// minimum touch target, so the 16 adjustments use the panel's empty lower area
+/// instead of two clipped rows. No scroll of its own: the dock and the touch sheet
+/// already scroll this body.
 fn adjustments_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     ui.label(RichText::new(tl!("Add an adjustment")).color(t.text_dim));
@@ -2585,18 +2727,49 @@ fn adjustments_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ("colorLookup", "grid-3x3", tl!("Color Lookup")),
     ];
     let mut run = None;
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
-        for (kind, icon, tip) in items {
-            if icons::button(ui, icon, 30.0, false, tip).clicked() {
+    // Measured once, outside the grid: per-cell widths feed the grid's own sizing
+    // back into itself (the touch tool list blew up the same way). No inner scroll
+    // either: the desktop dock and the touch sheet already scroll this body, and a
+    // vertical scroll inside theirs pushed it out from under the canvas on-device.
+    let avail = ui.available_width().max(120.0);
+    let cols = if avail < 280.0 { 2 } else { 3 };
+    let cell_w = ((avail - (cols as f32 - 1.0) * 8.0) / cols as f32).clamp(48.0, 140.0);
+    egui::Grid::new("adjustments-grid").num_columns(cols).spacing([8.0, 8.0]).show(ui, |ui| {
+        for (i, (kind, icon, tip)) in items.iter().enumerate() {
+            if adjustment_button(ui, icon, tip, cell_w) {
                 run = Some(format!("layer.newAdjustmentLayer.{kind}"));
             }
+            if i % cols == cols - 1 {
+                ui.end_row();
+            }
+        }
+        if !items.len().is_multiple_of(cols) {
+            ui.end_row();
         }
     });
     if let Some(id) = run {
         let _ = app.run(&id, json!({}));
         app.ui.dock_tabs.properties = 0;
     }
+}
+
+/// One adjustment cell: centred 28px icon over a short label, 48x64pt minimum so
+/// touch never needs a tooltip to know what it taps. `label` arrives translated;
+/// `w` is fixed by the caller (see above).
+fn adjustment_button(ui: &mut egui::Ui, icon: &str, label: &str, w: f32) -> bool {
+    let t = Tokens::get(ui.ctx());
+    let (r, resp) = ui.allocate_exact_size(vec2(w, 68.0), Sense::click());
+    if resp.hovered() {
+        ui.painter().rect_filled(r, t.radius_sm, t.hover);
+    }
+    icons::paint(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 24.0), vec2(32.0, 32.0)), icon, 24.0, t.icon);
+    let max_w = (r.width() - 8.0).max(1.0);
+    let mut job = egui::text::LayoutJob::simple_singleline(label.to_owned(), egui::FontId::proportional(11.0), t.text);
+    job.wrap = egui::text::TextWrapping::truncate_at_width(max_w);
+    let g = ui.painter().layout_job(job);
+    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 42.0), g, t.text);
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label.to_string()));
+    resp.on_hover_text(label).clicked()
 }
 
 /// The Color panel's foreground and background chips. A click picks the colour the field edits,

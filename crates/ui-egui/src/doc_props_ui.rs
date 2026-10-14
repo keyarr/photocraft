@@ -86,11 +86,14 @@ fn section(ui: &mut egui::Ui, id: &str, title: &str) -> bool {
     open
 }
 
-/// Right-aligned field label in a fixed-width column.
+/// Right-aligned field label in a fixed-width column, widened when the translation
+/// needs it ("Preenchimento" in 44pt painted past the sheet edge on phones).
 fn field_label(ui: &mut egui::Ui, s: &str, w: f32) {
     let t = Tokens::get(ui.ctx());
-    let (r, _) = ui.allocate_exact_size(vec2(w, 22.0), Sense::hover());
-    ui.painter().text(pos2(r.right() - 4.0, r.center().y), Align2::RIGHT_CENTER, s, egui::FontId::proportional(12.0), t.text_dim);
+    let font = egui::FontId::proportional(12.0);
+    let g = ui.painter().layout_no_wrap(s.to_owned(), font, t.text_dim);
+    let (r, _) = ui.allocate_exact_size(vec2(w.max(g.size().x + 8.0), 22.0), Sense::hover());
+    ui.painter().galley(pos2(r.right() - 4.0 - g.size().x, r.center().y - g.size().y / 2.0), g, t.text_dim);
 }
 
 /// A number field that only reports a committed value (drag released, Enter, focus lost).
@@ -117,6 +120,9 @@ fn dim_field(ui: &mut egui::Ui, text: &str) {
 pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else { return };
+    // Top padding: the first size fields started at the scroll origin and read as
+    // cut in half by the tab row above.
+    ui.add_space(8.0);
     let (w, h, mode, depth, dpi) = (st.doc.size.width, st.doc.size.height, st.doc.mode, st.doc.depth, st.doc.resolution_dpi);
     let has_bg = st.doc.layers.first().is_some_and(|l| is_background(&st.doc, l));
     let mut run: Vec<(String, Value)> = Vec::new();
@@ -177,16 +183,34 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             ui.label(RichText::new(crate::i18n::fmt(tl!("Resolution: {dpi} pixels/inch"), &[("dpi", &widgets::fmt_num(dpi as f64))])).color(t.text));
         });
         ui.add_space(2.0);
-        ui.horizontal(|ui| {
+        // Narrow phones get one column: a wide label ("Preenchimento") beside a fixed
+        // 150pt dropdown ran past the sheet edge. Stacked, nothing clips left or right.
+        let narrow = ui.available_width() < 340.0;
+        if narrow {
             field_label(ui, tl!("Mode"), label_w);
-            let mut m = mode;
-            let opts: Vec<(ColorMode, &str)> = MODES.iter().map(|(m, l, _)| (*m, *l)).collect();
-            if widgets::dropdown(ui, "doc-props-mode", &mut m, &opts, 150.0)
-                && let Some((_, _, id)) = MODES.iter().find(|(x, _, _)| *x == m)
-            {
-                run.push(((*id).to_string(), Value::Null));
-            }
-        });
+            ui.horizontal(|ui| {
+                ui.add_space(8.0);
+                let mut m = mode;
+                let opts: Vec<(ColorMode, &str)> = MODES.iter().map(|(m, l, _)| (*m, *l)).collect();
+                let dd_w = (ui.available_width() - 8.0).clamp(100.0, 200.0);
+                if widgets::dropdown(ui, "doc-props-mode", &mut m, &opts, dd_w)
+                    && let Some((_, _, id)) = MODES.iter().find(|(x, _, _)| *x == m)
+                {
+                    run.push(((*id).to_string(), Value::Null));
+                }
+            });
+        } else {
+            ui.horizontal(|ui| {
+                field_label(ui, tl!("Mode"), label_w);
+                let mut m = mode;
+                let opts: Vec<(ColorMode, &str)> = MODES.iter().map(|(m, l, _)| (*m, *l)).collect();
+                if widgets::dropdown(ui, "doc-props-mode", &mut m, &opts, 150.0)
+                    && let Some((_, _, id)) = MODES.iter().find(|(x, _, _)| *x == m)
+                {
+                    run.push(((*id).to_string(), Value::Null));
+                }
+            });
+        }
         ui.horizontal(|ui| {
             ui.add_space(label_w + 8.0);
             let mut d = depth;
@@ -198,16 +222,30 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 run.push(((*id).to_string(), Value::Null));
             }
         });
-        ui.horizontal(|ui| {
+        if narrow {
             field_label(ui, tl!("Fill"), label_w);
-            let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
-            ui.painter().rect_stroke(r, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
-            // The canvas fill is only editable for documents without a Background layer.
-            ui.add_enabled_ui(!has_bg, |ui| {
-                let mut f = 0u8;
-                widgets::dropdown(ui, "doc-props-fill", &mut f, &[(0u8, tl!("Background Color"))], 124.0);
+            ui.horizontal(|ui| {
+                ui.add_space(8.0);
+                let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
+                ui.painter().rect_stroke(r, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+                ui.add_enabled_ui(!has_bg, |ui| {
+                    let mut f = 0u8;
+                    let dd_w = (ui.available_width() - 30.0).clamp(100.0, 200.0);
+                    widgets::dropdown(ui, "doc-props-fill", &mut f, &[(0u8, tl!("Background Color"))], dd_w);
+                });
             });
-        });
+        } else {
+            ui.horizontal(|ui| {
+                field_label(ui, tl!("Fill"), label_w);
+                let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
+                ui.painter().rect_stroke(r, 0.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+                // The canvas fill is only editable for documents without a Background layer.
+                ui.add_enabled_ui(!has_bg, |ui| {
+                    let mut f = 0u8;
+                    widgets::dropdown(ui, "doc-props-fill", &mut f, &[(0u8, tl!("Background Color"))], 124.0);
+                });
+            });
+        }
         ui.add_space(4.0);
     }
     widgets::hairline(ui);

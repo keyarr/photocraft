@@ -118,31 +118,37 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             // only grows, so the generic 380 pt minimum must not run for New Document.
             let narrow_max = (ctx.content_rect().width() - 48.0).clamp(280.0, 800.0);
             let wide = crate::prefs_ui::width(&d.fields);
+            // The About window: room for the contributor table, the same width on every tab.
+            let about_tabs = d.kind == DialogKind::About && d.fields.get("systemInfo").and_then(Value::as_bool) != Some(true);
             if d.kind == DialogKind::NewDocument {
                 ui.set_min_width(narrow_max.min(800.0));
             } else {
-                ui.set_min_width(380.0);
+                let mut min_w = 380.0;
                 if let Some(w) = wide {
-                    ui.set_min_width(w.min(460.0));
+                    min_w = w.min(460.0);
                 }
+                if about_tabs {
+                    min_w = 700.0;
+                }
+                // Phones are ~360 pt wide: a 460-780 pt minimum would push the body and the
+                // buttons off-screen, leaving a desktop-looking clipped dialog.
+                ui.set_min_width(min_w.min(narrow_max));
             }
-            // The About window: room for the contributor table, the same width on every tab.
-            let about_tabs = d.kind == DialogKind::About && d.fields.get("systemInfo").and_then(Value::as_bool) != Some(true);
-            if about_tabs {
-                ui.set_min_width(700.0);
-            }
-            ui.set_max_width(wide.unwrap_or(if d.kind == DialogKind::NewDocument {
-                narrow_max
-            } else if about_tabs {
-                700.0
-            } else if d.kind == DialogKind::LayerStyle || d.fields.contains_key("__export") || crate::color_picker_ui::owns(&d.fields) {
-                600.0
-            } else {
-                440.0
-            }));
+            ui.set_max_width(
+                wide.unwrap_or(if d.kind == DialogKind::NewDocument {
+                    narrow_max
+                } else if about_tabs {
+                    700.0
+                } else if d.kind == DialogKind::LayerStyle || d.fields.contains_key("__export") || crate::color_picker_ui::owns(&d.fields) {
+                    600.0
+                } else {
+                    440.0
+                })
+                .min(narrow_max),
+            );
             if let Some(w) = crate::file_ui::dialog_width(&d.fields) {
-                ui.set_min_width(w);
-                ui.set_max_width(w);
+                ui.set_min_width(w.min(narrow_max));
+                ui.set_max_width(w.min(narrow_max));
             }
             if color_picker {
                 ui.set_width(crate::color_picker_ui::CONTENT_WIDTH);

@@ -1407,7 +1407,10 @@ fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         paint_dots(ui, ui.available_rect_before_wrap());
         return;
     }
-    if !app.ui.view.hides_tabs() || opening {
+    // Touch phones hide the document tab strip (AGC_EGO… @ 25.9%): the file name
+    // already lives in the header beside Save, and the strip steals canvas height.
+    let mobile = crate::mobile_ui::is_mobile(ui.ctx());
+    if (!app.ui.view.hides_tabs() || opening) && !mobile {
         app.tab_strip = Some(tabs(app, ui));
         drop_slot_line(app, ui);
     }
@@ -1418,6 +1421,7 @@ fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let Some(idx) = app.session.active_index() else { return };
     let rect = ui.available_rect_before_wrap();
     app.last_canvas_rect = rect;
+    log::info!("MDBG canvas rect={rect:?} content={:?}", ui.ctx().content_rect());
     app.drop_canvas_rect = Some(rect);
     // Window › Arrange: tiled / n-up layouts show several documents side by side; the active one
     // takes input, a click elsewhere activates that document.
@@ -1953,132 +1957,17 @@ pub fn mode_label(doc: &Document) -> &'static str {
 }
 
 fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let t = crate::theme::Tokens::get(ui.ctx());
     let area = ui.available_rect_before_wrap();
     paint_dots(ui, area);
-    // File › Open Recent, newest first (on the web there are no paths to reopen).
-    let recent: Vec<String> = if cfg!(target_arch = "wasm32") { Vec::new() } else { app.ui.recent_files.iter().take(HOME_RECENT).cloned().collect() };
-    let recent_h = if recent.is_empty() { 0.0 } else { 34.0 + recent.len() as f32 * HOME_RECENT_ROW };
-    // On a phone the fixed 460 pt card would run off the screen; shrink it instead.
-    let card_w = (area.width() - 32.0).clamp(280.0, 460.0);
-    let card = Rect::from_center_size(area.center(), egui::vec2(card_w, 330.0 + recent_h));
-    let new_label = crate::shortcuts::command_label(app, "New document…", "file.new");
-    let open_label = crate::shortcuts::command_label(app, "Open…", "file.open");
-    ui.scope_builder(egui::UiBuilder::new().max_rect(card), |ui| {
-        ui.vertical_centered(|ui| {
-            ui.horizontal(|ui| {
-                let title = ui.painter().layout_no_wrap(tl!("PhotoCraft").into(), crate::theme::semibold(38.0), t.text);
-                let by = ui.painter().layout_no_wrap(tl!("open source").into(), egui::FontId::proportional(13.0), t.text_faint);
-                let total = title.size().x + by.size().x + 10.0;
-                ui.add_space(((card.width() - total) / 2.0).max(0.0));
-                let (r, _) = ui.allocate_exact_size(title.size(), Sense::hover());
-                ui.painter().galley(r.min, title, t.text);
-                let (r2, _) = ui.allocate_exact_size(egui::vec2(by.size().x + 10.0, r.height()), Sense::hover());
-                ui.painter().galley(egui::pos2(r2.left() + 10.0, r.bottom() - by.size().y - 8.0), by, t.text_faint);
-            });
-            ui.add_space(6.0);
-            ui.label(egui::RichText::new(tl!("Create a new document or open an existing file.")).color(t.text_dim).size(14.0));
-            ui.add_space(22.0);
-            // Narrow card: stack the buttons full-width instead of squeezing them side by side.
-            if card_w < 420.0 {
-                if crate::widgets::primary_button(ui, &new_label, card_w - 32.0).clicked() {
-                    let fields = app.new_document_fields();
-                    app.ui.open_dialog(crate::state::DialogKind::NewDocument, fields);
-                }
-                ui.add_space(8.0);
-                if crate::widgets::secondary_button(ui, &open_label, card_w - 32.0).clicked() {
-                    app.open_interactive();
-                }
-            } else {
-                ui.horizontal(|ui| {
-                    ui.add_space(((card.width() - 2.0 * 190.0 - 12.0) / 2.0).max(0.0));
-                    ui.spacing_mut().item_spacing.x = 12.0;
-                    if crate::widgets::primary_button(ui, &new_label, 190.0).clicked() {
-                        let fields = app.new_document_fields();
-                        app.ui.open_dialog(crate::state::DialogKind::NewDocument, fields);
-                    }
-                    if crate::widgets::secondary_button(ui, &open_label, 190.0).clicked() {
-                        app.open_interactive();
-                    }
-                });
-            }
-            ui.add_space(22.0);
-            // A phone can't drop files and has no room for promo: keep just the actions.
-            if card_w >= 420.0 {
-                ui.horizontal(|ui| {
-                    let msg = start_screen_drop_hint(app);
-                    let g = ui.painter().layout_no_wrap(msg.to_string(), egui::FontId::proportional(12.5), t.text_faint);
-                    ui.add_space(((card.width() - g.size().x - 24.0) / 2.0).max(0.0));
-                    let (r, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), Sense::hover());
-                    crate::icons::paint(ui, r, "image", 15.0, t.text_faint);
-                    ui.label(egui::RichText::new(msg).color(t.text_faint));
-                });
-            }
-            if !recent.is_empty() {
-                ui.add_space(22.0);
-                home_recent(app, ui, &recent);
-            }
-            if card_w >= 420.0 {
-                ui.add_space(26.0);
-                crate::links::discord_button(app, ui, 190.0);
-                ui.add_space(10.0);
-                crate::links::link_row(app, ui);
-            }
-        });
-    });
+    crate::home_ui::home_screen(app, ui);
 }
 
 /// Wayland has no native file drops (winit 0.30, #386), so the hint offers File › Open and paste.
-fn start_screen_drop_hint(app: &PhotocraftApp) -> std::borrow::Cow<'static, str> {
+pub(crate) fn start_screen_drop_hint(app: &PhotocraftApp) -> std::borrow::Cow<'static, str> {
     if app.services.is_wayland {
         crate::i18n::fmt(tl!("Use File › Open, or paste a copied image with {paste}."), &[("paste", &crate::notices::paste_hint(app))]).into()
     } else {
         tl!("Drop an image or PSD anywhere to open it.").into()
-    }
-}
-
-/// Recent files listed on the Home screen.
-const HOME_RECENT: usize = 6;
-/// Height of one Home-screen recent-file row.
-const HOME_RECENT_ROW: f32 = 30.0;
-
-/// The Home screen's "Recent" list: file name, its folder on the right, click to open.
-fn home_recent(app: &mut PhotocraftApp, ui: &mut egui::Ui, recent: &[String]) {
-    let t = crate::theme::Tokens::get(ui.ctx());
-    let width = 380.0_f32.min(ui.available_width() - 16.0).max(200.0);
-    ui.horizontal(|ui| {
-        // Line the heading up with the file icons.
-        ui.add_space(((ui.available_width() - width) / 2.0).max(0.0) + 8.0);
-        ui.label(egui::RichText::new(tl!("Recent")).font(crate::theme::semibold(12.5)).color(t.text_dim));
-    });
-    ui.add_space(4.0);
-    let mut open = None;
-    for path in recent {
-        let name = crate::file_open::display_name(path);
-        let folder = std::path::Path::new(path).parent().map(|d| d.to_string_lossy().into_owned()).unwrap_or_default();
-        let (row, resp) = ui.allocate_exact_size(egui::vec2(width, HOME_RECENT_ROW), Sense::click());
-        if resp.hovered() {
-            ui.painter().rect_filled(row, t.radius_sm, t.hover);
-        }
-        let icon = Rect::from_center_size(egui::pos2(row.left() + 16.0, row.center().y), egui::vec2(16.0, 16.0));
-        crate::icons::paint(ui, icon, "file", 14.0, t.text_dim);
-        let x = row.left() + 32.0;
-        let name_g = crate::tab_strip::elided(ui, &name, egui::FontId::proportional(12.5), t.text, 170.0);
-        let name_w = name_g.size().x;
-        ui.painter().galley(egui::pos2(x, row.center().y - name_g.size().y / 2.0), name_g, t.text);
-        let folder_max = (row.right() - 10.0 - (x + name_w + 14.0)).max(0.0);
-        if folder_max > 20.0 && !folder.is_empty() {
-            let fg = crate::tab_strip::elided(ui, &folder, egui::FontId::proportional(11.5), t.text_faint, folder_max);
-            ui.painter().galley(egui::pos2(row.right() - 10.0 - fg.size().x, row.center().y - fg.size().y / 2.0), fg, t.text_faint);
-        }
-        if resp.on_hover_text(path).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
-            open = Some(path.clone());
-        }
-    }
-    if let Some(path) = open
-        && let Err(e) = app.open_path(&path)
-    {
-        app.open_failed(&crate::file_open::display_name(&path), &e);
     }
 }
 
@@ -2918,9 +2807,11 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         }
     }
     // Scrollbars (scrollbars.rs): drawn over the canvas edges, they take the pointer there.
+    // Touch phones hide them: pan/zoom stays on two-finger gestures over the transform.
     let t0 = crate::gpu_canvas::now_ms();
     let before = view.center;
     let over_bars = app.ui.view.shows_scrollbars()
+        && !crate::mobile_ui::is_mobile(&ctx)
         && crate::scrollbars::show(ui, rect, &mut view, flip, app.session.prefs().tools.overscroll, egui::Id::new(("pc-canvas", idx)));
     ctx.data_mut(|d| d.insert_temp(bars_id, over_bars));
     if view.center != before {

@@ -442,25 +442,28 @@ pub(crate) fn browser(
             ev.push(Ev::Drop(key, pos));
         }
     }
-    // Footer: thumbnail size | New Group, New, Delete.
+    // Footer: thumbnail size | New Group, New, Delete. 8pt gaps and 32pt targets:
+    // the 24pt boxes sat edge to edge and the trash read as clipped by the panel.
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
+        ui.spacing_mut().item_spacing.x = 8.0;
         let mut s = size;
         ui.add_sized(vec2(90.0, 18.0), egui::Slider::new(&mut s, MIN_THUMB..=96.0).show_value(false)).on_hover_text(tl!("Thumbnail size (smallest: list)"));
         if (s - size).abs() > 0.01 {
             st.sizes.insert(panel.to_string(), s);
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if crate::icons::button(ui, "trash", 24.0, false, tl!("Delete")).clicked()
+            // Right-edge padding first: in RTL the first item lands at the edge.
+            ui.add_space(4.0);
+            if crate::icons::button(ui, "trash", 32.0, false, tl!("Delete")).clicked()
                 && let Some(k) = selected.clone()
             {
                 ev.push(Ev::Delete(k));
             }
-            if crate::icons::button(ui, "plus", 24.0, false, new_tip).clicked() {
+            if crate::icons::button(ui, "plus", 32.0, false, new_tip).clicked() {
                 ev.push(Ev::New);
             }
-            if crate::icons::button(ui, "folder-plus", 24.0, false, tl!("Create new group")).clicked() {
+            if crate::icons::button(ui, "folder-plus", 32.0, false, tl!("Create new group")).clicked() {
                 ev.push(Ev::NewGroup);
             }
         });

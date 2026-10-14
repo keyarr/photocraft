@@ -96,6 +96,9 @@ const LINK_W: f32 = 20.0;
 /// Actions, all with the same collapsible headers (#155).
 pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
     let t = Tokens::get(ui.ctx());
+    // Same top padding as the document view: the Transform fields are the first row
+    // under the tab strip and read as clipped without it.
+    ui.add_space(8.0);
     let mut run: Vec<(String, Value)> = Vec::new();
     if let Some(s) = layer.surface() {
         let b = app.cached_bounds(layer.id.0, s);

@@ -54,7 +54,8 @@ pub fn two_finger(ctx: &egui::Context, rect: egui::Rect) -> Option<egui::MultiTo
 
 /// Compact header: undo, the document title, save and an overflow menu. Everything else
 /// lives one tap away in the command palette or the overflow menu, so no menu bar has to
-/// fit in 360 pt.
+/// fit in 360 pt. With no document open only the title and the overflow menu stay:
+/// undo and save need an editable document.
 pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     egui::Panel::top("mobile_header")
@@ -63,21 +64,27 @@ pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .show(ui, |ui| {
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
-                let undo_on = crate::menus::is_enabled(app, "edit.undo");
-                let undo = ui.add_enabled_ui(undo_on, |ui| icons::button_with_icon_size(ui, "undo-2", 44.0, 20.0, false, tl!("Undo")));
-                if undo.inner.clicked() {
-                    let _ = crate::menus::invoke(app, ui.ctx(), "edit.undo", json!({}));
+                let has_doc = app.session.active().is_some();
+                if has_doc {
+                    let undo_on = crate::menus::is_enabled(app, "edit.undo");
+                    let undo = ui.add_enabled_ui(undo_on, |ui| icons::button_with_icon_size(ui, "undo-2", 48.0, 22.0, false, tl!("Undo")));
+                    if undo.inner.clicked() {
+                        let _ = crate::menus::invoke(app, ui.ctx(), "edit.undo", json!({}));
+                    }
                 }
                 let title =
                     app.session.active().map(|st| format!("{}{}", st.doc.name, if st.is_dirty() { " *" } else { "" })).unwrap_or_else(|| "PhotoCraft".into());
                 // Whatever the right-hand buttons take, the title gets the rest, truncated.
-                let avail = (ui.available_width() - 64.0 - 44.0 - 12.0).max(48.0);
-                ui.add_sized(vec2(avail, 44.0), egui::Label::new(RichText::new(title).color(t.text).size(13.0)).truncate());
-                let save_on = crate::menus::is_enabled(app, "file.save");
-                if ui.add_enabled_ui(save_on, |ui| widgets::secondary_button(ui, tl!("Save"), 64.0)).inner.clicked() {
-                    let _ = crate::menus::invoke(app, ui.ctx(), "file.save", json!({}));
+                let right_reserve = if has_doc { 64.0 } else { 0.0 } + 48.0 + 12.0;
+                let avail = (ui.available_width() - right_reserve).max(48.0);
+                ui.add_sized(vec2(avail, 48.0), egui::Label::new(RichText::new(title).color(t.text).size(13.0)).truncate());
+                if has_doc {
+                    let save_on = crate::menus::is_enabled(app, "file.save");
+                    if ui.add_enabled_ui(save_on, |ui| widgets::secondary_button(ui, tl!("Save"), 64.0)).inner.clicked() {
+                        let _ = crate::menus::invoke(app, ui.ctx(), "file.save", json!({}));
+                    }
                 }
-                let more = icons::button(ui, "ellipsis", 44.0, false, tl!("Options"));
+                let more = icons::button(ui, "ellipsis", 48.0, false, tl!("Options"));
                 egui::Popup::menu(&more).show(|ui| {
                     ui.set_min_width(220.0);
                     menu_item(ui, app, tl!("New…"), "file.new", json!({}));
@@ -109,32 +116,33 @@ fn menu_item(ui: &mut egui::Ui, app: &mut PhotocraftApp, label: &str, id: &str, 
     }
 }
 
-/// The active tool's name plus its options, horizontally scrollable: the same controls
-/// as the desktop options bar, so every tool keeps its settings on a phone. The name
-/// stays visible because touch has no hover for the icon tooltip.
+/// The active tool's options, horizontally scrollable: the same controls
+/// as the desktop options bar, so every tool keeps its settings on a phone.
+/// The tool itself is already marked in the bottom bar, so no icon or name here.
 pub fn options_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    if app.session.active().is_none() {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     egui::Panel::top("mobile_options").exact_size(48.0).frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(8, 0))).show(ui, |ui| {
-        ui.horizontal_centered(|ui| {
-            ui.spacing_mut().item_spacing.x = 6.0;
-            let tool = app.ui.tool;
-            let (ir, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
-            icons::paint(ui, ir, icons::tool_icon(tool), 16.0, t.icon);
-            let lw = (ui.available_width() - 200.0).clamp(90.0, 150.0);
-            ui.add_sized(vec2(lw, 32.0), egui::Label::new(RichText::new(tl!(tool.label())).size(12.5).strong().color(t.text)).truncate());
-            widgets::vline(ui, 22.0);
-            let rest = ui.available_width().max(80.0);
-            egui::ScrollArea::horizontal().id_salt("mobile-options-scroll").auto_shrink([false, false]).max_width(rest).show(ui, |ui| {
-                crate::panels::options_content(app, ui);
-            });
+        let rest = ui.available_width().max(80.0);
+        egui::ScrollArea::horizontal().id_salt("mobile-options-scroll").auto_shrink([false, false]).max_width(rest).show(ui, |ui| {
+            crate::panels::options_content(app, ui);
+            // Right padding inside the scroll: the last field (Opacity/Flow) ended
+            // exactly at the panel edge and read as clipped.
+            ui.add_space(12.0);
         });
     });
 }
 
 /// Favourite tools, touch-sized and scrollable, with the panel shortcuts beside them.
 /// The active tool is always in the row (prepended when it is not a favourite), so the
-/// selection never silently points at a tool the user cannot see.
+/// selection never silently points at a tool the user cannot see. Hidden with no
+/// document open: the start screen has no editing context.
 pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    if app.session.active().is_none() {
+        return;
+    }
     let t = Tokens::get(ui.ctx());
     egui::Panel::bottom("mobile_tools")
         .exact_size(68.0)
@@ -142,7 +150,7 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .show(ui, |ui| {
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
-                if icons::button_with_icon_size(ui, "grid-2x2", 44.0, 20.0, app.ui.mobile.tools_open, tl!("Tools")).clicked() {
+                if icons::button_with_icon_size(ui, "grid-2x2", 48.0, 22.0, app.ui.mobile.tools_open, tl!("Tools")).clicked() {
                     app.ui.mobile.tools_open = !app.ui.mobile.tools_open;
                     if app.ui.mobile.tools_open {
                         app.ui.mobile.tools_filter.clear();
@@ -163,7 +171,7 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         }
                         for tool in favs {
                             let tip = tl!(tool.label()).to_string();
-                            let resp = icons::button_with_icon_size(ui, icons::tool_icon(tool), 44.0, 22.0, app.ui.tool == tool, &tip);
+                            let resp = icons::button_with_icon_size(ui, icons::tool_icon(tool), 48.0, 24.0, app.ui.tool == tool, &tip);
                             // Touch has no hover: a press-and-hold names the tool without selecting it.
                             let held_for = resp.is_pointer_button_down_on().then(|| ui.input(|i| i.pointer.press_start_time().map(|t0| i.time - t0))).flatten();
                             if let Some(seconds) = held_for
@@ -199,8 +207,11 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     ("sliders-horizontal", tl!("Properties"), crate::dock::Group::Properties),
                     ("layers", tl!("Layers"), crate::dock::Group::Layers),
                 ] {
+                    // Panel shortcuts use the quiet rail style on purpose: the accent fill
+                    // is reserved for the active canvas tool above, so brush + open panel
+                    // never read as two selected tools.
                     let on = app.ui.mobile.panel == Some(group);
-                    if icons::button_with_icon_size(ui, icon, 44.0, 20.0, on, name).clicked() {
+                    if icons::rail_button(ui, icon, 48.0, on, name).clicked() {
                         app.ui.mobile.panel = if on { None } else { Some(group) };
                     }
                 }
@@ -216,82 +227,96 @@ fn favourites() -> [Tool; 10] {
 
 /// The full tool list over the canvas: every tool with its name, in desktop-toolbar
 /// groups, with a filter. The old 6-column icon grid was unreadable on touch (no hover
-/// ever shows the tooltip), so each 48 pt row names its tool. No new `tl!` literals:
+/// ever shows the tooltip), so each card names its tool. No new `tl!` literals:
 /// everything here reuses strings the catalogs already translate.
 pub fn tool_sheet(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    if !app.ui.mobile.tools_open {
+    if !app.ui.mobile.tools_open || app.session.active().is_none() {
         return;
     }
     let screen = ctx.content_rect();
+    let list_w = (screen.width() - 48.0).clamp(280.0, 420.0);
     egui::Window::new(tl!("Tools"))
         .id(egui::Id::new("mobile-tools"))
         .anchor(Align2::CENTER_BOTTOM, vec2(0.0, -84.0))
         .collapsible(false)
         .resizable(false)
         .constrain(true)
+        .title_bar(false)
         .show(ctx, |ui| {
-            ui.set_min_width((screen.width() - 48.0).clamp(280.0, 420.0));
+            ui.set_min_width(list_w);
+            ui.set_max_width(list_w);
+            // Custom header: title left, X on the same row right. The default title
+            // bar plus a second row with a lone X wasted a full row of height.
             ui.horizontal(|ui| {
                 ui.label(RichText::new(tl!("Tools")).size(14.0).strong());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icons::button(ui, "x", 32.0, false, tl!("Close")).clicked() {
+                    if icons::button(ui, "x", 40.0, false, tl!("Close")).clicked() {
                         app.ui.mobile.tools_open = false;
                     }
                 });
             });
             ui.add_space(4.0);
-            ui.add(
-                egui::TextEdit::singleline(&mut app.ui.mobile.tools_filter).hint_text(tl!("Search commands, tools and panels…")).desired_width(f32::INFINITY),
+            let avail = ui.available_width().max(200.0);
+            ui.add_sized(
+                vec2(avail, 48.0),
+                egui::TextEdit::singleline(&mut app.ui.mobile.tools_filter).hint_text(tl!("Search commands, tools and panels…")).desired_width(f32::INFINITY).margin(vec2(12.0, 12.0)),
             );
-            ui.add_space(4.0);
+            ui.add_space(8.0);
+            // Fixed width from the window size: deriving it from available_width
+            // inside the grid fed the grid's own sizing back into itself and the
+            // window blew up past the screen (only its bottom showed on-device).
+            let card_w = ((list_w - 32.0 - 8.0) / 2.0).clamp(48.0, 200.0);
             egui::ScrollArea::vertical().id_salt("mobile-tools-list").auto_shrink([false, false]).max_height((screen.height() * 0.5).clamp(200.0, 420.0)).show(
                 ui,
                 |ui| {
+                    // Top/bottom breathing room: first/last cards were clipped by the
+                    // scroll viewport edge.
+                    ui.add_space(16.0);
                     let q = app.ui.mobile.tools_filter.trim().to_lowercase();
                     let sections = crate::panels::visible_sections(&app.session.prefs().toolbar.hidden);
-                    let mut shown = 0u32;
-                    for (si, section) in sections.iter().enumerate() {
-                        let tools: Vec<Tool> = section
-                            .iter()
-                            .flat_map(|(_, slot)| slot.iter().copied())
-                            .filter(|tool| q.is_empty() || tl!(tool.label()).to_lowercase().contains(&q))
-                            .collect();
-                        if tools.is_empty() {
-                            continue;
-                        }
-                        // Hairline between toolbar groups, like the desktop rail (text headers
-                        // would each need 15 translations, so groups stay divider-only).
-                        if si > 0 && q.is_empty() {
-                            let t = Tokens::get(ui.ctx());
-                            let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
-                            ui.painter().line_segment([r.left_center(), r.right_center()], egui::Stroke::new(1.0, t.separator));
-                            ui.add_space(2.0);
-                        }
-                        for tool in tools {
-                            shown += 1;
-                            tool_row(app, ui, tool);
-                        }
-                    }
-                    if shown == 0 {
+                    let tools: Vec<Tool> = sections
+                        .iter()
+                        .flat_map(|section| section.iter().flat_map(|(_, slot)| slot.iter().copied()))
+                        .filter(|tool| q.is_empty() || tl!(tool.label()).to_lowercase().contains(&q))
+                        .collect();
+                    if tools.is_empty() {
                         ui.label(RichText::new(tl!("No matching commands")).color(Tokens::get(ui.ctx()).text_faint));
+                        return;
                     }
+                    egui::Grid::new("mobile-tools-grid").num_columns(2).spacing([8.0, 8.0]).show(ui, |ui| {
+                        for (i, tool) in tools.iter().enumerate() {
+                            tool_card(app, ui, *tool, card_w);
+                            if i % 2 == 1 {
+                                ui.end_row();
+                            }
+                        }
+                        if tools.len() % 2 == 1 {
+                            ui.end_row();
+                        }
+                    });
+                    ui.add_space(16.0);
                 },
             );
         });
 }
 
-/// One 48 pt touch row: icon plus the tool's name (the tooltip alone never shows on touch).
-fn tool_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
+/// One touch card: 24px icon over the short name ("Mover", not "Ferramenta Mover").
+/// 48x68pt minimum, two columns show 8-10 tools without immediate scrolling.
+/// `w` is fixed by the caller: measuring it per cell breaks the grid's sizing.
+fn tool_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, w: f32) {
     let t = Tokens::get(ui.ctx());
-    let name = tl!(tool.label()).to_string();
-    let w = ui.available_width().max(200.0);
-    let (r, resp) = ui.allocate_exact_size(vec2(w, 48.0), Sense::click());
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, name.clone()));
+    let full = tl!(tool.label()).to_string();
+    let short = Tool::short_display(tl!(tool.label())).to_string();
+    let (r, resp) = ui.allocate_exact_size(vec2(w, 68.0), Sense::click());
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, full.clone()));
     let tint = icons::button_chrome(ui, r, app.ui.tool == tool, resp.hovered());
-    icons::paint(ui, Rect::from_center_size(pos2(r.left() + 28.0, r.center().y), vec2(28.0, 28.0)), icons::tool_icon(tool), 19.0, tint);
+    icons::paint(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 24.0), vec2(32.0, 32.0)), icons::tool_icon(tool), 24.0, tint);
     let fg = if app.ui.tool == tool { t.accent_text } else { t.text };
-    ui.painter().text(pos2(r.left() + 50.0, r.center().y), Align2::LEFT_CENTER, name, egui::FontId::proportional(13.5), fg);
-    if resp.clicked() {
+    let mut job = egui::text::LayoutJob::simple_singleline(short, egui::FontId::proportional(12.5), fg);
+    job.wrap = egui::text::TextWrapping::truncate_at_width((r.width() - 12.0).max(1.0));
+    let g = ui.painter().layout_job(job);
+    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 44.0), g, fg);
+    if resp.on_hover_text(full).clicked() {
         app.ui.tool = tool;
         app.ui.mobile.tools_open = false;
         app.ui.mobile.tools_filter.clear();
@@ -302,15 +327,28 @@ fn tool_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
 /// the canvas takes the room back as soon as it closes. The bodies are the desktop dock's
 /// ([`crate::panels::dock_body`]), sharing its state and commands.
 pub fn sheet(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    if app.session.active().is_none() {
+        return;
+    }
     let Some(group) = app.ui.mobile.panel else { return };
     let ctx = ui.ctx().clone();
     let screen = ctx.content_rect();
     let h = (screen.height() * 0.45).clamp(260.0, 420.0);
     let t = Tokens::get(ui.ctx());
-    egui::Panel::bottom("mobile_sheet").exact_size(h).frame(egui::Frame::NONE.fill(t.dock).inner_margin(egui::Margin::symmetric(8, 6))).show(ui, |ui| {
-        // One row tall: `horizontal_centered` allocates the whole sheet height and
-        // would leave the sub-tabs and the body below with nothing.
-        ui.horizontal(|ui| {
+    egui::Panel::bottom("mobile_sheet").exact_size(h).frame(egui::Frame::NONE.fill(t.dock).inner_margin(egui::Margin { left: 12, right: 12, top: 6, bottom: 6 })).show(ui, |outer| {
+        // The contents live in a child pinned to the sheet's rect, clipped at its bottom.
+        // A bottom panel whose content runs past `exact_size` keeps its bottom edge but
+        // reports its top as `overflowed bottom - size`, so the canvas grew down by the
+        // overflow and painted over the group pills (on-device: ppp 2.57, pt-BR labels).
+        let body = outer.max_rect();
+        let clip = outer.clip_rect();
+        let mut inner = outer.new_child(egui::UiBuilder::new().max_rect(body).layout(egui::Layout::top_down(egui::Align::Min)));
+        inner.set_clip_rect(Rect::from_min_max(pos2(clip.min.x, body.min.y.max(clip.min.y)), pos2(clip.max.x, body.max.y.min(clip.max.y))));
+        let ui = &mut inner;
+        // Fixed 40pt header row: the 24pt pills and the close button share one center
+        // line. A bare `horizontal` top-aligns them (X sat below the baseline).
+        let row_w = ui.available_width();
+        ui.allocate_ui_with_layout(vec2(row_w, 40.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             let mut groups = vec![
                 (crate::dock::Group::Color, tl!("Color")),
@@ -323,9 +361,17 @@ pub fn sheet(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 groups.push((crate::dock::Group::Character, tl!("Character")));
             }
             // The pills plus Close don't fit in 360 pt: scroll them instead of
-            // clipping Navigator and Close off-screen.
-            let rest = (ui.available_width() - 32.0 - ui.spacing().item_spacing.x).max(64.0);
-            egui::ScrollArea::horizontal().id_salt("mobile-sheet-groups").auto_shrink([false, false]).max_width(rest).show(ui, |ui| {
+            // clipping Navigator and Close off-screen. Shrunk to the content: an
+            // unshrunk horizontal scroll takes the whole panel height and pushes
+            // the tabs and the body out from under the canvas.
+            let rest = (row_w - 40.0 - ui.spacing().item_spacing.x).max(64.0);
+            egui::ScrollArea::horizontal()
+                .id_salt("mobile-sheet-groups")
+                .auto_shrink([true, true])
+                .max_width(rest)
+                // No scrollbar: when the pills overflow it cut through their middles.
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+                .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 4.0;
                     for (g, label) in groups {
@@ -340,26 +386,47 @@ pub fn sheet(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             }
         });
         // The group's own tabs (Layers | Channels | Paths, …), as in the desktop dock.
+        // This segmented control is the only "Properties" label kept: no extra header below it.
+        // The Color group's own "Color" tab duplicates the group pill above it, so the
+        // sheet only offers Swatches | Gradients | Patterns (its content stays the body).
         let pro = Tokens::get(ui.ctx()).pro;
         let tabs = group.tabs(pro);
         let sel = tab_index(&app.ui.dock_tabs, group).min(tabs.len().saturating_sub(1));
         // Same as above: one row, so the body keeps the rest of the sheet.
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            for (i, tab) in tabs.iter().enumerate() {
-                if widgets::pill_tab(ui, tab, sel == i).clicked() {
-                    *tab_index_mut(&mut app.ui.dock_tabs, group) = i;
-                }
-            }
-        });
+        // Panel tabs scroll instead of clipping ("Navegad" cutoff on 360pt).
+        // Shrunk to the content, like the group row above.
+        egui::ScrollArea::horizontal()
+            .id_salt(("mobile-sheet-tabs", group.key()))
+            .auto_shrink([true, true])
+            // Same as the group pills above: no scrollbar through the tabs.
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    for (i, tab) in tabs.iter().enumerate() {
+                        if group == crate::dock::Group::Color && *tab == "Color" {
+                            continue;
+                        }
+                        if widgets::pill_tab(ui, tab, sel == i).clicked() {
+                            *tab_index_mut(&mut app.ui.dock_tabs, group) = i;
+                        }
+                    }
+                });
+            });
         let tab = tab_index(&app.ui.dock_tabs, group).min(tabs.len().saturating_sub(1));
         if group.scrolls_itself(tab) {
             crate::panels::dock_body(app, ui, group, tab);
         } else {
             egui::ScrollArea::vertical().id_salt(("mobile-sheet", group.key())).auto_shrink([false, false]).show(ui, |ui| {
+                // Top padding: the first size fields started at the scroll origin and
+                // read as cut in half by the tab row above.
+                ui.add_space(8.0);
                 crate::panels::dock_body(app, ui, group, tab);
+                ui.add_space(8.0);
             });
         }
+        // Report exactly the sheet's rect, never the overflow.
+        outer.expand_to_include_rect(body);
     });
 }
 
@@ -442,7 +509,7 @@ mod tests {
         };
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(chrome, a);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
-        h.run_steps(6);
+        h.run_steps(60);
         assert!(is_mobile(&h.ctx));
         let r = h.state().last_canvas_rect;
         assert!(r.width() >= 340.0, "full width with no side panels: {r:?}");
@@ -519,11 +586,11 @@ mod tests {
         }
     }
 
-    /// The narrow start screen drops the promo: no drop hint, no Discord, no links.
+    /// The home screen carries no promo at any width: no Discord, no links.
     #[test]
     fn start_screen_has_no_promo_on_phones() {
         use egui_kittest::kittest::Queryable;
-        for (w, promo) in [(360.0, false), (1440.0, true)] {
+        for w in [360.0, 1440.0] {
             let a = app();
             assert!(a.session.documents().is_empty());
             let mut h = Harness::builder().with_size(vec2(w, 800.0)).build_ui_state(
@@ -537,8 +604,9 @@ mod tests {
             );
             PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
             h.run_steps(6);
-            assert_eq!(h.query_all_by_label_contains("Discord").next().is_some(), promo, "{w} pt promo");
-            assert_eq!(h.query_all_by_label_contains("GitHub").next().is_some(), promo, "{w} pt links");
+            assert!(h.query_all_by_label_contains("Discord").next().is_none(), "{w} pt promo");
+            assert!(h.query_all_by_label_contains("GitHub").next().is_none(), "{w} pt links");
+            assert!(h.query_all_by_label_contains("Your creations").next().is_some(), "{w} pt home");
         }
     }
 
@@ -568,6 +636,7 @@ mod tests {
         }
     }
 
+
     /// The sheet filter narrows the rows ("heal" keeps the healing tools, drops the brush).
     #[test]
     fn tool_sheet_filter_narrows_the_rows() {
@@ -593,9 +662,96 @@ mod tests {
         assert!(h.query_all_by_label_contains("No matching commands").next().is_none(), "matches exist, so no empty state");
     }
 
-    /// The options strip always shows the active tool's name (the icon tooltip never fires on touch).
+    /// The tool window stays on screen: a bare right-to-left close row once measured
+    /// screen height and blew the window off the top (only its bottom showed on-device).
     #[test]
-    fn options_strip_shows_the_active_tool_name() {
+    fn tool_sheet_stays_inside_the_window() {
+        use egui_kittest::kittest::Queryable;
+        let mut a = app();
+        a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        a.ui.mobile.tools_open = true;
+        let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                let ctx = ui.ctx().clone();
+                tool_sheet(app, &ctx);
+            },
+            a,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.run_steps(8);
+        let win = h.query_all_by_label_contains("Tools").next().expect("the tool window renders").rect();
+        assert!(win.min.y >= 0.0 && win.max.y <= 800.0 && win.max.x <= 360.0, "the window stays on screen: {win:?}");
+        for probe in ["Move Tool", "Rectangular Marquee Tool"] {
+            let n = h.query_all_by_label_contains(probe).next().unwrap_or_else(|| panic!("the first row shows {probe}"));
+            assert!(n.rect().min.y >= 0.0 && n.rect().max.y <= 800.0, "{probe} is inside the window: {:?}", n.rect());
+        }
+    }
+
+    /// The Adjustments tab starts at the top of the sheet: unshrunk horizontal pill
+    /// scrolls once ate the panel height and pushed the body out under the canvas.
+    #[test]
+    fn sheet_adjustments_stay_inside_the_window() {
+        use egui_kittest::kittest::Queryable;
+        let mut a = app();
+        a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        a.ui.mobile.panel = Some(crate::dock::Group::Properties);
+        a.ui.dock_tabs.properties = 1;
+        let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                header(app, ui);
+                tool_bar(app, ui);
+                sheet(app, ui);
+                crate::canvas::document_area(app, ui);
+            },
+            a,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.run_steps(8);
+        for probe in ["Add an adjustment", "Brightness/Contrast", "Levels"] {
+            let n = h.query_all_by_label_contains(probe).next().unwrap_or_else(|| panic!("the adjustments body renders {probe}"));
+            assert!(n.rect().min.y >= 0.0 && n.rect().max.y <= 800.0, "{probe} is inside the window: {:?}", n.rect());
+        }
+    }
+
+    /// The Layers footer stays inside the sheet: the 56pt touch cells once overflowed
+    /// the 30pt desktop footer bar onto the bottom nav, and its right-to-left bar hid
+    /// buttons off the left edge.
+    #[test]
+    fn sheet_layers_footer_stays_inside_the_window() {
+        use egui_kittest::kittest::Queryable;
+        let mut a = app();
+        a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        a.ui.mobile.panel = Some(crate::dock::Group::Layers);
+        let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                header(app, ui);
+                tool_bar(app, ui);
+                sheet(app, ui);
+                crate::canvas::document_area(app, ui);
+            },
+            a,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.run_steps(8);
+        let del = h.query_all_by_label_contains("Delete layer").next().expect("the footer renders Delete").rect();
+        assert!(del.max.y <= 800.0, "Delete stays above the bottom nav: {del:?}");
+        let link = h.query_all_by_label_contains("Link layers").next().expect("the footer renders Link").rect();
+        assert!(link.min.x >= 0.0 && link.max.y <= 800.0, "Link starts on screen: {link:?}");
+    }
+
+    /// The options strip hides the active tool's name (the bottom bar already marks it)
+    /// but keeps its contextual controls.
+    #[test]
+    fn options_strip_hides_the_tool_name_but_keeps_its_options() {
         use egui_kittest::kittest::Queryable;
         let mut a = app();
         a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
@@ -611,7 +767,59 @@ mod tests {
         );
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
-        assert!(h.query_all_by_label_contains("Clone Stamp Tool").next().is_some(), "the strip names the active tool");
+        assert!(h.query_all_by_label_contains("Clone Stamp Tool").next().is_none(), "the strip no longer repeats the active tool");
+        assert!(h.query_all_by_label_contains("Aligned").next().is_some(), "the Clone Stamp options stay");
+    }
+
+    /// With no document open the strip draws nothing: there is no tool context.
+    #[test]
+    fn options_strip_hides_without_a_document() {
+        use egui_kittest::kittest::Queryable;
+        let a = app();
+        assert!(a.session.active().is_none());
+        let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                options_strip(app, ui);
+            },
+            a,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.run_steps(6);
+        assert!(h.query_all_by_label_contains("Aligned").next().is_none(), "no tool options without a document");
+    }
+
+    /// The canvas never covers the sheet: at the phone's density (ppp 2.57) the Layers
+    /// body ran a few points past the sheet's exact height, the bottom panel then reported
+    /// its top that much lower, and the canvas painted over the group pills (SM-S928B).
+    #[test]
+    fn canvas_stays_above_the_sheet_at_phone_density() {
+        for (w, hh, ppp) in [(360.0, 800.0, 1.0), (420.0, 910.0, 2.56875), (412.0, 915.0, 2.625), (360.0, 640.0, 3.0)] {
+            let mut a = app();
+            a.run("file.new", json!({"width": 200, "height": 200})).unwrap();
+            for _ in 0..7 {
+                a.run("layer.new.layer", json!({})).unwrap();
+            }
+            a.ui.mobile.panel = Some(crate::dock::Group::Layers);
+            let chrome = |ui: &mut egui::Ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                header(app, ui);
+                options_strip(app, ui);
+                tool_bar(app, ui);
+                sheet(app, ui);
+                crate::canvas::document_area(app, ui);
+            };
+            let mut h = Harness::builder().with_size(vec2(w, hh)).with_pixels_per_point(ppp).build_ui_state(chrome, a);
+            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+            h.run_steps(8);
+            let sheet_top = hh - 68.0 - (hh * 0.45_f32).clamp(260.0, 420.0);
+            let canvas = h.state().last_canvas_rect;
+            assert!(canvas.max.y <= sheet_top + 0.5, "{w}x{hh}@{ppp}: canvas {canvas:?} runs into the sheet at {sheet_top}");
+        }
     }
 
     /// Two fingers over the canvas count as navigation, one (or none) does not.

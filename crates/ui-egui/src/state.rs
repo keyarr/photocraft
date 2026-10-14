@@ -228,6 +228,12 @@ impl Tool {
             Tool::CustomShape => "Custom Shape Tool",
         }
     }
+    /// Short display name without the repetitive prefix/suffix: "Mover" instead of
+    /// "Ferramenta Mover", "Brush" instead of "Brush Tool". Touch lists have no hover,
+    /// so the short name is what the grid shows; matching still uses the full label.
+    pub fn short_display(translated: &str) -> &str {
+        translated.trim_start_matches("Ferramenta ").trim_end_matches(" Tool")
+    }
     pub fn is_type(self) -> bool {
         matches!(self, Self::Type | Self::VerticalType)
     }
@@ -863,6 +869,10 @@ pub struct UiState {
     /// Layers panel kind filter ("pixel", "adjustment", "type", "shape", "smart"); empty = all.
     #[serde(default)]
     pub layer_filter: Vec<String>,
+    /// Layers panel: advanced rows (Kind filter, Lock + Fill) hidden by default on touch.
+    /// Only blend mode + Opacity stay visible until the filter button expands them.
+    #[serde(default)]
+    pub show_layer_filters: bool,
     /// Actions panel: which row is selected and which are expanded. The list lives on the session.
     #[serde(default)]
     pub actions: crate::actions::ActionsUi,
@@ -999,6 +1009,7 @@ impl Default for UiState {
             slices: Default::default(),
             shell: Default::default(),
             layer_filter: Vec::new(),
+            show_layer_filters: false,
             pen: None,
             direct_selection: Default::default(),
             selected_path: None,

@@ -70,6 +70,7 @@ pub mod gpu_canvas;
 pub mod gpu_status;
 pub mod gradient_ui;
 pub mod hold_keys;
+pub mod home_ui;
 pub mod i18n;
 mod icon_data;
 pub mod icons;
@@ -621,6 +622,7 @@ impl PhotocraftApp {
         };
         // Saved preferences (and recovered documents) are in place before the first frame.
         prefs_ui::load(&mut app);
+        prefs_ui::adopt_saved_theme(&mut app);
         notices::wayland_file_drop_guidance(&mut app);
         // File › Scripts › Script Events Manager: "Start Application".
         photocraft_engine::automate_cmds::fire_event(&mut app.session, "startApplication");
@@ -1073,10 +1075,18 @@ impl PhotocraftApp {
 }
 
 impl eframe::App for PhotocraftApp {
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        self.startup_bg().to_normalized_gamma_f32()
+    }
+
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         i18n::set_current(i18n::Lang::from_pref(&self.session.prefs().interface.language));
         if !self.styled {
-            Self::setup_context(ctx, self.ui.theme);
+            // The creator usually ran `setup_context` already with this same theme:
+            // reinstalling only discards the font atlas for a frame (white glyph boxes).
+            if ctx.data(|d| d.get_temp::<theme::ThemeKind>(egui::Id::new("photocraft-setup"))) != Some(self.ui.theme) {
+                Self::setup_context(ctx, self.ui.theme);
+            }
             self.styled = true;
         } else {
             self.fonts_ready = true;
@@ -1166,7 +1176,11 @@ impl eframe::App for PhotocraftApp {
         let ctx = ui.ctx().clone();
         i18n::set_current(i18n::Lang::from_pref(&self.session.prefs().interface.language));
         // Fonts registered via set_fonts only take effect next frame; named families would panic now.
+        // Paint the final background anyway: an empty frame leaves a translucent clear
+        // over whatever the compositor held (white stripes on Android).
         if !self.fonts_ready {
+            let bg = self.startup_bg();
+            egui::CentralPanel::default().frame(egui::Frame::NONE.fill(bg)).show(ui, |_| {});
             ctx.request_repaint();
             self.automation_input = false;
             return;
@@ -1202,38 +1216,47 @@ impl eframe::App for PhotocraftApp {
         // Narrow windows (phones) get the compact touch chrome instead of the desktop
         // toolbar + dock, which would squeeze the canvas to nothing.
         let mobile = chrome && crate::mobile_ui::is_mobile(&ctx);
+        // Editing chrome needs an open document; the start screen uses the central
+        // area only, with the title/header for global actions.
+        let has_doc = self.session.active().is_some();
+        let showing_home = self.ui.chrome.shows_home(self.session.documents().len(), self.session.prefs().general.auto_show_home_screen);
         if mobile {
-            crate::mobile_ui::header(self, ui);
-            if self.ui.panels.options_bar {
-                crate::mobile_ui::options_strip(self, ui);
+            if showing_home || !has_doc {
+                crate::home_ui::header(self, ui);
+            } else {
+                crate::mobile_ui::header(self, ui);
+                if self.ui.panels.options_bar {
+                    crate::mobile_ui::options_strip(self, ui);
+                }
             }
             // Bottom panels stack upward in declaration order: the tool bar stays at the
             // screen edge, the panel sheet opens above it.
-            crate::mobile_ui::tool_bar(self, ui);
-            crate::mobile_ui::sheet(self, ui);
+            if has_doc && !showing_home {
+                crate::mobile_ui::tool_bar(self, ui);
+                crate::mobile_ui::sheet(self, ui);
+            }
         } else {
             if chrome {
                 panels::title_bar(self, ui);
             }
-            if chrome && self.ui.panels.options_bar {
+            if chrome && has_doc && self.ui.panels.options_bar {
                 panels::options_bar(self, ui);
             }
             if chrome && self.ui.panels.status_bar {
                 panels::status_bar(self, ui);
             }
-            if chrome && self.ui.panels.toolbar {
+            if chrome && has_doc && self.ui.panels.toolbar {
                 panels::toolbar(self, ui);
             }
-            if chrome && self.ui.panels.dock {
+            if chrome && has_doc && self.ui.panels.dock {
                 panels::right_dock(self, ui);
             }
         }
-        let t = theme::Tokens::get(&ctx);
-        let backdrop = if chrome { prefs_ui::pasteboard_color(self).unwrap_or(t.canvas) } else { egui::Color32::BLACK };
+        let backdrop = self.startup_bg();
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(backdrop)).show(ui, |ui| {
             canvas::document_area(self, ui);
         });
-        if mobile {
+        if mobile && !showing_home {
             crate::mobile_ui::tool_sheet(self, &ctx);
         }
         panels::properties_window(self, &ctx);
@@ -1366,6 +1389,17 @@ impl PhotocraftApp {
         self.checker = None;
     }
 
+    /// Window background before and around the first real frame: opaque and the same
+    /// colour the CentralPanel paints, so startup never blends a translucent clear
+    /// with whatever the compositor held underneath.
+    fn startup_bg(&self) -> egui::Color32 {
+        if self.ui.view.hides_chrome() {
+            egui::Color32::BLACK
+        } else {
+            prefs_ui::pasteboard_color(self).unwrap_or(theme::Tokens::for_kind(self.ui.theme).canvas)
+        }
+    }
+
     /// Cached 64px thumbnail of a pixel-ish layer, laid out in document space.
     pub fn layer_thumb(&mut self, ctx: &egui::Context, doc: &Document, layer: &photocraft_doc::Layer) -> egui::TextureId {
         // Key by content, not document revision: COW tiles change pointer only when their pixels
@@ -1471,6 +1505,7 @@ impl PhotocraftApp {
     /// Install fonts, image loaders and the theme. Call from the app creator when possible so the
     /// very first frame renders; otherwise `logic` does it and the first frame is skipped.
     pub fn setup_context(ctx: &egui::Context, kind: theme::ThemeKind) {
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new("photocraft-setup"), kind));
         ctx.add_plugin(tool_cursor::CursorLifecycle);
         theme::install_fonts(ctx);
         egui_extras::install_image_loaders(ctx);
