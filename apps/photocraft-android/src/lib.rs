@@ -162,8 +162,17 @@ pub fn android_services() -> (Services, Inbox) {
 fn android_services_in(dir: Option<PathBuf>) -> (Services, Inbox) {
     let inbox = shared_inbox();
     let prefs_file = dir.map(|d| d.join("preferences.json"));
-    let load_path = prefs_file.clone();
-    let save_path = prefs_file;
+    // No data dir means no persistence and no recovery (same as web): leave the
+    // services unset so a change stays in memory without a save warning.
+    let load_prefs = prefs_file.clone().map(|path| {
+        let f: photocraft_ui_egui::LoadTextFn = Box::new(move || std::fs::read_to_string(&path).ok());
+        f
+    });
+    let save_prefs = prefs_file.map(|path| {
+        let f: photocraft_ui_egui::SaveTextFn =
+            Box::new(move |text: &str| photocraft_format::atomic_write(&path, text.as_bytes()).map_err(|e| e.to_string()));
+        f
+    });
     let services = Services {
         import: Some(Box::new(|name: &str, bytes: &[u8]| photocraft_io::import(name, bytes).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string()))),
         export: Some(Box::new(|doc: &Document, path: &str, settings: &photocraft_ui_egui::ExportSettings| {
@@ -191,11 +200,8 @@ fn android_services_in(dir: Option<PathBuf>) -> (Services, Inbox) {
         // ClipboardManager via JNI later; None pastes from the internal clipboard.
         clipboard_set_image: None,
         clipboard_get_image: None,
-        load_prefs: Some(Box::new(move || load_path.as_ref().and_then(|p| std::fs::read_to_string(p).ok()))),
-        save_prefs: Some(Box::new(move |text: &str| {
-            let path = save_path.as_ref().ok_or("no app data directory")?;
-            photocraft_format::atomic_write(path, text.as_bytes()).map_err(|e| e.to_string())
-        })),
+        load_prefs,
+        save_prefs,
         // No control TCP server, no screen picker, no open_url on a phone.
         ..Default::default()
     };
@@ -295,12 +301,10 @@ mod tests {
     }
 
     #[test]
-    fn prefs_without_a_data_dir_fail_gracefully() {
-        let (mut services, _) = android_services_in(None);
-        let back: Option<String> = services.load_prefs.as_mut().and_then(|load| load());
-        assert!(back.is_none());
-        let mut save = services.save_prefs.take().unwrap();
-        assert!(save("{}").is_err());
+    fn prefs_without_a_data_dir_stay_off() {
+        let (services, _) = android_services_in(None);
+        assert!(services.load_prefs.is_none());
+        assert!(services.save_prefs.is_none());
     }
 
     #[test]
