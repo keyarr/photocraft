@@ -34,12 +34,12 @@ const ROOTS: &[&str] =
 /// stall on giant folders.
 const MAX_ENTRIES: usize = 2000;
 
-/// Photo thumbnail: longest side in px. Thrice the 88 pt cell, so it stays
-/// sharp on 3x phone displays (the GPU downscales on draw).
-const THUMB_SIDE: u32 = 256;
-/// Cap on cached thumbnails: at 256 px each is ~260 KB, so this bounds the
-/// grid's GPU use (~25 MB). Older folders re-decode on revisit.
-const MAX_CACHED_THUMBS: usize = 96;
+/// Photo thumbnail: longest side in px. Covers 3x phone cells without
+/// upscaling (the GPU downscales on draw).
+const THUMB_SIDE: u32 = 512;
+/// Cap on cached thumbnails: at 512 px each is ~1 MB, so this bounds the
+/// grid's GPU use (~50 MB). Older folders re-decode on revisit.
+const MAX_CACHED_THUMBS: usize = 48;
 /// Files bigger than this get a placeholder icon instead of a thumbnail: the
 /// file still opens on tap, it just isn't decoded for the grid.
 const MAX_THUMB_BYTES: u64 = 32 * 1024 * 1024;
@@ -52,7 +52,7 @@ const THUMB_BUDGET: usize = 4;
 /// this with stale requests that the worker skips; the visible cells retry on
 /// later frames with a fresh generation.
 const MAX_QUEUED_THUMBS: usize = 64;
-/// Native: worker results uploaded per frame. One upload is ~260 KB, so this
+/// Native: worker results uploaded per frame. One upload is ~1 MB, so this
 /// never approaches a frame budget while still filling the grid in a couple
 /// of frames after a scroll settles.
 const RESULTS_PER_FRAME: usize = 8;
@@ -881,7 +881,7 @@ mod tests {
         assert_eq!(thumb_kind("noext"), ThumbKind::None);
 
         let img = decode_thumb(&dir.join("red.png"), "red.png", Some(len)).expect("small photo decodes");
-        assert_eq!(img.size, [100, 50], "long side shrinks to the grid, aspect kept");
+        assert_eq!(img.size, [200, 100], "small photos keep native size, aspect kept");
         assert!(decode_thumb(&dir.join("bad.png"), "bad.png", Some(12)).is_none(), "corrupt bytes degrade to the icon");
         assert!(decode_thumb(&dir.join("note.txt"), "note.txt", Some(2)).is_none(), "unsupported files get no decode");
         assert!(decode_thumb(&dir.join("red.png"), "red.png", Some(MAX_THUMB_BYTES + 1)).is_none(), "oversized files keep the icon");

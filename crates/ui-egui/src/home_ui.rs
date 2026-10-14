@@ -39,8 +39,8 @@ const RECENT_MAX: usize = 6;
 const PHOTOS_MAX: usize = 9;
 /// Inline thumbnail decodes per frame; the rest keep their icon until later.
 const THUMB_BUDGET: usize = 4;
-/// Longest thumbnail side in px (sharp on 3x phones, still small on GPU).
-const THUMB_SIDE: u32 = 256;
+/// Longest thumbnail side in px (covers 3x phone cells without upscaling).
+const THUMB_SIDE: u32 = 512;
 /// Files bigger than this keep their icon; they still open on tap.
 const MAX_THUMB_BYTES: u64 = 32 * 1024 * 1024;
 /// Photo scan cache lifetime in seconds (egui time). Expiry never blocks a
@@ -594,7 +594,11 @@ fn thumb_for(ui: &egui::Ui, path: &str, budget: &mut usize) -> Option<egui::Text
     *budget -= 1;
     match decode_thumb(Path::new(path), size) {
         Some(img) => {
-            let tex = ui.ctx().load_texture(format!("home-thumb-{fingerprint}"), img, egui::TextureOptions::LINEAR);
+            let tex = ui.ctx().load_texture(
+                format!("home-thumb-{fingerprint}"),
+                img,
+                egui::TextureOptions { mipmap_mode: Some(egui::TextureFilter::Linear), ..egui::TextureOptions::LINEAR },
+            );
             ui.ctx().data_mut(|d| d.insert_temp(key, tex.clone()));
             Some(tex)
         }
@@ -824,7 +828,7 @@ mod tests {
     fn shrink_averages_instead_of_aliasing() {
         // 1px checkerboard: point sampling renders it solid black or white,
         // area averaging renders mid grey everywhere.
-        let (w, h) = (512usize, 512usize);
+        let (w, h) = (1024usize, 1024usize);
         let mut px = vec![0u8; w * h * 4];
         for y in 0..h {
             for x in 0..w {
@@ -837,7 +841,7 @@ mod tests {
             }
         }
         let img = shrink(&px, w as u32, h as u32);
-        assert_eq!(img.size, [256, 256]);
+        assert_eq!(img.size, [512, 512]);
         for p in img.pixels.iter().step_by(997) {
             assert!((120..=135).contains(&p.r()), "red averages to grey, got {}", p.r());
             assert!((120..=135).contains(&p.g()), "green averages to grey, got {}", p.g());
