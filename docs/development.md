@@ -43,7 +43,7 @@ CRAFT_FONTS_DIR="$PWD/../craft-fonts" cargo test --workspace     # runs the Japa
 
 ## Graphics startup and device loss
 
-Phones render on the CPU compositor by default; `PHOTOCRAFT_ANDROID_GPU=1` opts into the wgpu canvas. If the device is lost while running (#243), every GPU entry point checks the device's health flag first, the canvas switches to the CPU compositor for the rest of the session and a notice says "GPU device was lost; using the CPU renderer."
+Phones render on the CPU compositor by default; Preferences › Performance › Rendering Mode: GPU opts into the wgpu canvas (applies at next launch). `PHOTOCRAFT_ANDROID_GPU=1` does the same on a host run. If the device is lost while running (#243), every GPU entry point checks the device's health flag first, the canvas switches to the CPU compositor for the rest of the session and a notice says "GPU device was lost; using the CPU renderer."
 
 ## Logs
 
@@ -56,8 +56,8 @@ By default PhotoCraft's own crates log at `info` and everything else at `warn`. 
 | Variable | Effect |
 |---|---|
 | `RUST_LOG` | Log levels for standard error and logcat (see [Logs](#logs)) |
-| `PHOTOCRAFT_ANDROID_GPU=1` | Use the wgpu canvas instead of the default CPU compositor |
-| `PHOTOCRAFT_ANDROID_DATA_DIR` | Private files dir (set from `Context.getFilesDir` on device; prefs + recovery stay off without it) |
+| `PHOTOCRAFT_ANDROID_GPU=1` | Use the wgpu canvas instead of the default CPU compositor (host runs; on device use Preferences › Performance › Rendering Mode: GPU) |
+| `PHOTOCRAFT_ANDROID_DATA_DIR` | Private files dir override (on device the NativeActivity's internal data path is used; prefs + recovery stay off without either) |
 | `PHOTOCRAFT_INLINE_JOBS=1` | Run background-capable commands inline instead of on the job thread |
 | `PHOTOCRAFT_CPU_CANVAS=1` | Force the CPU canvas path instead of the wgpu shader canvas |
 | `PHOTOCRAFT_GPU_TILE=2048` | Force GPU canvas tiling (tests tile seams) |

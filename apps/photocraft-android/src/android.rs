@@ -196,6 +196,13 @@ pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
     android_logger::init_once(android_logger::Config::default().with_max_level(log::LevelFilter::Info));
     log::info!("photocraft-android: activity start");
     remember(&app);
+    match app.internal_data_path() {
+        Some(dir) => {
+            log::info!("photocraft-android: data dir {}", dir.display());
+            crate::set_data_dir(dir);
+        }
+        None => log::warn!("photocraft-android: no internal data path; preferences and recovery stay off"),
+    }
     let options = eframe::NativeOptions { android_app: Some(app), ..Default::default() };
     if let Err(e) = crate::run(options) {
         log::error!("photocraft-android: run_native failed: {e}");

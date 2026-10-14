@@ -12,8 +12,9 @@
 //! access is granted; on a host run (`cargo run -p photocraft-android`) rfd
 //! dialogs are wired so the dev loop can open and save.
 //!
-//! GPU is opt-in (`PHOTOCRAFT_ANDROID_GPU=1`); default is the CPU compositor.
-//! The JNI half (`getFilesDir`, ClipboardManager) is still open:
+//! GPU canvas is opt-in (Preferences › Performance › Rendering Mode: GPU, or
+//! `PHOTOCRAFT_ANDROID_GPU=1` on a host run); default is the CPU compositor.
+//! The JNI half (ClipboardManager) is still open:
 //! its seam is `shared_inbox`/`push_bytes` + `data_dir` below, both safe Rust
 //! with no new unsafe.
 
@@ -24,7 +25,6 @@ use std::sync::OnceLock;
 
 use photocraft_doc::Document;
 use photocraft_engine::Session;
-use photocraft_ui_egui::theme::ThemeKind;
 use photocraft_ui_egui::{Inbox, PhotocraftApp, Services};
 
 /// Android entry point (`android_main`); compiled in on-device only.
@@ -36,11 +36,26 @@ pub mod android;
 // `import` opens. The full list stays in one place so the browser
 // (`ui-egui/src/device_browser.rs`) and the host dialog below never drift.
 
-/// Where private files live: set by the Java side from `Context.getFilesDir`
-/// before `android_main` runs (`PHOTOCRAFT_ANDROID_DATA_DIR` on a host run).
+/// Private files dir, remembered from `android_main` (`internal_data_path`;
+/// `PHOTOCRAFT_ANDROID_DATA_DIR` on a host run). Same pattern as
+/// [`SHARED_INBOX`]: `run` never returns a handle for it, so `android_main`
+/// stores it here before the app starts.
+static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Remember where private files live. Called once from `android_main` before
+/// the app starts; later calls (activity recreation) keep the first value.
+pub fn set_data_dir(dir: PathBuf) {
+    let _ = DATA_DIR.set(dir);
+}
+
+/// Where private files live.
 /// `None` means prefs don't persist and recovery is off (same as web).
 pub fn data_dir() -> Option<PathBuf> {
-    std::env::var_os("PHOTOCRAFT_ANDROID_DATA_DIR").map(PathBuf::from).filter(|p| !p.as_os_str().is_empty())
+    DATA_DIR
+        .get()
+        .cloned()
+        .or_else(|| std::env::var_os("PHOTOCRAFT_ANDROID_DATA_DIR").map(PathBuf::from))
+        .filter(|p| !p.as_os_str().is_empty())
 }
 
 /// Queue bytes from SAF (or a host test) for the app to open next frame.
@@ -227,13 +242,24 @@ pub fn new_app() -> (PhotocraftApp, Inbox) {
     (app, inbox)
 }
 
+/// Whether the Android shell should use the wgpu canvas: an explicit GPU rendering
+/// mode in Preferences › Performance (applies at next launch), or the host
+/// dev-loop override. `auto` stays on the CPU compositor on phones.
+fn android_wants_gpu(app: &PhotocraftApp) -> bool {
+    std::env::var_os("PHOTOCRAFT_ANDROID_GPU").is_some()
+        || app.session.prefs().performance.effective_rendering_mode() == photocraft_engine::prefs::RenderingMode::Gpu
+}
+
 fn maybe_enable_gpu(app: &mut PhotocraftApp, cc: &eframe::CreationContext) {
-    if std::env::var_os("PHOTOCRAFT_ANDROID_GPU").is_none() {
+    let Some(rs) = cc.wgpu_render_state.clone() else { return };
+    // The window always has a wgpu device: record it so Help › System Info shows
+    // the real adapter even while the image compositor stays on the CPU.
+    app.perf.gpu_info.set_adapter(&rs.adapter.get_info());
+    if !android_wants_gpu(app) {
+        app.perf.gpu_info.canvas = "cpu".into();
         return;
     }
-    if let Some(rs) = cc.wgpu_render_state.clone() {
-        app.set_wgpu(rs);
-    }
+    app.set_wgpu(rs);
 }
 
 /// Run on host (`main.rs`) or from `android_main` (`src/android.rs`).
@@ -243,8 +269,8 @@ pub fn run(options: eframe::NativeOptions) -> eframe::Result {
         "PhotoCraft",
         options,
         Box::new(|cc| {
-            PhotocraftApp::setup_context(&cc.egui_ctx, ThemeKind::Pro);
             let (mut app, _inbox) = new_app();
+            PhotocraftApp::setup_context(&cc.egui_ctx, app.ui.theme);
             maybe_enable_gpu(&mut app, cc);
             Ok(Box::new(app))
         }),
@@ -329,5 +355,22 @@ mod tests {
         assert!(services.storage_has_access.is_none());
         assert!(services.storage_request.is_none());
         assert!(services.storage_settings.is_none());
+    }
+
+    #[test]
+    fn gpu_canvas_is_opt_in_through_the_rendering_mode() {
+        if std::env::var_os("PHOTOCRAFT_ANDROID_GPU").is_some() {
+            return; // host override on: prefs can't keep the canvas off.
+        }
+        let (mut app, _) = new_app();
+        app.session.edit_prefs(|p| {
+            p.performance.rendering_mode = None;
+            p.performance.use_gpu = true;
+        });
+        assert!(!android_wants_gpu(&app), "auto stays on the CPU compositor on phones");
+        app.session.edit_prefs(|p| p.performance.rendering_mode = Some(photocraft_engine::prefs::RenderingMode::Gpu));
+        assert!(android_wants_gpu(&app));
+        app.session.edit_prefs(|p| p.performance.rendering_mode = Some(photocraft_engine::prefs::RenderingMode::Cpu));
+        assert!(!android_wants_gpu(&app));
     }
 }
