@@ -34,12 +34,12 @@ const ROOTS: &[&str] =
 /// stall on giant folders.
 const MAX_ENTRIES: usize = 2000;
 
-/// Photo thumbnail: longest side in px. Twice the 88 pt cell, so it stays
-/// sharp on 2x phone displays (the GPU downscales on draw).
-const THUMB_SIDE: u32 = 192;
-/// Cap on cached thumbnails: at 192 px each is ~150 KB, so this bounds the
-/// grid's GPU use (~20 MB). Older folders re-decode on revisit.
-const MAX_CACHED_THUMBS: usize = 150;
+/// Photo thumbnail: longest side in px. Thrice the 88 pt cell, so it stays
+/// sharp on 3x phone displays (the GPU downscales on draw).
+const THUMB_SIDE: u32 = 256;
+/// Cap on cached thumbnails: at 256 px each is ~260 KB, so this bounds the
+/// grid's GPU use (~25 MB). Older folders re-decode on revisit.
+const MAX_CACHED_THUMBS: usize = 96;
 /// Files bigger than this get a placeholder icon instead of a thumbnail: the
 /// file still opens on tap, it just isn't decoded for the grid.
 const MAX_THUMB_BYTES: u64 = 32 * 1024 * 1024;
@@ -52,7 +52,7 @@ const THUMB_BUDGET: usize = 4;
 /// this with stale requests that the worker skips; the visible cells retry on
 /// later frames with a fresh generation.
 const MAX_QUEUED_THUMBS: usize = 64;
-/// Native: worker results uploaded per frame. One upload is ~150 KB, so this
+/// Native: worker results uploaded per frame. One upload is ~260 KB, so this
 /// never approaches a frame budget while still filling the grid in a couple
 /// of frames after a scroll settles.
 const RESULTS_PER_FRAME: usize = 8;
@@ -377,8 +377,10 @@ fn decode_thumb(path: &Path, name: &str, size: Option<u64>) -> Option<egui::Colo
         ThumbKind::Flat => {
             // Phone JPEGs/TIFFs carry a tiny IFD1 preview: decode that
             // (tens of KB) instead of the 12 MP main image, falling back to
-            // the full decode when there is none.
-            if let Some(img) = photocraft_codecs::exif_thumbnail(&bytes) {
+            // the full decode when there is none. A stamp smaller than the
+            // grid cell stretched up looks worse than no shortcut at all, so
+            // tiny previews fall through to the full decode too.
+            if let Some(img) = photocraft_codecs::exif_thumbnail(&bytes).filter(|img| img.width().max(img.height()) >= THUMB_SIDE) {
                 return Some(shrink(&img.to_rgba8(), img.width(), img.height()));
             }
             let limits =
@@ -389,21 +391,32 @@ fn decode_thumb(path: &Path, name: &str, size: Option<u64>) -> Option<egui::Colo
     }
 }
 
-/// Nearest-neighbour shrink of RGBA8 bytes to `THUMB_SIDE` on the long side.
+/// Area-averaged shrink of RGBA8 bytes to `THUMB_SIDE` on the long side.
 fn shrink(px: &[u8], w: u32, h: u32) -> egui::ColorImage {
     let (w, h) = (w.max(1) as usize, h.max(1) as usize);
     let side = THUMB_SIDE as usize;
     let k = w.max(h).div_ceil(side).max(1);
     let (ow, oh) = (w.div_ceil(k), h.div_ceil(k));
-    let mut out = Vec::with_capacity(ow * oh * 4);
-    for y in 0..oh {
-        for x in 0..ow {
-            let o = (y * k * w + x * k) * 4;
-            match px.get(o..o + 4) {
-                Some(p) => out.extend_from_slice(p),
-                None => out.extend_from_slice(&[0, 0, 0, 0]),
-            }
+    let mut sum = vec![0u32; ow * oh * 4];
+    let mut count = vec![0u32; ow * oh];
+    for y in 0..h {
+        for x in 0..w {
+            let o = (y * w + x) * 4;
+            let cell = (y / k) * ow + (x / k);
+            let Some(p) = px.get(o..o + 4) else { continue };
+            let s = &mut sum[cell * 4..cell * 4 + 4];
+            s[0] += u32::from(p[0]);
+            s[1] += u32::from(p[1]);
+            s[2] += u32::from(p[2]);
+            s[3] += u32::from(p[3]);
+            count[cell] += 1;
         }
+    }
+    let mut out = Vec::with_capacity(ow * oh * 4);
+    for (cell, n) in count.iter().enumerate() {
+        let n = (*n).max(1);
+        let s = &sum[cell * 4..cell * 4 + 4];
+        out.extend_from_slice(&[(s[0] / n) as u8, (s[1] / n) as u8, (s[2] / n) as u8, (s[3] / n) as u8]);
     }
     egui::ColorImage::from_rgba_unmultiplied([ow, oh], &out)
 }
