@@ -699,7 +699,9 @@ pub(crate) fn options_content(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     ui.painter().line_segment([r.left_top(), r.right_top()], Stroke::new(1.0, t.separator));
     ui.painter().line_segment([r.left_bottom(), r.right_bottom()], Stroke::new(1.0, t.separator));
     ui.horizontal_centered(|ui| {
-                if t.pro {
+                // Home lives in the mobile header (file title bar), so the strip below
+                // skips it: two house icons stacked was the duplicate.
+                if t.pro && !crate::mobile_ui::is_mobile(ui.ctx()) {
                     crate::chrome_ui::home_button(app, ui);
                     widgets::vline(ui, 22.0);
                 }

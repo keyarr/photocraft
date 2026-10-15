@@ -52,24 +52,145 @@ pub fn two_finger(ctx: &egui::Context, rect: egui::Rect) -> Option<egui::MultiTo
     ctx.input(|i| i.multi_touch()).filter(|m| m.num_touches >= 2 && rect.contains(m.center_pos))
 }
 
-/// Compact header: undo, the document title, export and an overflow menu. Everything else
-/// lives one tap away in the command palette or the overflow menu, so no menu bar has to
-/// fit in 360 pt. With no document open only the title and the overflow menu stay:
-/// undo and export need an editable document.
+/// Which half of the canvas a two-finger tap landed on: left undoes, right redoes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum TapSide {
+    Undo,
+    Redo,
+}
+
+/// An in-progress two-finger tap over the canvas: a short two-finger touch with almost
+/// no pan or pinch. Anything longer or farther keeps navigating (see [`two_finger`]).
+#[derive(Clone, Copy, Debug)]
+pub struct TapTrack {
+    start: f64,
+    center: egui::Pos2,
+    moved: f32,
+}
+
+/// Longest a two-finger touch may last to still count as a tap, and farthest its
+/// centre may wander (points).
+const TAP_SECS: f64 = 0.4;
+const TAP_TRAVEL: f32 = 24.0;
+
+/// Fold one frame of multi-touch state into the tap tracker. Returns the tap's side when
+/// the fingers lift in time and in place: the caller undoes (left) or redoes (right).
+/// A pinch, spread or twist is navigation, never a tap, so any real zoom/rotation kills it.
+pub fn two_finger_tap(track: &mut Option<TapTrack>, now: f64, rect: egui::Rect, touch: Option<&egui::MultiTouchInfo>) -> Option<TapSide> {
+    let Some(m) = touch else {
+        let t = track.take()?;
+        let dt = now - t.start;
+        // Same-frame lifts (dt == 0) still count; `(0.0..TAP_SECS)` would drop them.
+        if !dt.is_sign_negative() && dt < TAP_SECS && t.moved < TAP_TRAVEL && rect.contains(t.center) {
+            return Some(if t.center.x < rect.center().x { TapSide::Undo } else { TapSide::Redo });
+        }
+        return None;
+    };
+    if m.num_touches != 2 {
+        // Three fingers (or more) is some other gesture: wait for fresh fingers.
+        *track = None;
+        return None;
+    }
+    match track {
+        None => {
+            // Taps start on the canvas; a gesture that slides in from the chrome never counts.
+            if !rect.contains(m.center_pos) {
+                return None;
+            }
+            *track = Some(TapTrack { start: now, center: m.center_pos, moved: 0.0 });
+        }
+        Some(t) => {
+            if (m.zoom_delta - 1.0).abs() > 0.08 || m.rotation_delta.abs() > 0.06 {
+                t.moved = TAP_TRAVEL + 1.0;
+            } else {
+                t.moved = t.moved.max(t.center.distance(m.center_pos));
+            }
+        }
+    }
+    None
+}
+
+/// Accumulated two-finger twist for the Move tool: total rotation (radians) since both
+/// fingers landed. Committed once on lift as one `edit.transform`, so a twist is one step.
+#[derive(Clone, Copy, Debug)]
+pub struct TwistTrack {
+    acc: f64,
+}
+
+/// Twist below this never rotates: pinch noise, not intent (~2 degrees).
+pub const TWIST_DEADZONE_RAD: f64 = 0.035;
+
+/// Fold one frame of multi-touch state into the twist tracker. Returns the accumulated
+/// angle on lift when past the deadzone; the caller rotates (Move tool) or drops it.
+pub fn two_finger_twist(track: &mut Option<TwistTrack>, touch: Option<&egui::MultiTouchInfo>) -> Option<f64> {
+    let Some(m) = touch else {
+        let t = track.take()?;
+        return (t.acc.abs() >= TWIST_DEADZONE_RAD).then_some(t.acc);
+    };
+    if m.num_touches != 2 {
+        *track = None;
+        return None;
+    }
+    match track {
+        None => *track = Some(TwistTrack { acc: 0.0 }),
+        Some(t) => {
+            let d = f64::from(m.rotation_delta);
+            if d.is_finite() && d != 0.0 {
+                t.acc += d;
+            }
+        }
+    }
+    None
+}
+
+/// Rotation matrix about (cx, cy) for `edit.transform`. None on hostile input or no turn.
+pub fn twist_matrix(cx: f64, cy: f64, angle: f64) -> Option<[f64; 6]> {
+    if !cx.is_finite() || !cy.is_finite() || !angle.is_finite() || angle.abs() < 1e-9 {
+        return None;
+    }
+    let (s, c) = angle.sin_cos();
+    if !s.is_finite() || !c.is_finite() {
+        return None;
+    }
+    let m = [c, s, -s, c, cx - cx * c + cy * s, cy - cx * s - cy * c];
+    m.iter().all(|v| v.is_finite()).then_some(m)
+}
+
+/// Snap an accumulated twist to 15 degree steps while Shift is held, like the Free
+/// Transform outside drag.
+pub fn snap_twist(angle: f64, shift: bool) -> f64 {
+    if !shift || !angle.is_finite() {
+        return angle;
+    }
+    let step = 15f64.to_radians();
+    (angle / step).round() * step
+}
+
+/// Compact header: Home, the document title, export and an overflow menu. Undo and redo
+/// live on two-finger taps over the canvas (left half undoes, right half redoes), so they
+/// take no header room. Everything else lives one tap away in the command palette or the
+/// overflow menu, so no menu bar has to fit in 360 pt. With no document open only the title
+/// and the overflow menu stay: Home and export need an editable document.
 pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     egui::Panel::top("mobile_header")
         .exact_size(52.0 + SAFE_TOP)
-        .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin { left: 8, right: 8, top: SAFE_TOP as i8, bottom: 0 }))
+        .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin { left: 4, right: 8, top: SAFE_TOP as i8, bottom: 0 }))
         .show(ui, |ui| {
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
                 let has_doc = app.session.active().is_some();
                 if has_doc {
-                    let undo_on = crate::menus::is_enabled(app, "edit.undo");
-                    let undo = ui.add_enabled_ui(undo_on, |ui| icons::button_with_icon_size(ui, "undo-2", 48.0, 22.0, false, tl!("Undo")));
-                    if undo.inner.clicked() {
-                        let _ = crate::menus::invoke(app, ui.ctx(), "edit.undo", json!({}));
+                    // Same toggle as the desktop options bar's Home button, touch-sized:
+                    // going Home snapshots first on picker-less builds, where nothing
+                    // else saves before a background kill (see `chrome_ui::home_button`).
+                    let n = app.session.documents().len();
+                    let on = app.ui.chrome.shows_home(n, app.session.prefs().general.auto_show_home_screen);
+                    if icons::button_with_icon_size(ui, "house", 48.0, 22.0, on, tl!("Home")).clicked() {
+                        if !on && app.services.file_dialog.is_none() {
+                            crate::prefs_ui::save_all_for_exit(app);
+                        }
+                        app.ui.chrome.home = if on { None } else { Some(n) };
                     }
                 }
                 let title =
@@ -855,5 +976,141 @@ mod tests {
         // Outside the canvas (over the tool bar) it is not a canvas gesture.
         let bar = egui::Rect::from_min_size(egui::pos2(0.0, 740.0), vec2(360.0, 60.0));
         assert_eq!(two_finger(&ctx, bar), None);
+    }
+
+    fn tap_touch(center: egui::Pos2, n: usize) -> egui::MultiTouchInfo {
+        egui::MultiTouchInfo {
+            start_time: 0.0,
+            start_pos: center,
+            center_pos: center,
+            num_touches: n,
+            zoom_delta: 1.0,
+            zoom_delta_2d: vec2(1.0, 1.0),
+            rotation_delta: 0.0,
+            translation_delta: egui::Vec2::ZERO,
+            force: 0.0,
+        }
+    }
+
+    /// A quick two-finger tap undoes on the left half of the canvas, redoes on the right.
+    #[test]
+    fn two_finger_tap_picks_undo_left_and_redo_right() {
+        let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(360.0, 600.0));
+        for (at, want) in [(pos2(90.0, 300.0), TapSide::Undo), (pos2(270.0, 300.0), TapSide::Redo)] {
+            let mut track = None;
+            assert_eq!(two_finger_tap(&mut track, 1.0, rect, Some(&tap_touch(at, 2))), None);
+            assert!(track.is_some(), "fingers down start the track");
+            assert_eq!(two_finger_tap(&mut track, 1.2, rect, None), Some(want), "lifting in time fires {want:?}");
+            assert!(track.is_none(), "the track resets after firing");
+        }
+    }
+
+    /// Slow lifts, wandering centres, extra fingers and taps outside the canvas stay navigation.
+    #[test]
+    fn two_finger_tap_ignores_non_taps() {
+        let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(360.0, 600.0));
+        // Held too long: a pan, not a tap.
+        let mut track = None;
+        assert_eq!(two_finger_tap(&mut track, 1.0, rect, Some(&tap_touch(pos2(90.0, 300.0), 2))), None);
+        assert_eq!(two_finger_tap(&mut track, 2.0, rect, None), None);
+        // Wandered off: a pan, not a tap.
+        let mut track = None;
+        let mut moved = tap_touch(pos2(190.0, 300.0), 2);
+        assert_eq!(two_finger_tap(&mut track, 1.0, rect, Some(&tap_touch(pos2(90.0, 300.0), 2))), None);
+        moved.center_pos = pos2(190.0, 300.0);
+        assert_eq!(two_finger_tap(&mut track, 1.1, rect, Some(&moved)), None);
+        assert_eq!(two_finger_tap(&mut track, 1.2, rect, None), None);
+        // Three fingers: some other gesture, and the lift after them fires nothing.
+        let mut track = None;
+        assert_eq!(two_finger_tap(&mut track, 1.0, rect, Some(&tap_touch(pos2(90.0, 300.0), 2))), None);
+        assert_eq!(two_finger_tap(&mut track, 1.1, rect, Some(&tap_touch(pos2(90.0, 300.0), 3))), None);
+        assert_eq!(two_finger_tap(&mut track, 1.2, rect, None), None);
+        // No fingers ever down: nothing to lift.
+        let mut track = None;
+        assert_eq!(two_finger_tap(&mut track, 1.2, rect, None), None);
+    }
+
+    fn twist_touch(rot: f32, n: usize) -> egui::MultiTouchInfo {
+        let mut m = tap_touch(pos2(180.0, 300.0), n);
+        m.rotation_delta = rot;
+        m
+    }
+
+    #[test]
+    fn two_finger_twist_fires_the_accumulated_angle_on_lift() {
+        let mut track = None;
+        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.0, 2))), None);
+        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.1, 2))), None);
+        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.1, 2))), None);
+        let got = two_finger_twist(&mut track, None).expect("past the deadzone");
+        assert!((got - 0.2).abs() < 1e-6, "{got}");
+        assert!(track.is_none(), "the track resets after firing");
+    }
+
+    #[test]
+    fn two_finger_twist_ignores_noise_and_other_gestures() {
+        let mut track = None;
+        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.0, 2))), None);
+        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.01, 2))), None);
+        assert_eq!(two_finger_twist(&mut track, None), None);
+        let mut track = None;
+        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.0, 2))), None);
+        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.2, 3))), None);
+        assert_eq!(two_finger_twist(&mut track, None), None);
+        let mut track = None;
+        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(f32::NAN, 2))), None);
+        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.2, 2))), None);
+        let got = two_finger_twist(&mut track, None).expect("NaN adds nothing");
+        assert!((got - 0.2).abs() < 1e-6, "{got}");
+        let mut track: Option<TwistTrack> = None;
+        assert_eq!(two_finger_twist(&mut track, None), None);
+    }
+
+    #[test]
+    fn twist_matrix_and_snap_behave() {
+        let m = twist_matrix(10.0, 10.0, std::f64::consts::FRAC_PI_2).expect("90 degrees");
+        assert!((m[0]).abs() < 1e-9 && (m[1] - 1.0).abs() < 1e-9 && (m[2] + 1.0).abs() < 1e-9 && (m[3]).abs() < 1e-9);
+        assert!((m[4] - 20.0).abs() < 1e-9 && m[5].abs() < 1e-9, "{m:?}");
+        assert_eq!(twist_matrix(0.0, 0.0, 0.0), None);
+        assert_eq!(twist_matrix(f64::NAN, 0.0, 0.5), None);
+        assert_eq!(twist_matrix(0.0, 0.0, f64::NAN), None);
+        let snapped = snap_twist(40f64.to_radians(), true);
+        assert!((snapped - 45f64.to_radians()).abs() < 1e-9, "{snapped}");
+        assert!((snap_twist(40f64.to_radians(), false) - 40f64.to_radians()).abs() < 1e-12);
+        assert!((snap_twist(7f64.to_radians(), true)).abs() < 1e-9, "small twists snap to zero");
+    }
+
+    /// The header carries Home where undo used to be: tapping it parks the documents
+    /// on the Home screen, tapping again comes back. Undo/redo moved to two-finger taps.
+    #[test]
+    fn header_home_button_toggles_the_home_screen() {
+        use egui_kittest::Harness;
+        let mut a = app();
+        a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        assert!(a.ui.chrome.home.is_none());
+        let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                // The themed fonts install after the first frame; skip until they are in.
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                header(app, ui);
+            },
+            a,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        h.run_steps(8);
+        // Touch-sized house button at the header's left edge (margin 4 + half of 48).
+        let at = egui::pos2(28.0, 26.0);
+        h.drag_at(at);
+        h.run_steps(1);
+        h.drop_at(at);
+        h.run_steps(2);
+        assert_eq!(h.state().ui.chrome.home, Some(1), "tapping Home parks the document there");
+        h.drag_at(at);
+        h.run_steps(1);
+        h.drop_at(at);
+        h.run_steps(2);
+        assert!(h.state().ui.chrome.home.is_none(), "tapping Home again comes back");
     }
 }

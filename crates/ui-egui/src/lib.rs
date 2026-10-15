@@ -373,6 +373,13 @@ pub struct PhotocraftApp {
     pub(crate) patch_preview: Option<patch_preview::PatchPreview>,
     /// The pixels a Magnetic Lasso border follows (`magnetic_lasso_ui`).
     pub(crate) magnetic: magnetic_lasso_ui::Runtime,
+    /// A two-finger tap over the canvas in progress (touch undo/redo, `mobile_ui`).
+    pub(crate) touch_tap: Option<crate::mobile_ui::TapTrack>,
+    /// A two-finger twist over the canvas in progress (Move-tool rotate, `mobile_ui`).
+    pub(crate) touch_twist: Option<crate::mobile_ui::TwistTrack>,
+    /// A two-finger gesture was down: the leftover finger must not paint until every
+    /// finger lifts, or the tap's undo is immediately covered by a new dot (`canvas`).
+    pub(crate) touch_lock: bool,
     /// The next tool `Down` is a right-button drag that erases (see `paint_mouse`).
     secondary_erase: bool,
     /// While a batch of recovered pointer samples is replayed, defer the live-stroke update to one
@@ -550,6 +557,9 @@ impl PhotocraftApp {
             blend_preview: None,
             patch_preview: None,
             magnetic: Default::default(),
+            touch_tap: None,
+            touch_twist: None,
+            touch_lock: false,
             secondary_erase: false,
             defer_live_stroke: false,
             press_stroke: false,

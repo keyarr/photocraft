@@ -2329,6 +2329,42 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         }
     }
     let touch_nav = touch.is_some();
+    // The unfiltered gesture feeds the tap tracker: `touch` above only exists while two
+    // fingers are down on the canvas, so passing it would mistake a slide off the canvas
+    // (or a pinch) for a lift. The tracker itself decides what counts as a tap.
+    let raw_touch = ctx.input(|i| i.multi_touch());
+    let any_touch = ctx.input(|i| i.any_touches());
+    // Set by the previous frame once two fingers land; the leftover finger must not paint
+    // until every finger lifts, or its release click covers the tap's undo with a new dot.
+    let paint_locked = app.touch_lock;
+
+    // Two-finger tap: left half undoes, right half redoes. Short and steady only;
+    // anything longer or farther kept panning and pinching above.
+    let mut tap_fired = false;
+    if primary
+        && let Some(side) = crate::mobile_ui::two_finger_tap(&mut app.touch_tap, ctx.input(|i| i.time), rect, raw_touch.as_ref())
+    {
+        tap_fired = true;
+        let id = match side {
+            crate::mobile_ui::TapSide::Undo => "edit.undo",
+            crate::mobile_ui::TapSide::Redo => "edit.redo",
+        };
+        let _ = crate::menus::invoke(app, &ctx, id, json!({}));
+    }
+    // Move tool: a two-finger twist rotates the active layer about its content centre.
+    // Accumulated across the gesture, committed once on lift as one `edit.transform`.
+    let move_twist = app.ui.tool == Tool::Move && app.ui.transform.is_none();
+    if !move_twist {
+        app.touch_twist = None;
+    }
+    let mut twist_fired = false;
+    if primary
+        && move_twist
+        && let Some(angle) = crate::mobile_ui::two_finger_twist(&mut app.touch_twist, raw_touch.as_ref())
+        && crate::move_ui::finish_twist(app, angle, ctx.input(|i| i.modifiers.shift))
+    {
+        twist_fired = true;
+    }
 
     // Pen pressure/tilt for this frame's tool events (mouse = 1.0), unless Preferences › Tools ›
     // Use Tablet Pressure is off; the pen's eraser end selects the Eraser.
@@ -2403,11 +2439,11 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             crate::color_range_ui::canvas_eyedropper(app, &ctx, p, press);
         }
     }
-    if tool == Tool::Hand && !touch_nav && response.dragged() {
+    if tool == Tool::Hand && !touch_nav && !paint_locked && response.dragged() {
         let d = xf.unmap_vec(response.drag_delta()) / view.zoom;
         view.center[0] -= d.x;
         view.center[1] -= d.y;
-    } else if primary && !touch_nav {
+    } else if primary && !touch_nav && !paint_locked {
         let mods = ui.input(|i| i.modifiers);
         // Tools follow the left button; the right one opens the Brush Preset picker or erases
         // (Preferences › Tools, `paint_mouse`).
@@ -2827,6 +2863,14 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     crate::rotate_view::overlay(app, &ctx, &painter, &xf, &mut view, &response);
     if primary {
         app.ui.views[idx] = view.clone();
+        // The lock clears only once every finger is gone (or a fresh press starts a new
+        // stroke): updated here, after painting used the previous frame's value, so the
+        // gesture's own release click is still swallowed on the lift frame.
+        if touch.is_some() || tap_fired || twist_fired {
+            app.touch_lock = true;
+        } else if ctx.input(|i| i.pointer.primary_pressed()) || !any_touch {
+            app.touch_lock = false;
+        }
     }
     view
 }
