@@ -375,8 +375,6 @@ pub struct PhotocraftApp {
     pub(crate) magnetic: magnetic_lasso_ui::Runtime,
     /// A two-finger tap over the canvas in progress (touch undo/redo, `mobile_ui`).
     pub(crate) touch_tap: Option<crate::mobile_ui::TapTrack>,
-    /// A two-finger twist over the canvas in progress (Move-tool rotate, `mobile_ui`).
-    pub(crate) touch_twist: Option<crate::mobile_ui::TwistTrack>,
     /// A two-finger gesture was down: the leftover finger must not paint until every
     /// finger lifts, or the tap's undo is immediately covered by a new dot (`canvas`).
     pub(crate) touch_lock: bool,
@@ -558,7 +556,6 @@ impl PhotocraftApp {
             patch_preview: None,
             magnetic: Default::default(),
             touch_tap: None,
-            touch_twist: None,
             touch_lock: false,
             secondary_erase: false,
             defer_live_stroke: false,

@@ -227,27 +227,6 @@ pub(crate) fn finish(app: &mut PhotocraftApp, dx: f64, dy: f64) {
     crate::canvas::shown_as_document(app, p.doc, is_preview_key);
 }
 
-/// Centre of what the Move tool would rotate: the active layer's content (within the
-/// selection, like Free Transform frames it). None without anything to turn.
-fn twist_center(app: &PhotocraftApp) -> Option<(f64, f64)> {
-    let st = app.session.active()?;
-    let l = st.active_layer.and_then(|id| st.doc.layer(id))?;
-    let b = photocraft_engine::transform_cmds::transform_bounds(&st.doc, l);
-    if b.is_empty() {
-        return None;
-    }
-    Some(((f64::from(b.x0) + f64::from(b.x1)) / 2.0, (f64::from(b.y0) + f64::from(b.y1)) / 2.0))
-}
-
-/// Commit a two-finger twist as one `edit.transform` rotation about [`twist_center`].
-/// True when a step was committed (the caller locks painting like a tap).
-pub(crate) fn finish_twist(app: &mut PhotocraftApp, angle: f64, shift: bool) -> bool {
-    let angle = crate::mobile_ui::snap_twist(angle, shift);
-    let Some((cx, cy)) = twist_center(app) else { return false };
-    let Some(m) = crate::mobile_ui::twist_matrix(cx, cy, angle) else { return false };
-    app.run("edit.transform", json!({"matrix": m})).is_ok()
-}
-
 #[cfg(test)]
 mod tests {
     use photocraft_geom::Rect;
@@ -430,45 +409,5 @@ mod tests {
         app.session.execute("select.deselect", json!({})).unwrap();
         drag(&mut app, [16.0, 16.0], [26.0, 16.0], egui::Modifiers::NONE);
         assert!(alpha(&app, id, 10, 10) == 0.0 && alpha(&app, id, 58, 16) == 1.0, "the whole layer moved");
-    }
-
-    fn twist_app() -> (PhotocraftApp, photocraft_doc::LayerId) {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        app.session.execute("file.new", json!({"width": 64, "height": 64, "background": "transparent"})).unwrap();
-        app.sync_views();
-        app.session.execute("select.rect", json!({"x": 8, "y": 8, "width": 16, "height": 8})).unwrap();
-        app.session.execute("edit.fill", json!({"color": "#ff0000"})).unwrap();
-        app.session.execute("select.deselect", json!({})).unwrap();
-        app.ui.tool = Tool::Move;
-        let id = app.session.active().unwrap().active_layer.unwrap();
-        (app, id)
-    }
-
-    #[test]
-    fn twist_rotates_the_layer_in_one_step() {
-        let (mut app, id) = twist_app();
-        let steps = app.session.active().unwrap().history.past_len();
-        assert!(super::finish_twist(&mut app, std::f64::consts::FRAC_PI_2, false));
-        let st = app.session.active().unwrap();
-        assert_eq!(st.history.past_len(), steps + 1, "one undo step");
-        assert_eq!(st.history.undo_label(), Some("Free Transform"));
-        let b = st.doc.layer(id).unwrap().surface().unwrap().content_bounds();
-        assert!(b.width().abs_diff(8) <= 2 && b.height().abs_diff(16) <= 2, "16x8 turned upright: {b:?}");
-        assert!(app.session.undo());
-        let b = app.session.active().unwrap().doc.layer(id).unwrap().surface().unwrap().content_bounds();
-        assert!(b.width().abs_diff(16) <= 2 && b.height().abs_diff(8) <= 2, "undone: {b:?}");
-    }
-
-    #[test]
-    fn twist_snaps_and_fails_gracefully() {
-        let (mut app, _) = twist_app();
-        let steps = app.session.active().unwrap().history.past_len();
-        assert!(!super::finish_twist(&mut app, 7f64.to_radians(), true), "7 degrees snaps to zero");
-        assert_eq!(app.session.active().unwrap().history.past_len(), steps);
-        assert!(!super::finish_twist(&mut app, f64::NAN, false));
-        assert_eq!(app.session.active().unwrap().history.past_len(), steps);
-        app.session.execute("layer.lockLayers", json!({"position": true})).unwrap();
-        assert!(!super::finish_twist(&mut app, 0.5, false), "locked layers refuse");
-        assert!(app.ui.status_error, "the refusal is reported");
     }
 }

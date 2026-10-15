@@ -110,62 +110,6 @@ pub fn two_finger_tap(track: &mut Option<TapTrack>, now: f64, rect: egui::Rect, 
     None
 }
 
-/// Accumulated two-finger twist for the Move tool: total rotation (radians) since both
-/// fingers landed. Committed once on lift as one `edit.transform`, so a twist is one step.
-#[derive(Clone, Copy, Debug)]
-pub struct TwistTrack {
-    acc: f64,
-}
-
-/// Twist below this never rotates: pinch noise, not intent (~2 degrees).
-pub const TWIST_DEADZONE_RAD: f64 = 0.035;
-
-/// Fold one frame of multi-touch state into the twist tracker. Returns the accumulated
-/// angle on lift when past the deadzone; the caller rotates (Move tool) or drops it.
-pub fn two_finger_twist(track: &mut Option<TwistTrack>, touch: Option<&egui::MultiTouchInfo>) -> Option<f64> {
-    let Some(m) = touch else {
-        let t = track.take()?;
-        return (t.acc.abs() >= TWIST_DEADZONE_RAD).then_some(t.acc);
-    };
-    if m.num_touches != 2 {
-        *track = None;
-        return None;
-    }
-    match track {
-        None => *track = Some(TwistTrack { acc: 0.0 }),
-        Some(t) => {
-            let d = f64::from(m.rotation_delta);
-            if d.is_finite() && d != 0.0 {
-                t.acc += d;
-            }
-        }
-    }
-    None
-}
-
-/// Rotation matrix about (cx, cy) for `edit.transform`. None on hostile input or no turn.
-pub fn twist_matrix(cx: f64, cy: f64, angle: f64) -> Option<[f64; 6]> {
-    if !cx.is_finite() || !cy.is_finite() || !angle.is_finite() || angle.abs() < 1e-9 {
-        return None;
-    }
-    let (s, c) = angle.sin_cos();
-    if !s.is_finite() || !c.is_finite() {
-        return None;
-    }
-    let m = [c, s, -s, c, cx - cx * c + cy * s, cy - cx * s - cy * c];
-    m.iter().all(|v| v.is_finite()).then_some(m)
-}
-
-/// Snap an accumulated twist to 15 degree steps while Shift is held, like the Free
-/// Transform outside drag.
-pub fn snap_twist(angle: f64, shift: bool) -> f64 {
-    if !shift || !angle.is_finite() {
-        return angle;
-    }
-    let step = 15f64.to_radians();
-    (angle / step).round() * step
-}
-
 /// Compact header: Home, the document title, export and an overflow menu. Undo and redo
 /// live on two-finger taps over the canvas (left half undoes, right half redoes), so they
 /// take no header room. Everything else lives one tap away in the command palette or the
@@ -1028,56 +972,6 @@ mod tests {
         // No fingers ever down: nothing to lift.
         let mut track = None;
         assert_eq!(two_finger_tap(&mut track, 1.2, rect, None), None);
-    }
-
-    fn twist_touch(rot: f32, n: usize) -> egui::MultiTouchInfo {
-        let mut m = tap_touch(pos2(180.0, 300.0), n);
-        m.rotation_delta = rot;
-        m
-    }
-
-    #[test]
-    fn two_finger_twist_fires_the_accumulated_angle_on_lift() {
-        let mut track = None;
-        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.0, 2))), None);
-        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.1, 2))), None);
-        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.1, 2))), None);
-        let got = two_finger_twist(&mut track, None).expect("past the deadzone");
-        assert!((got - 0.2).abs() < 1e-6, "{got}");
-        assert!(track.is_none(), "the track resets after firing");
-    }
-
-    #[test]
-    fn two_finger_twist_ignores_noise_and_other_gestures() {
-        let mut track = None;
-        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.0, 2))), None);
-        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.01, 2))), None);
-        assert_eq!(two_finger_twist(&mut track, None), None);
-        let mut track = None;
-        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.0, 2))), None);
-        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.2, 3))), None);
-        assert_eq!(two_finger_twist(&mut track, None), None);
-        let mut track = None;
-        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(f32::NAN, 2))), None);
-        assert_eq!(two_finger_twist(&mut track, Some(&twist_touch(0.2, 2))), None);
-        let got = two_finger_twist(&mut track, None).expect("NaN adds nothing");
-        assert!((got - 0.2).abs() < 1e-6, "{got}");
-        let mut track: Option<TwistTrack> = None;
-        assert_eq!(two_finger_twist(&mut track, None), None);
-    }
-
-    #[test]
-    fn twist_matrix_and_snap_behave() {
-        let m = twist_matrix(10.0, 10.0, std::f64::consts::FRAC_PI_2).expect("90 degrees");
-        assert!((m[0]).abs() < 1e-9 && (m[1] - 1.0).abs() < 1e-9 && (m[2] + 1.0).abs() < 1e-9 && (m[3]).abs() < 1e-9);
-        assert!((m[4] - 20.0).abs() < 1e-9 && m[5].abs() < 1e-9, "{m:?}");
-        assert_eq!(twist_matrix(0.0, 0.0, 0.0), None);
-        assert_eq!(twist_matrix(f64::NAN, 0.0, 0.5), None);
-        assert_eq!(twist_matrix(0.0, 0.0, f64::NAN), None);
-        let snapped = snap_twist(40f64.to_radians(), true);
-        assert!((snapped - 45f64.to_radians()).abs() < 1e-9, "{snapped}");
-        assert!((snap_twist(40f64.to_radians(), false) - 40f64.to_radians()).abs() < 1e-12);
-        assert!((snap_twist(7f64.to_radians(), true)).abs() < 1e-9, "small twists snap to zero");
     }
 
     /// The header carries Home where undo used to be: tapping it parks the documents
