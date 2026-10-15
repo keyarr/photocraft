@@ -2312,8 +2312,3 @@ fontWeight	Italic	斜体
 	{n} h ago	{n}小时前
 	{n} days ago	{n}天前
 	1 day ago	1天前
-	Interp:	插值：
-	Proportional	保持长宽比
-	Symmetric about pivot	关于中心对称
-	Snap 15°	吸附至 15°
-	Finger modifiers	手指修饰键

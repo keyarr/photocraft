@@ -3283,9 +3283,7 @@ mod color_tests {
     fn color_panel_hex_field_takes_a_typed_hex() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.session.tools.foreground = [1.0, 1.0, 1.0, 1.0];
-        // Tall enough for the 48pt touch rows at phone widths: the hex field sits
-        // below three slider rows and was clipped out of a 300pt window.
-        let mut h = egui_kittest::Harness::builder().with_size(vec2(300.0, 480.0)).build_ui_state(
+        let mut h = egui_kittest::Harness::builder().with_size(vec2(300.0, 300.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     color_picker(app, ui);

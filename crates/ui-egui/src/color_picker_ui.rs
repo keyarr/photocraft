@@ -698,10 +698,7 @@ mod tests {
         let web = h.get_by_label("Only Web Colors").rect();
         assert!(web.left() < hue.left() && web.top() > hue.bottom());
         // The full dialog should fit even in PhotoCraft's minimum 760 x 480 window.
-        // Touch sizing (48pt fields and checkboxes under MOBILE_WIDTH) makes the
-        // 700pt-phone layout taller than the desktop one; the 760pt desktop layout
-        // above still proves the minimum-window fit.
-        assert!(black.bottom() - ok.top() < 520.0);
+        assert!(black.bottom() - ok.top() < 360.0);
         assert!(black.right() - web.left() < 600.0);
         let hex = h.get_by_role(Role::TextInput).rect();
         assert!(hex.left() < lightness.left() && hex.top() > inputs[5].bottom());

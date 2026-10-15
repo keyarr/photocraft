@@ -2321,10 +2321,6 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                 view.center[1] -= d.y;
             }
         }
-        // A two-finger twist turns the box while transforming, not the view.
-        if m.rotation_delta.is_finite() && m.rotation_delta != 0.0 {
-            crate::transform_tool::twist(app, f64::from(m.rotation_delta));
-        }
         if app.drag.is_some() {
             app.drag = None;
             app.live_stroke = None;
@@ -2345,13 +2341,9 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     let paint_locked = app.touch_lock;
 
     // Two-finger tap: left half undoes, right half redoes. Short and steady only;
-    // anything longer or farther kept panning and pinching above. Suppressed while
-    // transforming (the box owns undo there) or typing in a field, where a tap
-    // would undo by accident.
+    // anything longer or farther kept panning and pinching above.
     let mut tap_fired = false;
     if primary
-        && app.ui.transform.is_none()
-        && !ctx.text_edit_focused()
         && let Some(side) = crate::mobile_ui::two_finger_tap(&mut app.touch_tap, ctx.input(|i| i.time), rect, raw_touch.as_ref())
     {
         tap_fired = true;
@@ -2482,23 +2474,6 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             && let Some(p) = response.interact_pointer_pos()
         {
             crate::canvas_tool_menu::open_transform(app, [p.x, p.y]);
-        }
-        // Touch has no right-click: a 0.5 s press-and-hold opens the same mode menu.
-        // The menu clamps itself to the window (`show`), so it fits a 360 pt phone.
-        if transforming
-            && crate::mobile_ui::is_mobile(&ctx)
-            && app.ui.canvas_tool_menu.is_none()
-            && response.is_pointer_button_down_on()
-            && !response.dragged()
-        {
-            let held = ctx.input(|i| i.pointer.press_start_time().map(|t0| i.time - t0)).unwrap_or(0.0);
-            if held >= 0.5 {
-                if let Some(p) = response.interact_pointer_pos() {
-                    crate::canvas_tool_menu::open_transform(app, [p.x, p.y]);
-                }
-            } else if held >= 0.0 {
-                ctx.request_repaint_after(std::time::Duration::from_secs_f64((0.5 - held).max(0.02)));
-            }
         }
         let lasso_retracted = response.secondary_clicked()
             && match tool {
@@ -2878,9 +2853,8 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         app.ui.views[idx] = view.clone();
         // The lock clears only once every finger is gone (or a fresh press starts a new
         // stroke): updated here, after painting used the previous frame's value, so the
-        // gesture's own release click is still swallowed on the lift frame. While
-        // transforming the box stays finger-ready right after a pinch, so no lock.
-        if (touch.is_some() && app.ui.transform.is_none()) || tap_fired {
+        // gesture's own release click is still swallowed on the lift frame.
+        if touch.is_some() || tap_fired {
             app.touch_lock = true;
         } else if ctx.input(|i| i.pointer.primary_pressed()) || !any_touch {
             app.touch_lock = false;
