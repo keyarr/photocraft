@@ -21,8 +21,10 @@ use crate::{PhotocraftApp, icons, widgets};
 pub const MOBILE_WIDTH: f32 = 720.0;
 
 /// Space kept above the mobile header so it clears the Android status bar, which
-/// draws over the app's window. egui doesn't report the real inset, so this is the
-/// standard status-bar height until the shell reads it from the OS; desktop is unaffected.
+/// draws over the app's window (Material needs at least 24dp here; 30pt keeps
+/// "Home", the title, "Exportar" and "..." off the notifications).
+/// egui doesn't report the real inset, so this is the standard status-bar
+/// height until the shell reads it from the OS; desktop is unaffected.
 #[cfg(target_os = "android")]
 const SAFE_TOP: f32 = 30.0;
 #[cfg(not(target_os = "android"))]
@@ -195,7 +197,17 @@ pub fn options_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         return;
     }
     let t = Tokens::get(ui.ctx());
-    egui::Panel::top("mobile_options").exact_size(48.0).frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(8, 0))).show(ui, |ui| {
+    // A transforming strip wraps its fields over rows instead of scrolling: the numeric
+    // fields and the angle slider swallow the horizontal drag gesture.
+    // Three compact rows (coords, rotation/interp, commit/cancel/grid): 24pt fields +
+    // one 48pt touch row fits in 116pt, so the canvas keeps room with the sheet open.
+    let transforming = app.ui.transform.is_some();
+    let h = if transforming { 116.0 } else { 48.0 };
+    egui::Panel::top("mobile_options").exact_size(h).frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(8, 0))).show(ui, |ui| {
+        if transforming {
+            crate::transform_tool::mobile_options_bar(app, ui);
+            return;
+        }
         let rest = ui.available_width().max(80.0);
         egui::ScrollArea::horizontal().id_salt("mobile-options-scroll").auto_shrink([false, false]).max_width(rest).show(ui, |ui| {
             crate::panels::options_content(app, ui);

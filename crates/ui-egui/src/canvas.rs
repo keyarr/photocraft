@@ -2327,6 +2327,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             app.press_stroke = false;
             app.trail = None;
         }
+        crate::transform_tool::cancel_gesture(app);
     }
     let touch_nav = touch.is_some();
     // The unfiltered gesture feeds the tap tracker: `touch` above only exists while two
@@ -2334,6 +2335,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     // (or a pinch) for a lift. The tracker itself decides what counts as a tap.
     let raw_touch = ctx.input(|i| i.multi_touch());
     let any_touch = ctx.input(|i| i.any_touches());
+    app.touch_active = any_touch || crate::mobile_ui::is_mobile(&ctx);
     // Set by the previous frame once two fingers land; the leftover finger must not paint
     // until every finger lifts, or its release click covers the tap's undo with a new dot.
     let paint_locked = app.touch_lock;
@@ -3211,17 +3213,20 @@ fn transform_controls_rect(app: &PhotocraftApp, xf: &ViewXform) -> Option<Rect> 
 }
 
 /// A visible handle starts scaling; the narrow band just outside the box starts rotation.
-/// The interior stays the normal Move-tool drag target.
-fn transform_controls_hit(r: Rect, p: Pos2) -> bool {
+/// The interior stays the normal Move-tool drag target. Touch uses the same 48dp
+/// hitbox as Free Transform, so a finger catches a handle without precision.
+fn transform_controls_hit(r: Rect, p: Pos2, touch: bool) -> bool {
     let handles = [r.left_top(), r.center_top(), r.right_top(), r.right_center(), r.right_bottom(), r.center_bottom(), r.left_bottom(), r.left_center()];
-    let grab = crate::transform_tool::HANDLE_PX as f32;
-    handles.iter().any(|h| h.distance(p) <= grab) || (r.expand(18.0).contains(p) && !r.expand(5.0).contains(p))
+    let grab = if touch { crate::transform_tool::HANDLE_TOUCH_PX as f32 } else { crate::transform_tool::HANDLE_PX as f32 };
+    let band = if touch { 26.0 } else { 18.0 };
+    let inner = if touch { 8.0 } else { 5.0 };
+    handles.iter().any(|h| h.distance(p) <= grab) || (r.expand(band).contains(p) && !r.expand(inner).contains(p))
 }
 
 /// Enter the existing Free Transform session when a Move-tool transform control is pressed.
 fn begin_transform_controls_at(app: &mut PhotocraftApp, ctx: &egui::Context, xf: &ViewXform, p: Pos2) -> bool {
     let Some(r) = transform_controls_rect(app, xf) else { return false };
-    if !transform_controls_hit(r, p) {
+    if !transform_controls_hit(r, p, app.touch_active) {
         return false;
     }
     match crate::transform_tool::begin(app, ctx) {
@@ -3238,8 +3243,9 @@ fn draw_transform_controls(app: &mut PhotocraftApp, painter: &egui::Painter, xf:
     let Some(r) = transform_controls_rect(app, xf) else { return };
     let accent = crate::theme::Tokens::get(painter.ctx()).accent;
     painter.rect_stroke(r, 0.0, Stroke::new(1.0, accent), egui::StrokeKind::Middle);
+    let hs = if app.touch_active { 13.0 } else { 7.0 };
     for p in [r.left_top(), r.center_top(), r.right_top(), r.right_center(), r.right_bottom(), r.center_bottom(), r.left_bottom(), r.left_center()] {
-        let h = Rect::from_center_size(p, vec2(7.0, 7.0));
+        let h = Rect::from_center_size(p, vec2(hs, hs));
         painter.rect_filled(h, 0.0, Color32::WHITE);
         painter.rect_stroke(h, 0.0, Stroke::new(1.0, accent), egui::StrokeKind::Inside);
     }
@@ -5046,7 +5052,7 @@ mod transform_controls_tests {
 
         let xf = ViewXform { rect: Rect::from_min_size(Pos2::ZERO, vec2(200.0, 200.0)), zoom: 1.0, center: [100.0, 100.0], flip: false, rotation: 0.0 };
         let r = transform_controls_rect(&app, &xf).expect("shape layers have transform bounds");
-        assert!(transform_controls_hit(r, r.right_bottom()));
+        assert!(transform_controls_hit(r, r.right_bottom(), false));
 
         let ctx = egui::Context::default();
         assert!(begin_transform_controls_at(&mut app, &ctx, &xf, r.right_bottom()));
@@ -5057,10 +5063,12 @@ mod transform_controls_tests {
     #[test]
     fn transform_control_hit_keeps_move_interior_free_and_has_rotation_band() {
         let r = Rect::from_min_max(pos2(20.0, 30.0), pos2(100.0, 70.0));
-        assert!(transform_controls_hit(r, r.left_top()));
-        assert!(transform_controls_hit(r, pos2(60.0, 18.0)));
-        assert!(!transform_controls_hit(r, r.center()));
-        assert!(!transform_controls_hit(r, pos2(60.0, 4.0)));
+        assert!(transform_controls_hit(r, r.left_top(), false));
+        assert!(transform_controls_hit(r, pos2(60.0, 18.0), false));
+        assert!(!transform_controls_hit(r, r.center(), false));
+        assert!(!transform_controls_hit(r, pos2(60.0, 4.0), false));
+        assert!(transform_controls_hit(r, r.left_top(), true));
+        assert!(transform_controls_hit(r, pos2(60.0, 4.0), true), "a finger catches the taller touch band");
     }
 }
 

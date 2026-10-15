@@ -378,6 +378,9 @@ pub struct PhotocraftApp {
     /// A two-finger gesture was down: the leftover finger must not paint until every
     /// finger lifts, or the tap's undo is immediately covered by a new dot (`canvas`).
     pub(crate) touch_lock: bool,
+    /// A finger is down or the window is phone-narrow: transform handles use the touch
+    /// grab radius instead of the mouse one (`transform_tool::handle_tolerance`).
+    pub(crate) touch_active: bool,
     /// The next tool `Down` is a right-button drag that erases (see `paint_mouse`).
     secondary_erase: bool,
     /// While a batch of recovered pointer samples is replayed, defer the live-stroke update to one
@@ -557,6 +560,7 @@ impl PhotocraftApp {
             magnetic: Default::default(),
             touch_tap: None,
             touch_lock: false,
+            touch_active: false,
             secondary_erase: false,
             defer_live_stroke: false,
             press_stroke: false,
