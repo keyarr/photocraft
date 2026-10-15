@@ -137,6 +137,14 @@ pub fn load(app: &mut PhotocraftApp) {
     }
 }
 
+/// A document opened from its recovery entry (not just at cold start): its entry
+/// already holds this revision, and its autosaves replace it in place.
+pub(crate) fn note_recovered(app: &mut PhotocraftApp, id: DocId, revision: u64, key: &str) {
+    app.prefs_rt.autosaved.insert(id, revision);
+    if let Some(adopt) = app.services.adopt_autosave.as_mut() {
+        adopt(id.0, key);
+    }
+}
 /// Adopt the saved interface theme into the UI state right after [`load`], so the
 /// creator's `setup_context` (which runs with `app.ui.theme`) paints the right theme
 /// on the very first frame instead of flashing through the default.
@@ -454,6 +462,43 @@ fn autosave(app: &mut PhotocraftApp) {
 /// Force the autosave timer to fire on the next tick (tests, `prefs` changes).
 pub fn autosave_now(app: &mut PhotocraftApp) {
     app.prefs_rt.next_autosave_ms = f64::MIN_POSITIVE;
+}
+
+/// Best-effort synchronous autosave of every dirty document for exit paths.
+/// Phones have no save picker (the header offers Export, and the prompt's Save
+/// is dead without one), so leaving must snapshot first rather than ask.
+/// Failures land in the status bar; the app still leaves. Without
+/// `autosave_blocking` (no recovery dir) this is a no-op.
+pub fn save_all_for_exit(app: &mut PhotocraftApp) {
+    if app.services.autosave_blocking.is_none() {
+        return;
+    }
+    let jobs: Vec<_> = app
+        .session
+        .documents()
+        .iter()
+        .filter(|d| d.is_dirty())
+        .map(|d| (d.doc.clone(), d.revision, d.path.clone()))
+        .collect();
+    if jobs.is_empty() {
+        return;
+    }
+    let mut failed = 0;
+    let n = jobs.len();
+    for (doc, rev, path) in jobs {
+        if let Some(save) = app.services.autosave_blocking.as_mut()
+            && save(&doc, rev, path.as_deref()).is_err()
+        {
+            failed += 1;
+        }
+    }
+    if failed > 0 {
+        app.ui.status = format!("Autosave failed for {failed} document{}", if failed == 1 { "" } else { "s" });
+        log::warn!("{}", app.ui.status);
+        app.ui.status_error = true;
+    } else {
+        log::info!("snapshotted {n} document{} for exit", if n == 1 { "" } else { "s" });
+    }
 }
 
 /// History Log preference: append executed commands to a text file.
@@ -874,12 +919,17 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     // Phones (~360 pt wide) can't fit the desktop's 170 pt list beside the 540 pt settings:
     // the sections scroll across the top and the settings use the full width below.
     if ui.available_width() < 600.0 {
-        egui::ScrollArea::horizontal().id_salt("prefs-sections").show(ui, |ui| {
+        egui::ScrollArea::horizontal()
+            .id_salt("prefs-sections")
+            .auto_shrink([true, true])
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+            .show(ui, |ui| {
             ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
                 for (id, title) in SECTIONS {
-                    let empty = !has_visible_fields(&values, id);
-                    let color = if empty { t.text_faint } else { t.text };
-                    ui.selectable_value(&mut section, id.to_string(), RichText::new(tl!(title)).size(13.0).color(color));
+                    if crate::widgets::pill_tab(ui, tl!(title), section == *id).clicked() {
+                        section = id.to_string();
+                    }
                 }
             });
         });

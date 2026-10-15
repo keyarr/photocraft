@@ -52,10 +52,10 @@ pub fn two_finger(ctx: &egui::Context, rect: egui::Rect) -> Option<egui::MultiTo
     ctx.input(|i| i.multi_touch()).filter(|m| m.num_touches >= 2 && rect.contains(m.center_pos))
 }
 
-/// Compact header: undo, the document title, save and an overflow menu. Everything else
+/// Compact header: undo, the document title, export and an overflow menu. Everything else
 /// lives one tap away in the command palette or the overflow menu, so no menu bar has to
 /// fit in 360 pt. With no document open only the title and the overflow menu stay:
-/// undo and save need an editable document.
+/// undo and export need an editable document.
 pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     egui::Panel::top("mobile_header")
@@ -79,25 +79,31 @@ pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let avail = (ui.available_width() - right_reserve).max(48.0);
                 ui.add_sized(vec2(avail, 48.0), egui::Label::new(RichText::new(title).color(t.text).size(13.0)).truncate());
                 if has_doc {
-                    let save_on = crate::menus::is_enabled(app, "file.save");
-                    if ui.add_enabled_ui(save_on, |ui| widgets::secondary_button(ui, tl!("Save"), 64.0)).inner.clicked() {
-                        let _ = crate::menus::invoke(app, ui.ctx(), "file.save", json!({}));
+                    // No save picker on phones: saving happens automatically
+                    // (autosave + on exit), so the header offers Export instead.
+                    let export_on = crate::menus::is_enabled(app, "file.export.exportAs");
+                    if ui.add_enabled_ui(export_on, |ui| widgets::secondary_button(ui, tl!("Export"), 64.0)).inner.clicked() {
+                        crate::mobile_export::open(app);
                     }
                 }
                 let more = icons::button(ui, "ellipsis", 48.0, false, tl!("Options"));
                 egui::Popup::menu(&more).show(|ui| {
-                    ui.set_min_width(220.0);
+                    ui.set_min_width(280.0);
+                    ui.spacing_mut().item_spacing.y = 4.0;
                     menu_item(ui, app, tl!("New…"), "file.new", json!({}));
                     // Same as the Home-screen button: a build with no picker explains
                     // instead of flashing "cancelled".
-                    if ui.add_enabled(crate::menus::is_enabled(app, "file.open"), egui::Button::new(tl!("Open…"))).clicked() {
+                    if ui
+                        .add_enabled(crate::menus::is_enabled(app, "file.open"), egui::Button::new(tl!("Open…")).min_size(vec2(280.0, 44.0)))
+                        .clicked()
+                    {
                         app.open_interactive();
                         ui.close();
                     }
                     menu_item(ui, app, tl!("Save As…"), "file.saveAs", json!({}));
                     menu_item(ui, app, tl!("Redo"), "edit.redo", json!({}));
                     menu_item(ui, app, tl!("Fit on Screen"), "view.fitOnScreen", json!({}));
-                    if ui.button(tl!("Search commands, tools and panels…")).clicked() {
+                    if ui.add_sized(vec2(280.0, 44.0), egui::Button::new(tl!("Search commands, tools and panels…"))).clicked() {
                         app.ui.palette_open = true;
                         ui.close();
                     }
@@ -107,7 +113,7 @@ pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 }
 
 fn menu_item(ui: &mut egui::Ui, app: &mut PhotocraftApp, label: &str, id: &str, params: serde_json::Value) {
-    if ui.add_enabled(crate::menus::is_enabled(app, id), egui::Button::new(label)).clicked() {
+    if ui.add_enabled(crate::menus::is_enabled(app, id), egui::Button::new(label).min_size(vec2(280.0, 44.0))).clicked() {
         if let Err(e) = crate::menus::invoke(app, ui.ctx(), id, params) {
             app.ui.status = e;
             app.ui.status_error = true;
@@ -518,7 +524,7 @@ mod tests {
         h.state_mut().ui.mobile.panel = Some(crate::dock::Group::Layers);
         h.state_mut().ui.mobile.tools_open = true;
         h.run_steps(6);
-        assert!(h.query_all_by_label("Save").next().is_some(), "the header keeps Save visible");
+        assert!(h.query_all_by_label("Export").next().is_some(), "the header keeps Export visible");
         assert!(h.query_all_by_label("Tools").next().is_some(), "the tool grid opens");
         assert_eq!(h.state().ui.mobile.panel, Some(crate::dock::Group::Layers));
         let r = h.state().last_canvas_rect;

@@ -175,6 +175,13 @@ pub fn home_button(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // With no documents and auto-show on, Home can't be dismissed (there's nothing behind it).
     let can_toggle = n > 0 || !auto;
     if icons::button(ui, "house", 26.0, on && can_toggle, tl!("Home")).clicked() && can_toggle {
+        // Going to the Home screen leaves the canvas: snapshot first on
+        // picker-less builds, where nothing else saves before a background
+        // kill (same rule as `App::save` and `guard_window_close`). Toggling
+        // back needs nothing: the snapshot is revision-keyed.
+        if !on && app.services.file_dialog.is_none() {
+            crate::prefs_ui::save_all_for_exit(app);
+        }
         app.ui.chrome.home = if on { None } else { Some(n) };
     }
 }
@@ -297,6 +304,39 @@ mod tests {
         c.home = Some(2);
         assert!(c.shows_home(2, true));
         assert!(!c.shows_home(3, true));
+    }
+
+    /// Tapping the house icon for the Home screen snapshots dirty documents on
+    /// picker-less builds: leaving the canvas is leaving unsaved work behind.
+    #[test]
+    fn home_button_snapshots_without_a_picker() {
+        use egui_kittest::Harness;
+        use std::{cell::RefCell, rc::Rc};
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
+        app.run("layer.new.layer", json!({})).unwrap();
+        assert!(app.session.active().unwrap().is_dirty());
+        let saved: Rc<RefCell<Vec<(u64, u64)>>> = Rc::default();
+        let log = saved.clone();
+        app.services.autosave_blocking =
+            Some(Box::new(move |doc: &std::sync::Arc<photocraft_doc::Document>, rev: u64, _path: Option<&str>| {
+                log.borrow_mut().push((doc.id.0, rev));
+                Ok(())
+            }));
+        assert!(app.services.file_dialog.is_none());
+        let mut h = Harness::builder()
+            .with_size(egui::vec2(900.0, 40.0))
+            .build_ui_state(|ui, app| home_button(app, ui), app);
+        h.run_steps(2);
+        // The icon button paints no accesskit node, so click its box (the only
+        // widget here) by position instead of by label.
+        let at = egui::pos2(13.0, 13.0);
+        h.drag_at(at);
+        h.run_steps(1);
+        h.drop_at(at);
+        h.run_steps(2);
+        assert_eq!(saved.borrow().len(), 1, "going Home snapshots the dirty document");
+        assert!(h.state().ui.chrome.home.is_some());
     }
 
     #[test]

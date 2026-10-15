@@ -575,14 +575,42 @@ pub fn slider_row_with(
 ) -> Response {
     let t = Tokens::get(ui.ctx());
     let mut changed_resp = None;
+    // Explicit -/+ steppers beside the field: thin sliders have no obvious way to
+    // nudge a value, and on touch they are hard to drag precisely.
+    let span = *range.end() - *range.start();
+    let base_step = if span.is_finite() && span <= 10.0 { 0.1 } else { 1.0 };
+    let mut stepped = 0.0;
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(tl!(label)).color(t.text_dim));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let mult = if ui.input(|i| i.modifiers.shift) { 10.0 } else { 1.0 };
+            let step = base_step * mult;
+            let inc = crate::icons::button(ui, "plus", 24.0, false, &format!("Increase {}", tl!(label)));
+            inc.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, format!("Increase {}", tl!(label))));
+            if inc.clicked() {
+                stepped += step;
+            }
             changed_resp = Some(value_field(ui, value, range.clone(), suffix, 74.0));
+            let dec = crate::icons::button(ui, "minus", 24.0, false, &format!("Decrease {}", tl!(label)));
+            dec.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, format!("Decrease {}", tl!(label))));
+            if dec.clicked() {
+                stepped -= step;
+            }
         });
     });
+    if stepped != 0.0 {
+        let (lo, hi) = (*range.start(), *range.end());
+        let nv = *value + stepped;
+        let nv = if lo <= hi && nv.is_finite() { nv.clamp(lo, hi) } else { *value };
+        if nv != *value {
+            *value = nv;
+        }
+    }
     let s = slider_with(ui, value, range, gradient, g);
     let mut r = s.clone();
+    if stepped != 0.0 {
+        r.mark_changed();
+    }
     if let Some(v) = changed_resp
         && v.changed()
     {

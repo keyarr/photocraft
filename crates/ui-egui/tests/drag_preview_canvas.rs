@@ -154,6 +154,29 @@ fn ink(background: &str) -> impl Fn(u8) -> bool {
     move |l| if white { l < 64 } else { l > 192 }
 }
 
+/// Same as [`ink`] but tolerant of 1 px antialiasing: a curved 1 px line straddling pixel
+/// boundaries renders mid-grey, which still reads against either background.
+fn soft_ink(background: &str) -> impl Fn(u8) -> bool {
+    let white = background == "white";
+    move |l| if white { l < 128 } else { l > 128 }
+}
+
+/// Fraction of samples along the ellipse arc around cardinal angle `t0` (centre `c`, radii
+/// `rx`/`ry`, all in screen points) where a pixel in the ±2 px box passes `test`. Follows
+/// the true curve: at 1× the ants drift ~2 px off a straight tangent across the window at
+/// the side midpoints, and the 1 px line greys out where it straddles pixel rows.
+fn arc_coverage(img: &Image, ppp: f32, c: Pos2, rx: f32, ry: f32, t0: f32, test: impl Fn(u8) -> bool) -> f32 {
+    let n = 29;
+    let mut hits = 0;
+    for i in 0..n {
+        let t = t0 + (i as f32 - (n as f32 - 1.0) / 2.0) * 0.012;
+        let p = (c + egui::vec2(rx * t.cos(), ry * t.sin())) * ppp;
+        let hit = (-2..=2).any(|ox| (-2..=2).any(|oy| img.luma((p.x + ox as f32).round() as i64, (p.y + oy as f32).round() as i64).is_some_and(&test)));
+        hits += usize::from(hit);
+    }
+    hits as f32 / n as f32
+}
+
 /// The four edges of the document rectangle `[x0, y0]`–`[x1, y1]` on screen.
 fn edges(h: &Harness, a: [f32; 2], b: [f32; 2]) -> [(Pos2, Pos2); 4] {
     let (tl, tr) = (screen(h, a[0], a[1]), screen(h, b[0], a[1]));
@@ -182,13 +205,14 @@ fn marquee_previews_show_while_dragging_on_white_and_black_at_1x_and_2x() {
                     }
                 } else {
                     // The ellipse touches its box at the edge midpoints: check short arcs there.
-                    let c = screen(&h, 200.0, 150.0);
-                    let (rx, ry) = (100.0, 70.0);
-                    for (dx, dy) in [(0.0, -ry), (rx, 0.0), (0.0, ry), (-rx, 0.0)] {
-                        let m = c + egui::vec2(dx, dy);
-                        let along = if dx == 0.0 { egui::vec2(14.0, 0.0) } else { egui::vec2(0.0, 14.0) };
-                        let now = coverage(&img, ppp, m - along, m + along, ink(bg));
-                        assert!(now > 0.3, "{tool} on {bg} @{ppp}x at {m:?}: {now:.2} contrasting");
+                    let tl = screen(&h, a[0], a[1]);
+                    let br = screen(&h, b[0], b[1]);
+                    let c = tl + (br - tl) * 0.5;
+                    let (rx, ry) = ((br.x - tl.x) / 2.0, (br.y - tl.y) / 2.0);
+                    use std::f32::consts::{FRAC_PI_2, PI};
+                    for t0 in [-FRAC_PI_2, 0.0, FRAC_PI_2, PI] {
+                        let now = arc_coverage(&img, ppp, c, rx, ry, t0, soft_ink(bg));
+                        assert!(now > 0.3, "{tool} on {bg} @{ppp}x at {t0:.2}rad: {now:.2} contrasting");
                     }
                 }
                 // Each move's frame shows the outline where the pointer is now (no stale frame).

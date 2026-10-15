@@ -269,6 +269,28 @@ impl RecoveryStore {
         saver.request_checked(doc.clone(), revision, original_path, SaveOptions::default())
     }
 
+    /// Synchronous snapshot write for exit paths: same key and layout as
+    /// [`autosave_checked`](Self::autosave_checked), but it blocks until the
+    /// bytes are on disk (the queued worker may not finish before the process
+    /// dies). Never panics; all failures are `Err`.
+    pub fn save_blocking(&mut self, doc: &Arc<Document>, revision: u64, original_path: Option<String>) -> std::result::Result<(), String> {
+        let id = doc.id.0;
+        let key = sanitize(&self.adopted.get(&id).cloned().unwrap_or_else(|| format!("doc-{}-{id}", self.session)));
+        let bundle = self.dir.join(format!("{key}.pcraft"));
+        let sidecar = self.dir.join(format!("{key}.json"));
+        let info = RecoveryInfo {
+            key,
+            document_name: doc.name.clone(),
+            original_path,
+            saved_at: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
+            revision,
+        };
+        std::fs::create_dir_all(&bundle).map_err(|e| e.to_string())?;
+        PcraftWriter::new().save_dir(doc, &bundle, &SaveOptions::default()).map_err(|e| e.to_string())?;
+        write_atomic(&sidecar, &serde_json::to_vec_pretty(&info).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     /// Return completed write outcomes as (document id, revision, outcome), without blocking.
     pub fn take_completed(&mut self) -> Vec<(u64, u64, std::result::Result<(), String>)> {
         self.savers.iter().flat_map(|(&id, saver)| saver.take_completed().into_iter().map(move |(revision, result)| (id, revision, result))).collect()

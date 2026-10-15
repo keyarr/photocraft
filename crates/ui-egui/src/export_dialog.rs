@@ -11,7 +11,7 @@ use crate::state::DialogKind;
 use crate::theme::Tokens;
 use crate::{ExportSettings, PhotocraftApp};
 
-const FORMATS: [(&str, &str); 5] = [("png", "PNG"), ("jpg", "JPG"), ("webp", "WebP"), ("tif", "TIFF"), ("tga", "TGA")];
+pub(crate) const FORMATS: [(&str, &str); 5] = [("png", "PNG"), ("jpg", "JPG"), ("webp", "WebP"), ("tif", "TIFF"), ("tga", "TGA")];
 
 pub fn open(app: &mut PhotocraftApp) -> Result<u64, String> {
     let st = app.session.active().ok_or("no document")?;
@@ -71,7 +71,7 @@ fn n(f: &Map<String, Value>, k: &str, d: f64) -> f64 {
 
 /// The document as exported: scaled (engine Image Size, bicubic) and flattened over white when
 /// transparency is off or the format has no alpha.
-fn export_document(doc: &Document, f: &Map<String, Value>, max_side: Option<u32>) -> Result<Document, String> {
+pub(crate) fn export_document(doc: &Document, f: &Map<String, Value>, max_side: Option<u32>) -> Result<Document, String> {
     let mut s = photocraft_engine::Session::new();
     s.add_document(doc.clone(), None);
     let mut scale = n(f, "scale", 100.0) / 100.0;
@@ -97,7 +97,7 @@ fn export_document(doc: &Document, f: &Map<String, Value>, max_side: Option<u32>
 
 /// The exported pixel size: each side scaled and rounded on its own, never below 1 px. The
 /// dialog's size label and `export_document` share it so the label names the file's real size.
-fn scaled_size(w: f64, h: f64, scale: f64) -> (f64, f64) {
+pub(crate) fn scaled_size(w: f64, h: f64, scale: f64) -> (f64, f64) {
     ((w * scale).round().max(1.0), (h * scale).round().max(1.0))
 }
 
@@ -126,7 +126,7 @@ fn lossless(f: &Map<String, Value>) -> bool {
     f.get("lossless").and_then(Value::as_bool).unwrap_or(false)
 }
 
-fn settings(f: &Map<String, Value>) -> ExportSettings {
+pub(crate) fn settings(f: &Map<String, Value>) -> ExportSettings {
     let fmt = s_fmt(f);
     let quality = n(f, "quality", 85.0).clamp(1.0, 100.0) as u8;
     ExportSettings {

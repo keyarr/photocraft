@@ -95,6 +95,13 @@ pub fn guard_window_close(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if !ctx.input(|i| i.viewport().close_requested()) {
         return;
     }
+    // No picker on-device: the header has no Save and the prompt's Save can't
+    // ask either, so snapshot everything first and leave quietly. Builds with
+    // a picker keep the prompt below.
+    if app.services.file_dialog.is_none() && app.services.autosave_blocking.is_some() {
+        crate::prefs_ui::save_all_for_exit(app);
+        app.allow_close = true;
+    }
     if !app.allow_close && intercept(app, EXIT, &Value::Null) {
         ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
         ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
@@ -562,6 +569,60 @@ mod tests {
         make_dirty(&mut app, 0);
         assert!(press_window_close(&mut app));
         assert!(app.discard.is_some());
+    }
+
+    /// Without a picker (on-device) leaving snapshots every dirty document and
+    /// goes through: the prompt's Save couldn't ask for a path anyway.
+    #[test]
+    fn exiting_without_a_picker_autosaves_and_leaves_quietly() {
+        use std::{cell::RefCell, rc::Rc};
+        let mut app = app_with_docs(1);
+        make_dirty(&mut app, 0);
+        let saved: Rc<RefCell<Vec<(u64, u64)>>> = Rc::default();
+        let log = saved.clone();
+        app.services.autosave_blocking =
+            Some(Box::new(move |doc: &std::sync::Arc<photocraft_doc::Document>, rev: u64, _path: Option<&str>| {
+                log.borrow_mut().push((doc.id.0, rev));
+                Ok(())
+            }));
+        assert!(app.services.file_dialog.is_none());
+        assert!(!press_window_close(&mut app));
+        assert!(app.allow_close);
+        assert!(app.discard.is_none());
+        assert_eq!(saved.borrow().len(), 1);
+    }
+
+    /// eframe's suspend hook (the home button on a phone, where no viewport
+    /// close ever arrives) snapshots dirty documents; the picker builds that
+    /// ask on quit keep the prompt instead.
+    #[test]
+    fn suspending_snapshots_without_a_picker_only() {
+        use std::{cell::RefCell, rc::Rc};
+        struct Stub;
+        impl eframe::Storage for Stub {
+            fn get_string(&self, _: &str) -> Option<String> {
+                None
+            }
+            fn set_string(&mut self, _: &str, _: String) {}
+            fn remove_string(&mut self, _: &str) {}
+            fn flush(&mut self) {}
+        }
+        for picker in [false, true] {
+            let mut app = app_with_docs(1);
+            make_dirty(&mut app, 0);
+            let saved: Rc<RefCell<Vec<(u64, u64)>>> = Rc::default();
+            let log = saved.clone();
+            app.services.autosave_blocking =
+                Some(Box::new(move |doc: &std::sync::Arc<photocraft_doc::Document>, rev: u64, _path: Option<&str>| {
+                    log.borrow_mut().push((doc.id.0, rev));
+                    Ok(())
+                }));
+            if picker {
+                app.services.file_dialog = Some(Box::new(|_, _, _| {}));
+            }
+            eframe::App::save(&mut app, &mut Stub);
+            assert_eq!(saved.borrow().len(), usize::from(!picker), "picker = {picker}");
+        }
     }
 
     #[test]

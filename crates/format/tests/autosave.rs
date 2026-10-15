@@ -223,6 +223,24 @@ fn new_documents_never_overwrite_surviving_entries() {
 }
 
 #[test]
+fn blocking_save_writes_a_recoverable_entry() {
+    let dir = temp_dir("blocking");
+    let mut store = RecoveryStore::new(&dir);
+    let doc = Arc::new(version(4, 2, ColorMode::Rgb));
+    store.save_blocking(&doc, 11, Some("/work/d.pcraft".into())).unwrap();
+    let entries = list_recovery(&dir);
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].info.revision, 11);
+    assert_eq!(entries[0].info.original_path.as_deref(), Some("/work/d.pcraft"));
+    assert_eq!(recover(&entries[0]).unwrap(), *doc);
+    // Same key as the queued autosave: no duplicate entry after both run.
+    store.autosave(&doc, 11, Some("/work/d.pcraft".into()));
+    drop(store);
+    assert_eq!(list_recovery(&dir).len(), 1);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn sidecars_cannot_point_at_other_bundles() {
     let dir = temp_dir("sidecar-key");
     let inner = dir.join("Recovery");

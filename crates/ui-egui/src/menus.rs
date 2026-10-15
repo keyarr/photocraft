@@ -281,7 +281,16 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
                 Err("Open Recent is unavailable on the web".to_string())
             }
         }
-        "file.saveAs" => app.save_as(params.get("path").and_then(Value::as_str).map(str::to_string)),
+        "file.saveAs" => {
+            // No picker on-device: asking would just say "cancelled", so Save As
+            // opens the touch export sheet instead. An explicit path (scripts,
+            // tests) still saves straight to it.
+            if params.get("path").is_none() && app.services.file_dialog.is_none() && app.session.active().is_some() {
+                crate::mobile_export::open(app);
+                return Ok(Value::Null);
+            }
+            app.save_as(params.get("path").and_then(Value::as_str).map(str::to_string))
+        }
         "view.zoomIn" | "view.zoomOut" | "view.fitOnScreen" | "view.actualPixels" => app.run(id, params),
         "window.newWindowForDocument" => {
             let doc = app.session.active_index().ok_or("no document")?;
@@ -343,7 +352,7 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
         // Layer Content Options…: the adjustment / fill controls live in Properties.
         "layer.layerContentOptions" => {
             let r = app.run(id, params)?;
-            app.ui.panels.properties = true;
+            crate::dock::reveal(app, crate::dock::Group::Properties);
             app.ui.dock_tabs.properties = 0;
             Ok(r)
         }
@@ -491,6 +500,14 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
         {
             let kind = &ls["layer.layerStyle.".len()..];
             crate::layer_style::open(app, Some(kind)).map(|d| json!({"dialog": d})).ok_or_else(|| "no active layer".to_string())
+        }
+        // Layer › New Adjustment Layer: the new layer becomes active but its sliders
+        // live in Properties, so bring that panel back or the adjustment looks dead.
+        id if id.starts_with("layer.newAdjustmentLayer.") => {
+            let r = app.run(id, params)?;
+            crate::dock::reveal(app, crate::dock::Group::Properties);
+            app.ui.dock_tabs.properties = 0;
+            Ok(r)
         }
         _ => app.run(id, params),
     }
@@ -1636,9 +1653,10 @@ mod open_recent_tests {
         let ctx = egui::Context::default();
         invoke(&mut app, &ctx, "file.open", json!({ "path": p })).unwrap();
         assert_eq!(app.ui.recent_files.first().map(String::as_str), Some(p.as_str()));
-        // Re-open via the recent entry.
+        // Re-open via the recent entry: the same file is already open, so it is
+        // shown again instead of opening a stale second copy from disk.
         invoke(&mut app, &ctx, "file.openRecent.0", json!({})).unwrap();
-        assert_eq!(app.session.documents().len(), 2);
+        assert_eq!(app.session.documents().len(), 1);
         let _ = std::fs::remove_file(&path);
     }
 }

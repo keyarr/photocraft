@@ -91,6 +91,7 @@ pub mod mask_thumbs_ui;
 pub mod menu_catalog;
 pub mod menu_nav;
 pub mod menus;
+pub mod mobile_export;
 pub mod mobile_ui;
 pub mod monitor_status;
 pub mod move_mods;
@@ -303,6 +304,13 @@ pub struct Services {
     pub discard_autosave: Option<DiscardAutosaveFn>,
     pub recover: Option<RecoverFn>,
     pub adopt_autosave: Option<AdoptAutosaveFn>,
+    /// Synchronous snapshot write for exit paths (same layout as `autosave`): the
+    /// queued worker may not finish before the process dies, so leaving calls
+    /// this for every dirty document. `None` where there is no recovery dir.
+    pub autosave_blocking: Option<AutosaveFn>,
+    /// Base directory the mobile export sheet writes into (on-device builds have
+    /// no save picker). `None` off-device, where exports keep asking for a path.
+    pub export_base_dir: Option<String>,
     /// History Log text file output.
     pub append_text: Option<AppendTextFn>,
     /// OS requests (macOS open-documents / quit Apple events), polled every frame.
@@ -1159,6 +1167,17 @@ impl eframe::App for PhotocraftApp {
         self.poll_file_dialog(ctx, Some(frame));
     }
 
+    /// eframe calls this when the event loop suspends (the home button on a
+    /// phone) and on quit. The viewport close request never fires on Android,
+    /// so without this the background kill loses every edit since the last
+    /// autosave. Picker builds keep the discard prompt; picker-less builds
+    /// snapshot instead of asking (same rule as `guard_window_close`).
+    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
+        if self.services.file_dialog.is_none() {
+            crate::prefs_ui::save_all_for_exit(self);
+        }
+    }
+
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         // Native menu key equivalents become the key presses they were (see `native_menu`).
         if let Some(menu) = self.services.native_menu.as_mut() {
@@ -1259,6 +1278,7 @@ impl eframe::App for PhotocraftApp {
         if mobile && !showing_home {
             crate::mobile_ui::tool_sheet(self, &ctx);
         }
+        crate::mobile_export::show(self, &ctx);
         panels::properties_window(self, &ctx);
         brush_panel::window(self, &ctx);
         preset_panels::windows(self, &ctx);

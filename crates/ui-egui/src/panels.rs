@@ -2749,6 +2749,9 @@ fn adjustments_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     });
     if let Some(id) = run {
         let _ = app.run(&id, json!({}));
+        // The new layer becomes active but its sliders live in Properties: if that
+        // panel was hidden or collapsed the adjustment looks dead. Bring it back.
+        crate::dock::reveal(app, crate::dock::Group::Properties);
         app.ui.dock_tabs.properties = 0;
     }
 }

@@ -680,7 +680,7 @@ fn save_new_style(app: &mut PhotocraftApp, f: &Map<String, Value>) {
 /// Dialog body (left list, right parameters).
 /// The enable checkbox of an effect row.
 fn fx_checkbox_rect(row: egui::Rect) -> egui::Rect {
-    egui::Rect::from_min_size(row.min + vec2(6.0, 6.0), vec2(14.0, 14.0))
+    egui::Rect::from_min_size(row.min + vec2(6.0, (row.height() - 14.0) / 2.0), vec2(14.0, 14.0))
 }
 
 /// An effect row's checkbox: an accent box with a tick when on, an outline when off.
@@ -694,317 +694,377 @@ fn fx_checkbox(p: &egui::Painter, cb: egui::Rect, on: bool, t: &Tokens) {
     }
 }
 
-pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
+/// The effect list: Styles + Blending Options + one row per effect kind.
+/// `list_w` is the full row width, `row_h` the touch height (26 desktop, 40 phone).
+fn effect_list(ui: &mut egui::Ui, f: &mut Map<String, Value>, selected: &str, list_w: f32, row_h: f32) {
     let t = Tokens::get(ui.ctx());
+    // Styles & Blending Options rows (matching the effect row layout & padding).
+    for (id, label) in [(STYLES_PAGE, "Styles"), (BLENDING, "Blending Options")] {
+        let is_sel = selected == id;
+        let (rect, resp) = ui.allocate_exact_size(vec2(list_w, row_h), Sense::click());
+        if is_sel {
+            ui.painter().rect_filled(rect, t.radius_sm, t.row_selected.gamma_multiply(if t.pro { 1.0 } else { 0.0 }).max_alpha(t.hover));
+        } else if resp.hovered() {
+            ui.painter().rect_filled(rect, t.radius_sm, t.hover.gamma_multiply(0.5));
+        }
+        ui.painter().text(
+            rect.left_center() + vec2(28.0, 0.0),
+            egui::Align2::LEFT_CENTER,
+            tl!(label),
+            egui::FontId::proportional(12.5),
+            if is_sel { t.text } else { t.text_dim },
+        );
+        if resp.clicked() {
+            f.insert("selected".into(), json!(id));
+        }
+    }
+    ui.add_space(4.0);
+    for &(kind, label) in KINDS {
+        let ids: Vec<String> = effects_of(f)
+            .iter()
+            .filter(|e| e.get("kind").and_then(Value::as_str) == Some(kind))
+            .filter_map(|e| e.get("id").and_then(Value::as_str).map(str::to_string))
+            .collect();
+        if ids.is_empty() {
+            // The effect isn't on the layer: a greyed row with an empty checkbox, as in
+            // Photoshop (#1357); a click on either adds it, turned on.
+            let (rect, resp) = ui.allocate_exact_size(vec2(list_w, row_h), Sense::click());
+            if resp.hovered() {
+                ui.painter().rect_filled(rect, t.radius_sm, t.hover.gamma_multiply(0.5));
+            }
+            fx_checkbox(ui.painter(), fx_checkbox_rect(rect), false, &t);
+            ui.painter().text(
+                rect.left_center() + vec2(28.0, 0.0),
+                egui::Align2::LEFT_CENTER,
+                tl!(label),
+                egui::FontId::proportional(12.5),
+                t.text_faint,
+            );
+            if resp.clicked() {
+                add_instance(f, kind);
+            }
+            continue;
+        }
+        let count = ids.len();
+        for id in &ids {
+            let Some(e) = entry(f, id) else { continue };
+            let kind_label = KINDS.iter().find(|k| k.0 == kind).map(|k| k.1).unwrap_or(label);
+            let mut on = e.get("on").and_then(Value::as_bool).unwrap_or(false);
+            let is_sel = id == selected;
+            let (rect, resp) = ui.allocate_exact_size(vec2(list_w, row_h), Sense::click());
+            if is_sel {
+                ui.painter().rect_filled(rect, t.radius_sm, t.row_selected.gamma_multiply(if t.pro { 1.0 } else { 0.0 }).max_alpha(t.hover));
+            } else if resp.hovered() {
+                ui.painter().rect_filled(rect, t.radius_sm, t.hover.gamma_multiply(0.5));
+            }
+            let cb = fx_checkbox_rect(rect);
+            // Phones get a bigger toggle target around the 14px box; desktop keeps its exact hit.
+            let cresp = if row_h > 30.0 {
+                let cb_hit = egui::Rect::from_min_max(cb.min - vec2(8.0, 8.0), cb.max + vec2(8.0, 8.0));
+                ui.interact(cb_hit, ui.id().with(("fxcb", kind, id)), Sense::click())
+            } else {
+                ui.interact(cb, ui.id().with(("fxcb", kind, id)), Sense::click())
+            };
+            fx_checkbox(ui.painter(), cb, on, &t);
+            ui.painter().text(
+                rect.left_center() + vec2(28.0, 0.0),
+                egui::Align2::LEFT_CENTER,
+                tl!(kind_label),
+                egui::FontId::proportional(12.5),
+                if on || is_sel { t.text } else { t.text_dim },
+            );
+            // + adds another instance; − removes one once there are several.
+            if multi(kind) {
+                let touch = row_h > 30.0;
+                let hit = if touch { 28.0 } else { 18.0 };
+                let btn = |ui: &egui::Ui, at: egui::Pos2, glyph: &str, tag: &str| {
+                    let r = egui::Rect::from_center_size(at, vec2(hit, hit));
+                    let hresp = ui.interact(r, ui.id().with(("fxbtn", tag, id)), Sense::click());
+                    let col = if hresp.hovered() { t.accent } else { t.text_faint };
+                    ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, glyph, egui::FontId::proportional(13.0), col);
+                    hresp.clicked()
+                };
+                if count > 1 && btn(ui, rect.right_center() - vec2(if touch { 28.0 } else { 22.0 }, 0.0), "\u{2212}", "minus") {
+                    remove_instance(f, id);
+                    continue;
+                }
+                if btn(ui, rect.right_center() - vec2(if touch { 10.0 } else { 8.0 }, 0.0), "+", "plus") {
+                    add_instance(f, kind);
+                }
+            }
+            if cresp.clicked() {
+                on = !on;
+                if let Some(e) = entry_mut(f, id) {
+                    e["on"] = json!(on);
+                }
+                f.insert("selected".into(), json!(id));
+            } else if resp.clicked() {
+                f.insert("selected".into(), json!(id));
+            }
+        }
+    }
+}
+
+/// What the parameters page did: a style swatch was picked, or New Style was pressed.
+#[derive(Default)]
+struct StyleAction {
+    click: Option<String>,
+    new_style: bool,
+}
+
+/// Right-hand parameters of the selected page: Styles gallery, Blending Options
+/// or the selected effect's controls. `width` is the column width (330 desktop,
+/// full width on phones).
+#[allow(clippy::too_many_lines)]
+fn params_page(
+    app: &mut PhotocraftApp,
+    ui: &mut egui::Ui,
+    f: &mut Map<String, Value>,
+    selected: &str,
+    invalid: &Option<String>,
+    width: f32,
+    out: &mut StyleAction,
+) {
+    let t = Tokens::get(ui.ctx());
+    ui.set_width(width);
+    if selected == STYLES_PAGE {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(tl!("Styles")).font(crate::theme::semibold(14.0)).color(t.text));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if crate::widgets::secondary_button(ui, tl!("New Style…"), 100.0).clicked() {
+                    out.new_style = true;
+                }
+            });
+        });
+        ui.add_space(8.0);
+        let ctx = ui.ctx().clone();
+        let sw = if width < 300.0 { 44.0 } else { 32.0 };
+        egui::ScrollArea::vertical().max_height(if width < 300.0 { 240.0 } else { 340.0 }).id_salt("layer-style-presets-main").show(ui, |ui| {
+            for group in &app.session.presets.styles {
+                ui.label(RichText::new(&group.name).size(12.0).color(t.text_dim));
+                ui.add_space(3.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = vec2(4.0, 4.0);
+                    for st in &group.items {
+                        let tex = crate::preset_panels::style_texture(app, &ctx, st);
+                        let (rect, resp) = ui.allocate_exact_size(vec2(sw, sw), Sense::click());
+                        ui.painter().image(tex.id(), rect, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
+                        let (stroke, kind) = if resp.hovered() {
+                            (Stroke::new(1.5, t.accent), egui::StrokeKind::Outside)
+                        } else {
+                            (Stroke::new(1.0, t.card_border), egui::StrokeKind::Inside)
+                        };
+                        ui.painter().rect_stroke(rect, 2.0, stroke, kind);
+                        if resp.on_hover_text(&st.name).clicked() {
+                            out.click = Some(st.name.clone());
+                        }
+                    }
+                });
+                ui.add_space(10.0);
+            }
+        });
+        return;
+    }
+    let sel_kind: String = if selected == BLENDING {
+        BLENDING.to_string()
+    } else {
+        entry(f, selected).and_then(|e| e.get("kind").and_then(Value::as_str)).unwrap_or("").to_string()
+    };
+    let label = KINDS.iter().find(|k| k.0 == sel_kind).map(|k| k.1).unwrap_or(if selected == BLENDING { "Blending Options" } else { "" });
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(tl!(&label)).font(crate::theme::semibold(14.0)).color(t.text));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let mut preview = f.get("preview").and_then(Value::as_bool).unwrap_or(true);
+            if widgets::checkbox(ui, &mut preview, tl!("Preview")).changed() {
+                f.insert("preview".into(), json!(preview));
+            }
+        });
+    });
+    ui.add_space(6.0);
+    // Only reachable through `ui.dialog.set`: say what is wrong once, keep the bad value.
+    if let Some(error) = invalid {
+        ui.colored_label(t.danger, error);
+        return;
+    }
+    if selected == BLENDING {
+        // General Blending, Advanced Blending and Blend If, laid out like Photoshop's page.
+        let names = channel_names_of(f);
+        let key = format!("p:{BLENDING}");
+        let Some(mut p) = f.get(&key).filter(|v| v.is_object()).cloned() else { return };
+        blending_page(ui, &mut p, &names);
+        f.insert(key, p);
+        return;
+    }
+    // The page shows the factory defaults under the instance's values,
+    // but only real edits reach the stored params.
+    let disp = if selected == BLENDING {
+        f.get("p:blendingOptions").cloned().unwrap_or_else(|| json!({}))
+    } else {
+        entry(f, selected).and_then(|e| e.get("params").cloned()).unwrap_or_else(|| json!({}))
+    };
+    let Some(mut disp) = disp.as_object().map(|o| Value::Object(o.clone())) else { return };
+    if selected != BLENDING {
+        let base = defaults(sel_kind.as_str());
+        if let (Some(o), Some(b)) = (disp.as_object_mut(), base.as_object()) {
+            for (k, v) in b {
+                o.entry(k.clone()).or_insert_with(|| v.clone());
+            }
+        }
+    }
+    for &(key, label, kind_p) in spec(sel_kind.as_str()) {
+        match kind_p {
+            P::Angle => {
+                let mut v = disp.get(key).and_then(Value::as_f64).unwrap_or(0.0) as f32;
+                if angle_row(ui, label, &mut v).changed() {
+                    let value = json!(v);
+                    disp[key] = value.clone();
+                    set_param(f, selected, key, value);
+                }
+            }
+            P::Slider(min, max, unit) => {
+                let mut v = disp.get(key).and_then(Value::as_f64).unwrap_or(min as f64) as f32;
+                if widgets::slider_row(ui, label, &mut v, min..=max, unit, None).changed() {
+                    let value = json!(v.round());
+                    disp[key] = value.clone();
+                    set_param(f, selected, key, value);
+                }
+            }
+            P::Color => {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(tl!(&label)).color(t.text_dim));
+                    let hexs = disp.get(key).and_then(Value::as_str).unwrap_or("#000000").to_string();
+                    let mut c = parse_hex(&hexs);
+                    if crate::widgets::color_edit_button_srgba(ui, &mut c).changed() {
+                        let value = json!(format!("#{r:02x}{g:02x}{b:02x}", r = c.r(), g = c.g(), b = c.b()));
+                        disp[key] = value.clone();
+                        set_param(f, selected, key, value);
+                    }
+                });
+            }
+            P::Blend => {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(tl!(&label)).color(t.text_dim));
+                    let mut cur = disp.get(key).and_then(Value::as_str).unwrap_or("Normal").to_string();
+                    let opts: Vec<(String, &str)> =
+                        photocraft_color::BlendMode::LAYER_MODES.iter().map(|m| (m.label().to_string(), m.label())).collect();
+                    if widgets::dropdown(ui, &format!("fx-blend-{sel_kind}"), &mut cur, &opts, 150.0) {
+                        let value = json!(cur);
+                        disp[key] = value.clone();
+                        set_param(f, selected, key, value);
+                    }
+                });
+            }
+            P::Choice(options) => {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(tl!(&label)).color(t.text_dim));
+                    let mut cur = disp.get(key).and_then(Value::as_str).unwrap_or(options[0].0).to_string();
+                    let opts: Vec<(String, &str)> = options.iter().map(|(v, l)| (v.to_string(), *l)).collect();
+                    if widgets::dropdown(ui, &format!("fx-{sel_kind}-{key}"), &mut cur, &opts, 150.0) {
+                        let value = json!(cur);
+                        disp[key] = value.clone();
+                        set_param(f, selected, key, value);
+                    }
+                });
+            }
+            P::Pattern => {
+                let list: Vec<(String, String)> = f
+                    .get("patternList")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().filter_map(|e| Some((e.get(0)?.as_str()?.to_string(), e.get(1)?.as_str()?.to_string()))).collect())
+                    .unwrap_or_default();
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(tl!(&label)).color(t.text_dim));
+                    let mut cur = disp
+                        .get(key)
+                        .and_then(Value::as_str)
+                        .filter(|c| !c.is_empty())
+                        .map(str::to_string)
+                        .or_else(|| list.first().map(|l| l.0.clone()))
+                        .unwrap_or_default();
+                    let opts: Vec<(String, &str)> = list.iter().map(|(id, n)| (id.clone(), n.as_str())).collect();
+                    if widgets::dropdown(ui, &format!("fx-{sel_kind}-{key}"), &mut cur, &opts, 180.0)
+                        || disp.get(key).and_then(Value::as_str).is_none_or(str::is_empty)
+                    {
+                        let value = json!(cur);
+                        disp[key] = value.clone();
+                        set_param(f, selected, key, value);
+                    }
+                });
+            }
+            P::Check => {
+                let mut b = disp.get(key).and_then(Value::as_bool).unwrap_or(false);
+                if widgets::checkbox(ui, &mut b, label).changed() {
+                    let value = json!(b);
+                    disp[key] = value.clone();
+                    set_param(f, selected, key, value);
+                }
+            }
+        }
+        ui.add_space(2.0);
+    }
+    // Make Default stores this page as the user default; Reset to Default
+    // restores it (or the factory defaults before the first Make).
+    let page_kind = sel_kind != BLENDING && entry(f, selected).is_some();
+    ui.add_space(4.0);
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+        ui.add_enabled_ui(page_kind, |ui| {
+            if crate::widgets::secondary_button(ui, tl!("Reset to Default"), 130.0).clicked()
+                && let Ok(v) = app.run("layer.layerStyle.defaultFor", json!({"kind": sel_kind}))
+                && let Some(e) = entry_mut(f, selected)
+            {
+                e["params"] = v["params"].clone();
+            }
+            if crate::widgets::secondary_button(ui, tl!("Make Default"), 110.0).clicked() {
+                let _ = app.run("layer.layerStyle.makeDefault", json!({"kind": sel_kind, "params": disp}));
+            }
+        });
+    });
+}
+
+pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let selected = f.get("selected").and_then(Value::as_str).unwrap_or("dropShadow").to_string();
-    let mut style_click: Option<String> = None;
-    let mut new_style = false;
+    let mut action = StyleAction::default();
     let invalid = validate_params(f).err();
+    // Phones (~360 pt wide) can't fit the desktop's 190 pt list beside the 330 pt
+    // parameters: the list goes on top (full width, touch rows) and the parameters
+    // use the full width below, both scrolling inside the dialog.
+    if ui.available_width() < 500.0 {
+        let list_w = ui.available_width().max(200.0);
+        egui::ScrollArea::vertical().max_height(200.0).id_salt("layer-style-list-narrow").show(ui, |ui| {
+            effect_list(ui, f, &selected, list_w, 40.0);
+        });
+        crate::widgets::hairline(ui);
+        ui.add_space(4.0);
+        let room = (ui.ctx().content_rect().height() - 420.0).clamp(200.0, 360.0);
+        egui::ScrollArea::vertical().max_height(room).id_salt("layer-style-params-narrow").show(ui, |ui| {
+            params_page(app, ui, f, &selected, &invalid, list_w, &mut action);
+        });
+        if let Some(name) = action.click {
+            apply_style_preset(app, f, &name);
+        }
+        if action.new_style {
+            save_new_style(app, f);
+        }
+        return;
+    }
     ui.horizontal_top(|ui| {
         // Left: effect list.
         ui.vertical(|ui| {
             ui.set_width(190.0);
-            // Styles & Blending Options rows (matching the effect row layout & padding).
-            for (id, label) in [(STYLES_PAGE, "Styles"), (BLENDING, "Blending Options")] {
-                let is_sel = selected == id;
-                let (rect, resp) = ui.allocate_exact_size(vec2(190.0, 26.0), Sense::click());
-                if is_sel {
-                    ui.painter().rect_filled(rect, t.radius_sm, t.row_selected.gamma_multiply(if t.pro { 1.0 } else { 0.0 }).max_alpha(t.hover));
-                } else if resp.hovered() {
-                    ui.painter().rect_filled(rect, t.radius_sm, t.hover.gamma_multiply(0.5));
-                }
-                ui.painter().text(
-                    rect.left_center() + vec2(28.0, 0.0),
-                    egui::Align2::LEFT_CENTER,
-                    tl!(label),
-                    egui::FontId::proportional(12.5),
-                    if is_sel { t.text } else { t.text_dim },
-                );
-                if resp.clicked() {
-                    f.insert("selected".into(), json!(id));
-                }
-            }
-            ui.add_space(4.0);
-            for &(kind, label) in KINDS {
-                let ids: Vec<String> = effects_of(f)
-                    .iter()
-                    .filter(|e| e.get("kind").and_then(Value::as_str) == Some(kind))
-                    .filter_map(|e| e.get("id").and_then(Value::as_str).map(str::to_string))
-                    .collect();
-                if ids.is_empty() {
-                    // The effect isn't on the layer: a greyed row with an empty checkbox, as in
-                    // Photoshop (#1357); a click on either adds it, turned on.
-                    let (rect, resp) = ui.allocate_exact_size(vec2(190.0, 26.0), Sense::click());
-                    if resp.hovered() {
-                        ui.painter().rect_filled(rect, t.radius_sm, t.hover.gamma_multiply(0.5));
-                    }
-                    fx_checkbox(ui.painter(), fx_checkbox_rect(rect), false, &t);
-                    ui.painter().text(
-                        rect.left_center() + vec2(28.0, 0.0),
-                        egui::Align2::LEFT_CENTER,
-                        tl!(label),
-                        egui::FontId::proportional(12.5),
-                        t.text_faint,
-                    );
-                    if resp.clicked() {
-                        add_instance(f, kind);
-                    }
-                    continue;
-                }
-                let count = ids.len();
-                for id in &ids {
-                    let Some(e) = entry(f, id) else { continue };
-                    let kind_label = KINDS.iter().find(|k| k.0 == kind).map(|k| k.1).unwrap_or(label);
-                    let mut on = e.get("on").and_then(Value::as_bool).unwrap_or(false);
-                    let is_sel = id == &selected;
-                    let (rect, resp) = ui.allocate_exact_size(vec2(190.0, 26.0), Sense::click());
-                    if is_sel {
-                        ui.painter().rect_filled(rect, t.radius_sm, t.row_selected.gamma_multiply(if t.pro { 1.0 } else { 0.0 }).max_alpha(t.hover));
-                    } else if resp.hovered() {
-                        ui.painter().rect_filled(rect, t.radius_sm, t.hover.gamma_multiply(0.5));
-                    }
-                    let cb = fx_checkbox_rect(rect);
-                    let cresp = ui.interact(cb, ui.id().with(("fxcb", kind, id)), Sense::click());
-                    fx_checkbox(ui.painter(), cb, on, &t);
-                    ui.painter().text(
-                        rect.left_center() + vec2(28.0, 0.0),
-                        egui::Align2::LEFT_CENTER,
-                        tl!(kind_label),
-                        egui::FontId::proportional(12.5),
-                        if on || is_sel { t.text } else { t.text_dim },
-                    );
-                    // + adds another instance; − removes one once there are several.
-                    if multi(kind) {
-                        let btn = |ui: &egui::Ui, at: egui::Pos2, glyph: &str, tag: &str| {
-                            let r = egui::Rect::from_center_size(at, vec2(18.0, 18.0));
-                            let hresp = ui.interact(r, ui.id().with(("fxbtn", tag, id)), Sense::click());
-                            let col = if hresp.hovered() { t.accent } else { t.text_faint };
-                            ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, glyph, egui::FontId::proportional(13.0), col);
-                            hresp.clicked()
-                        };
-                        if count > 1 && btn(ui, rect.right_center() - vec2(22.0, 0.0), "\u{2212}", "minus") {
-                            remove_instance(f, id);
-                            continue;
-                        }
-                        if btn(ui, rect.right_center() - vec2(8.0, 0.0), "+", "plus") {
-                            add_instance(f, kind);
-                        }
-                    }
-                    if cresp.clicked() {
-                        on = !on;
-                        if let Some(e) = entry_mut(f, id) {
-                            e["on"] = json!(on);
-                        }
-                        f.insert("selected".into(), json!(id));
-                    } else if resp.clicked() {
-                        f.insert("selected".into(), json!(id));
-                    }
-                }
-            }
+            effect_list(ui, f, &selected, 190.0, 26.0);
         });
         widgets::vline(ui, 330.0);
         // Right: parameters of the selected page.
         ui.vertical(|ui| {
-            ui.set_width(330.0);
-            if selected == STYLES_PAGE {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(tl!("Styles")).font(crate::theme::semibold(14.0)).color(t.text));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if crate::widgets::secondary_button(ui, tl!("New Style…"), 100.0).clicked() {
-                            new_style = true;
-                        }
-                    });
-                });
-                ui.add_space(8.0);
-                let ctx = ui.ctx().clone();
-                egui::ScrollArea::vertical().max_height(340.0).id_salt("layer-style-presets-main").show(ui, |ui| {
-                    for group in &app.session.presets.styles {
-                        ui.label(RichText::new(&group.name).size(12.0).color(t.text_dim));
-                        ui.add_space(3.0);
-                        ui.horizontal_wrapped(|ui| {
-                            ui.spacing_mut().item_spacing = vec2(4.0, 4.0);
-                            for st in &group.items {
-                                let tex = crate::preset_panels::style_texture(app, &ctx, st);
-                                let (rect, resp) = ui.allocate_exact_size(vec2(32.0, 32.0), Sense::click());
-                                ui.painter().image(tex.id(), rect, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
-                                let (stroke, kind) = if resp.hovered() {
-                                    (Stroke::new(1.5, t.accent), egui::StrokeKind::Outside)
-                                } else {
-                                    (Stroke::new(1.0, t.card_border), egui::StrokeKind::Inside)
-                                };
-                                ui.painter().rect_stroke(rect, 2.0, stroke, kind);
-                                if resp.on_hover_text(&st.name).clicked() {
-                                    style_click = Some(st.name.clone());
-                                }
-                            }
-                        });
-                        ui.add_space(10.0);
-                    }
-                });
-                return;
-            }
-            let sel_kind: String = if selected == BLENDING {
-                BLENDING.to_string()
-            } else {
-                entry(f, &selected).and_then(|e| e.get("kind").and_then(Value::as_str)).unwrap_or("").to_string()
-            };
-            let label = KINDS.iter().find(|k| k.0 == sel_kind).map(|k| k.1).unwrap_or(if selected == BLENDING { "Blending Options" } else { "" });
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(tl!(&label)).font(crate::theme::semibold(14.0)).color(t.text));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let mut preview = f.get("preview").and_then(Value::as_bool).unwrap_or(true);
-                    if widgets::checkbox(ui, &mut preview, tl!("Preview")).changed() {
-                        f.insert("preview".into(), json!(preview));
-                    }
-                });
-            });
-            ui.add_space(6.0);
-            // Only reachable through `ui.dialog.set`: say what is wrong once, keep the bad value.
-            if let Some(error) = &invalid {
-                ui.colored_label(t.danger, error);
-                return;
-            }
-            if selected == BLENDING {
-                // General Blending, Advanced Blending and Blend If, laid out like Photoshop's page.
-                let names = channel_names_of(f);
-                let key = format!("p:{BLENDING}");
-                let Some(mut p) = f.get(&key).filter(|v| v.is_object()).cloned() else { return };
-                blending_page(ui, &mut p, &names);
-                f.insert(key, p);
-                return;
-            }
-            // The page shows the factory defaults under the instance's values,
-            // but only real edits reach the stored params.
-            let disp = if selected == BLENDING {
-                f.get("p:blendingOptions").cloned().unwrap_or_else(|| json!({}))
-            } else {
-                entry(f, &selected).and_then(|e| e.get("params").cloned()).unwrap_or_else(|| json!({}))
-            };
-            let Some(mut disp) = disp.as_object().map(|o| Value::Object(o.clone())) else { return };
-            if selected != BLENDING {
-                let base = defaults(&sel_kind);
-                if let (Some(o), Some(b)) = (disp.as_object_mut(), base.as_object()) {
-                    for (k, v) in b {
-                        o.entry(k.clone()).or_insert_with(|| v.clone());
-                    }
-                }
-            }
-            for &(key, label, kind_p) in spec(&sel_kind) {
-                match kind_p {
-                    P::Angle => {
-                        let mut v = disp.get(key).and_then(Value::as_f64).unwrap_or(0.0) as f32;
-                        if angle_row(ui, label, &mut v).changed() {
-                            let value = json!(v);
-                            disp[key] = value.clone();
-                            set_param(f, &selected, key, value);
-                        }
-                    }
-                    P::Slider(min, max, unit) => {
-                        let mut v = disp.get(key).and_then(Value::as_f64).unwrap_or(min as f64) as f32;
-                        if widgets::slider_row(ui, label, &mut v, min..=max, unit, None).changed() {
-                            let value = json!(v.round());
-                            disp[key] = value.clone();
-                            set_param(f, &selected, key, value);
-                        }
-                    }
-                    P::Color => {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(tl!(&label)).color(t.text_dim));
-                            let hexs = disp.get(key).and_then(Value::as_str).unwrap_or("#000000").to_string();
-                            let mut c = parse_hex(&hexs);
-                            if crate::widgets::color_edit_button_srgba(ui, &mut c).changed() {
-                                let value = json!(format!("#{r:02x}{g:02x}{b:02x}", r = c.r(), g = c.g(), b = c.b()));
-                                disp[key] = value.clone();
-                                set_param(f, &selected, key, value);
-                            }
-                        });
-                    }
-                    P::Blend => {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(tl!(&label)).color(t.text_dim));
-                            let mut cur = disp.get(key).and_then(Value::as_str).unwrap_or("Normal").to_string();
-                            let opts: Vec<(String, &str)> =
-                                photocraft_color::BlendMode::LAYER_MODES.iter().map(|m| (m.label().to_string(), m.label())).collect();
-                            if widgets::dropdown(ui, &format!("fx-blend-{sel_kind}"), &mut cur, &opts, 150.0) {
-                                let value = json!(cur);
-                                disp[key] = value.clone();
-                                set_param(f, &selected, key, value);
-                            }
-                        });
-                    }
-                    P::Choice(options) => {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(tl!(&label)).color(t.text_dim));
-                            let mut cur = disp.get(key).and_then(Value::as_str).unwrap_or(options[0].0).to_string();
-                            let opts: Vec<(String, &str)> = options.iter().map(|(v, l)| (v.to_string(), *l)).collect();
-                            if widgets::dropdown(ui, &format!("fx-{sel_kind}-{key}"), &mut cur, &opts, 150.0) {
-                                let value = json!(cur);
-                                disp[key] = value.clone();
-                                set_param(f, &selected, key, value);
-                            }
-                        });
-                    }
-                    P::Pattern => {
-                        let list: Vec<(String, String)> = f
-                            .get("patternList")
-                            .and_then(Value::as_array)
-                            .map(|a| a.iter().filter_map(|e| Some((e.get(0)?.as_str()?.to_string(), e.get(1)?.as_str()?.to_string()))).collect())
-                            .unwrap_or_default();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(tl!(&label)).color(t.text_dim));
-                            let mut cur = disp
-                                .get(key)
-                                .and_then(Value::as_str)
-                                .filter(|c| !c.is_empty())
-                                .map(str::to_string)
-                                .or_else(|| list.first().map(|l| l.0.clone()))
-                                .unwrap_or_default();
-                            let opts: Vec<(String, &str)> = list.iter().map(|(id, n)| (id.clone(), n.as_str())).collect();
-                            if widgets::dropdown(ui, &format!("fx-{sel_kind}-{key}"), &mut cur, &opts, 180.0)
-                                || disp.get(key).and_then(Value::as_str).is_none_or(str::is_empty)
-                            {
-                                let value = json!(cur);
-                                disp[key] = value.clone();
-                                set_param(f, &selected, key, value);
-                            }
-                        });
-                    }
-                    P::Check => {
-                        let mut b = disp.get(key).and_then(Value::as_bool).unwrap_or(false);
-                        if widgets::checkbox(ui, &mut b, label).changed() {
-                            let value = json!(b);
-                            disp[key] = value.clone();
-                            set_param(f, &selected, key, value);
-                        }
-                    }
-                }
-                ui.add_space(2.0);
-            }
-            // Make Default stores this page as the user default; Reset to Default
-            // restores it (or the factory defaults before the first Make).
-            let page_kind = sel_kind != BLENDING && entry(f, &selected).is_some();
-            ui.add_space(4.0);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                ui.add_enabled_ui(page_kind, |ui| {
-                    if crate::widgets::secondary_button(ui, tl!("Reset to Default"), 130.0).clicked()
-                        && let Ok(v) = app.run("layer.layerStyle.defaultFor", json!({"kind": sel_kind}))
-                        && let Some(e) = entry_mut(f, &selected)
-                    {
-                        e["params"] = v["params"].clone();
-                    }
-                    if crate::widgets::secondary_button(ui, tl!("Make Default"), 110.0).clicked() {
-                        let _ = app.run("layer.layerStyle.makeDefault", json!({"kind": sel_kind, "params": disp}));
-                    }
-                });
-            });
+            params_page(app, ui, f, &selected, &invalid, 330.0, &mut action);
         });
     });
     // Style swatch clicks apply to the layer (Photoshop does this immediately);
     // New Style… saves the dialog's pending state as a preset.
-    if let Some(name) = style_click {
+    if let Some(name) = action.click {
         apply_style_preset(app, f, &name);
     }
-    if new_style {
+    if action.new_style {
         save_new_style(app, f);
     }
 }

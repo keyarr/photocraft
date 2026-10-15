@@ -101,12 +101,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             app.ui.palette_open = false;
         }
     });
-    let width = 560.0;
+    let narrow = screen.width() < crate::mobile_ui::MOBILE_WIDTH;
+    let width = (screen.width() - 32.0).clamp(280.0, 560.0);
+    let row_h = if narrow { 48.0 } else { 32.0 };
     let mut run: Option<String> = None;
     egui::Area::new(egui::Id::new("palette"))
         .order(egui::Order::Tooltip)
         .pivot(Align2::CENTER_TOP)
-        .fixed_pos(egui::pos2(screen.center().x, screen.top() + 110.0))
+        .fixed_pos(egui::pos2(screen.center().x, screen.top() + if narrow { 60.0 } else { 110.0 }))
         .show(ctx, |ui| {
             egui::Frame::NONE
                 .fill(t.card)
@@ -116,17 +118,21 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 .inner_margin(egui::Margin::same(10))
                 .show(ui, |ui| {
                     ui.set_width(width);
+                    ui.set_max_width(width);
                     let qid = egui::Id::new("palette-query");
                     let mut q: String = ui.data_mut(|d| d.get_temp(qid).unwrap_or_default());
-                    ui.horizontal(|ui| {
-                        let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
-                        icons::paint(ui, r, "search", 16.0, t.text_dim);
-                        let te = egui::TextEdit::singleline(&mut q)
-                            .hint_text(tl!("Search commands, tools and panels…"))
-                            .frame(egui::Frame::NONE)
-                            .font(egui::FontId::proportional(15.0))
-                            .desired_width(width - 40.0);
-                        let resp = ui.add(te);
+                    ui.allocate_ui_with_layout(
+                        vec2(width, if narrow { 48.0 } else { 28.0 }),
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
+                            icons::paint(ui, r, "search", 16.0, t.text_dim);
+                            let te = egui::TextEdit::singleline(&mut q)
+                                .hint_text(tl!("Search commands, tools and panels…"))
+                                .frame(egui::Frame::NONE)
+                                .font(egui::FontId::proportional(if narrow { 16.0 } else { 15.0 }))
+                                .desired_width(width - 40.0);
+                            let resp = ui.add(te);
                         // Only when focus is missing: every request_focus interrupts the IME, and
                         // doing that each frame makes Wayland input methods drop key releases (#585).
                         if !resp.has_focus() {
@@ -187,13 +193,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                         ui.label(RichText::new(tl!("No matching commands")).color(t.text_faint));
                     }
                     for (i, (_, id, label, detail, enabled)) in hits.iter().enumerate() {
-                        let (rect, resp) = ui.allocate_exact_size(vec2(width, 32.0), Sense::click());
+                        let (rect, resp) = ui.allocate_exact_size(vec2(width, row_h), Sense::click());
                         if i == sel || resp.hovered() {
                             ui.painter().rect_filled(rect, t.radius_sm, if i == sel { t.accent_soft } else { t.hover });
                         }
                         let color = if *enabled { t.text } else { t.text_faint };
-                        ui.painter().text(rect.left_center() + vec2(12.0, 0.0), Align2::LEFT_CENTER, label, theme::medium(13.0), color);
-                        if let Some(d) = detail {
+                        ui.painter().text(rect.left_center() + vec2(12.0, 0.0), Align2::LEFT_CENTER, label, theme::medium(if narrow { 14.0 } else { 13.0 }), color);
+                        if !narrow
+                            && let Some(d) = detail {
                             ui.painter().text(rect.right_center() - vec2(12.0, 0.0), Align2::RIGHT_CENTER, d, egui::FontId::proportional(11.5), t.text_faint);
                         }
                         if resp.clicked() && *enabled {
@@ -209,12 +216,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     if esc {
                         app.ui.palette_open = false;
                     }
-                    ui.add_space(4.0);
-                    ui.label(
-                        RichText::new(crate::i18n::fmt(tl!("↑↓ navigate   {key} run   esc close"), &[("key", &crate::shortcuts::pretty("Enter"))]))
-                            .small()
-                            .color(t.text_faint),
-                    );
+                    if !narrow {
+                        ui.add_space(4.0);
+                        ui.label(
+                            RichText::new(crate::i18n::fmt(tl!("↑↓ navigate   {key} run   esc close"), &[("key", &crate::shortcuts::pretty("Enter"))]))
+                                .small()
+                                .color(t.text_faint),
+                        );
+                    }
                     ui.data_mut(|d| {
                         d.insert_temp(qid, q);
                         d.insert_temp(sel_id, sel);

@@ -111,6 +111,44 @@ impl PhotocraftApp {
     /// Read and open the file at `path` (see [`open_file`](Self::open_file)).
     #[cfg(not(target_arch = "wasm32"))]
     pub fn open_path(&mut self, path: &str) -> Result<Vec<String>, String> {
+        // Already open (e.g. dirty, Home overlaying it): just show it instead of
+        // opening a second clean copy from disk.
+        if let Some(i) = self.session.documents().iter().position(|d| d.path.as_deref() == Some(path)) {
+            self.session.set_active(i);
+            self.sync_views();
+            self.ui.chrome.home = None;
+            return Ok(Vec::new());
+        }
+        // A crash-recovery autosave is newer than the file on disk: cold start
+        // opens it via `recover`, so opening by path must too.
+        if let Some(recover) = self.services.recover.as_mut() {
+            let mut found = None;
+            for r in recover() {
+                if r.path.as_deref() == Some(path) {
+                    found = Some(r);
+                    break;
+                }
+            }
+            if let Some(r) = found {
+                let key = r.key.clone();
+                let doc_path = r.path.clone();
+                let name = r.doc.name.clone();
+                let i = self.session.add_document(r.doc, doc_path);
+                if let Some(st) = self.session.documents().get(i) {
+                    let (id, revision) = (st.doc.id, st.revision);
+                    crate::prefs_ui::note_recovered(self, id, revision, &key);
+                }
+                if let Some(st) = self.session.active_mut() {
+                    st.saved_revision = 0;
+                }
+                self.sync_views();
+                self.ui.chrome.home = None;
+                self.push_recent(path);
+                self.ui.status = format!("Opened {name}");
+                self.ui.status_error = false;
+                return Ok(Vec::new());
+            }
+        }
         // Documents opening in the background are read on the worker too (a 2 GB PSB read
         // would block the window). Preset files (brushes, gradients) go the usual way.
         let ext = std::path::Path::new(path).extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();

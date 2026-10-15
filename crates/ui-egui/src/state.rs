@@ -975,6 +975,9 @@ pub struct UiState {
     /// Transient: never persisted.
     #[serde(skip)]
     pub device_browser: Option<crate::device_browser::Browser>,
+    /// Mobile export sheet (touch Export flow, no picker). Transient.
+    #[serde(skip)]
+    pub mobile_export: crate::mobile_export::MobileExport,
 }
 
 impl Default for UiState {
@@ -1044,6 +1047,7 @@ impl Default for UiState {
             camera_raw_preview: Default::default(),
             mobile: Default::default(),
             device_browser: None,
+            mobile_export: Default::default(),
         }
     }
 }

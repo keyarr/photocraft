@@ -176,7 +176,7 @@ pub fn android_services() -> (Services, Inbox) {
 /// Same, with the data dir injected (tests stay off the process environment).
 fn android_services_in(dir: Option<PathBuf>) -> (Services, Inbox) {
     let inbox = shared_inbox();
-    let prefs_file = dir.map(|d| d.join("preferences.json"));
+    let prefs_file = dir.clone().map(|d| d.join("preferences.json"));
     // No data dir means no persistence and no recovery (same as web): leave the
     // services unset so a change stays in memory without a save warning.
     let load_prefs = prefs_file.clone().map(|path| {
@@ -188,7 +188,7 @@ fn android_services_in(dir: Option<PathBuf>) -> (Services, Inbox) {
             Box::new(move |text: &str| photocraft_format::atomic_write(&path, text.as_bytes()).map_err(|e| e.to_string()));
         f
     });
-    let services = Services {
+    let mut services = Services {
         import: Some(Box::new(|name: &str, bytes: &[u8]| photocraft_io::import(name, bytes).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string()))),
         export: Some(Box::new(|doc: &Document, path: &str, settings: &photocraft_ui_egui::ExportSettings| {
             let mut opts = photocraft_io::ExportOptions::default();
@@ -224,14 +224,80 @@ fn android_services_in(dir: Option<PathBuf>) -> (Services, Inbox) {
     // dialog plus the Settings screen, through the JNI bridge (`android.rs`).
     // Host builds keep `None` and the probe fallback (their picker exists).
     #[cfg(target_os = "android")]
-    let mut services = services;
-    #[cfg(target_os = "android")]
     {
         services.storage_has_access = Some(Box::new(crate::android::storage_has_access));
         services.storage_request = Some(Box::new(crate::android::storage_request));
         services.storage_settings = Some(Box::new(crate::android::storage_settings));
     }
+    if let Some(d) = dir {
+        install_recovery(&mut services, &d);
+    }
     (services, inbox)
+}
+
+/// Crash-recovery autosave wired to the private recovery dir, plus the
+/// synchronous exit snapshot and the picker-free export dir. Without a data
+/// dir everything stays off (same as web): changes live in memory only.
+fn install_recovery(services: &mut Services, dir: &std::path::Path) {
+    use std::sync::{Arc, Mutex};
+    let store = Arc::new(Mutex::new(photocraft_format::RecoveryStore::new(dir.join("recovery"))));
+    {
+        let store = store.clone();
+        services.autosave = Some(Box::new(move |doc, rev, path| {
+            store.lock().unwrap_or_else(|e| e.into_inner()).autosave_checked(doc, rev, path.map(str::to_string))
+        }));
+    }
+    {
+        let store = store.clone();
+        services.autosave_results = Some(Box::new(move || store.lock().unwrap_or_else(|e| e.into_inner()).take_completed()));
+    }
+    {
+        let store = store.clone();
+        services.discard_autosave = Some(Box::new(move |id| {
+            let _ = store.lock().unwrap_or_else(|e| e.into_inner()).discard(id);
+        }));
+    }
+    {
+        let store = store.clone();
+        services.recover = Some(Box::new(move || {
+            store
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .recover()
+                .into_iter()
+                .map(|(e, doc)| photocraft_ui_egui::Recovered { key: e.info.key, path: e.info.original_path, doc })
+                .collect()
+        }));
+    }
+    {
+        let store = store.clone();
+        services.adopt_autosave = Some(Box::new(move |id, key| {
+            store.lock().unwrap_or_else(|e| e.into_inner()).adopt(id, key);
+        }));
+    }
+    {
+        let store = store.clone();
+        services.autosave_blocking = Some(Box::new(move |doc, rev, path| {
+            store.lock().unwrap_or_else(|e| e.into_inner()).save_blocking(doc, rev, path.map(str::to_string))
+        }));
+    }
+    services.export_base_dir = Some(export_base_dir(dir));
+}
+
+/// Where picker-free exports land: shared Download/PhotoCraft when it takes a
+/// file (needs the storage grant), else the private exports dir (always
+/// writable). The path is shown on the sheet, so nothing is a surprise.
+fn export_base_dir(dir: &std::path::Path) -> String {
+    for root in ["/sdcard/Download/PhotoCraft", "/storage/emulated/0/Download/PhotoCraft"] {
+        let probe = std::path::Path::new(root).join(".photocraft-write-probe");
+        if std::fs::create_dir_all(root).is_ok() && std::fs::write(&probe, b"1").is_ok() {
+            let _ = std::fs::remove_file(&probe);
+            return root.to_string();
+        }
+    }
+    let private = dir.join("exports");
+    let _ = std::fs::create_dir_all(&private);
+    private.to_string_lossy().into_owned()
 }
 
 /// Build the app with CPU canvas default; GPU only when asked for.
@@ -331,6 +397,40 @@ mod tests {
         let (services, _) = android_services_in(None);
         assert!(services.load_prefs.is_none());
         assert!(services.save_prefs.is_none());
+        assert!(services.autosave.is_none());
+        assert!(services.autosave_results.is_none());
+        assert!(services.discard_autosave.is_none());
+        assert!(services.recover.is_none());
+        assert!(services.adopt_autosave.is_none());
+        assert!(services.autosave_blocking.is_none());
+        assert!(services.export_base_dir.is_none());
+    }
+
+    #[test]
+    fn recovery_roundtrips_through_a_data_dir() {
+        let dir = std::env::temp_dir().join(format!("photocraft-android-recovery-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (mut services, _) = android_services_in(Some(dir.clone()));
+        for (name, s) in
+            [("autosave", services.autosave.is_some()), ("results", services.autosave_results.is_some()), ("discard", services.discard_autosave.is_some()), ("recover", services.recover.is_some()), ("adopt", services.adopt_autosave.is_some()), ("blocking", services.autosave_blocking.is_some())]
+        {
+            assert!(s, "{name} is wired with a data dir");
+        }
+        assert!(services.export_base_dir.is_some());
+        let doc = std::sync::Arc::new(services.import.as_ref().unwrap()("red.png", &red_png(4, 4)).unwrap().0);
+        let id = doc.id.0;
+        services.autosave_blocking.as_mut().unwrap()(&doc, 3, None).unwrap();
+        let found = services.recover.as_mut().unwrap()();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].doc, *doc);
+        // Adopting the entry keeps snapshots on it: still one entry after more saves.
+        services.adopt_autosave.as_mut().unwrap()(id, &found[0].key);
+        services.autosave_blocking.as_mut().unwrap()(&doc, 4, None).unwrap();
+        assert_eq!(services.recover.as_mut().unwrap()().len(), 1);
+        services.discard_autosave.as_mut().unwrap()(id);
+        assert!(services.recover.as_mut().unwrap()().is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

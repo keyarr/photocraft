@@ -664,3 +664,53 @@ fn notices_render_without_panicking() {
     out.textures_delta.clear();
     assert_eq!(app.ui.notices.len(), 2);
 }
+
+#[test]
+fn reopening_an_open_path_activates_instead_of_duplicating() {
+    let (mut app, _) = app_with(Vec::new());
+    app.open_file("/pics/cat.psd", b"x").unwrap();
+    app.open_file("/pics/dog.psd", b"x").unwrap();
+    assert_eq!(app.session.documents().len(), 2);
+    // The first document is still open behind Home: reopening its path shows it,
+    // it does not read the disk again nor open a second copy.
+    app.ui.chrome.home = Some(2);
+    app.open_path("/pics/cat.psd").unwrap();
+    assert_eq!(app.session.documents().len(), 2);
+    assert_eq!(app.session.active().and_then(|s| s.path.as_deref()), Some("/pics/cat.psd"));
+    assert!(app.ui.chrome.home.is_none(), "leaves Home for the document");
+}
+
+#[test]
+fn open_path_prefers_the_recovery_over_the_file_on_disk() {
+    use std::sync::Mutex;
+    let (dir, paths) = files("recovery-wins", &["cat.psd"], b"x");
+    let path = paths[0].clone();
+    let (mut app, _) = app_with(Vec::new());
+    let imports = Rc::new(RefCell::new(0usize));
+    let n = imports.clone();
+    let disk_name = "cat.psd".to_string();
+    app.services.import = Some(Box::new(move |name: &str, bytes: &[u8]| {
+        *n.borrow_mut() += 1;
+        assert_eq!(name, disk_name);
+        assert_eq!(bytes, b"x");
+        Ok((Document::new(name, Size::new(4, 4), ColorMode::Rgb, SampleType::U8), Vec::new()))
+    }));
+    let mut edited = Document::new("cat.psd", Size::new(4, 4), ColorMode::Rgb, SampleType::U8);
+    edited.name = "cat-edited".into();
+    let recovered = crate::Recovered { key: "k1".into(), path: Some(path.clone()), doc: edited };
+    let queue = Rc::new(Mutex::new(vec![recovered]));
+    let q = queue.clone();
+    app.services.recover = Some(Box::new(move || std::mem::take(&mut *q.lock().unwrap())));
+    let adopted: Rc<RefCell<Vec<(u64, String)>>> = Rc::default();
+    let a = adopted.clone();
+    app.services.adopt_autosave = Some(Box::new(move |id: u64, key: &str| a.borrow_mut().push((id, key.to_string()))));
+    app.open_path(&path).unwrap();
+    assert_eq!(*imports.borrow(), 0, "the stale file on disk is never read");
+    let st = app.session.active().unwrap();
+    assert_eq!(st.doc.name, "cat-edited", "the autosaved edits open, not the original");
+    assert_eq!(st.path.as_deref(), Some(path.as_str()));
+    assert!(st.is_dirty(), "recovered work is unsaved");
+    assert_eq!(adopted.borrow().len(), 1, "later autosaves replace the entry in place");
+    assert_eq!(app.ui.recent_files.first(), Some(&path));
+    let _ = std::fs::remove_dir_all(&dir);
+}
