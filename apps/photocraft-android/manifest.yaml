@@ -6,11 +6,11 @@ android:
   # shows a placeholder and the system splash centers it on boot. Path is
   # relative to this package root; xbuild scales it into the mipmaps and sets
   # `@mipmap/icon` on the application itself.
-  icon: ../../assets/app-icon/photocraft-1024.png
+  icon: ../../assets/app-icon/niveta-1024.png
   manifest:
-    package: ai.storyteller.photocraft.android
+    package: app.niveta
     application:
-      label: PhotoCraft
+      label: Niveta
     # On-device browser (`device_browser`): photos come through the runtime
     # dialog (media on new devices, storage on old), anything else shared
     # (a PSD or .pcraft in Download is not "media") through the all-files

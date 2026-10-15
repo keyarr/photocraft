@@ -704,11 +704,11 @@
 	Timeline	タイムライン
 	Tool Presets	ツールプリセット
 	Tools	ツール
-	About PhotoCraft	PhotoCraft について
-	PhotoCraft Website	PhotoCraft の Web サイト
-	PhotoCraft on GitHub	GitHub 上の PhotoCraft
+	About Niveta	Niveta について
+	Niveta Website	Niveta の Web サイト
+	Niveta on GitHub	GitHub 上の Niveta
 	ArtCraft Website	ArtCraft の Web サイト
-	Join the ArtCraft Discord…	ArtCraft の Discord に参加…
+	Join Discord…	の Discord に参加…
 	Report an Issue…	問題を報告…
 	WIA Support…	WIA サポート…
 	Apply	適用
@@ -1237,7 +1237,7 @@
 	Photo Filter	写真フィルター
 	PhotoCraft	PhotoCraft
 	PhotoCraft Manages Colors	PhotoCraft でカラーを管理
-	PhotoCraft — an open-source, native image editor written in Rust.	PhotoCraft — Rust で書かれた、オープンソースのネイティブ画像エディター。
+	Niveta — an open-source, native image editor written in Rust.	Niveta — Rust で書かれた、オープンソースのネイティブ画像エディター。
 	Pin Depth:	ピンの深さ:
 	Pixel Length:	ピクセル長:
 	Pixels/Centimeter	ピクセル/センチメートル
@@ -1628,7 +1628,7 @@
 	Pen Tilt	ペンの傾き
 	Pen Tool	ペンツール
 	Photo	写真
-	PhotoCraft website	PhotoCraft の Web サイト
+	Niveta website	Niveta の Web サイト
 	Picas	パイカ
 	Pillow Emboss	ピローエンボス
 	Pixel Replacement	ピクセルの置き換え

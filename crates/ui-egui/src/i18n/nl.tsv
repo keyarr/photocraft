@@ -690,11 +690,11 @@
 	Timeline	Tijdlijn
 	Tool Presets	Gereedschapsvoorinstellingen
 	Tools	Gereedschappen
-	About PhotoCraft	Over PhotoCraft
-	PhotoCraft Website	Website van PhotoCraft
-	PhotoCraft on GitHub	PhotoCraft op GitHub
+	About Niveta	Over Niveta
+	Niveta Website	Website van Niveta
+	Niveta on GitHub	Niveta op GitHub
 	ArtCraft Website	Website van ArtCraft
-	Join the ArtCraft Discord…	Deelnemen aan de ArtCraft-Discord…
+	Join Discord…	Deelnemen aan de Discord…
 	Report an Issue…	Probleem melden…
 	WIA Support…	WIA-ondersteuning…
 	Apply	Toepassen
@@ -1223,7 +1223,7 @@
 	Photo Filter	Fotofilter
 	PhotoCraft	PhotoCraft
 	PhotoCraft Manages Colors	PhotoCraft beheert kleuren
-	PhotoCraft — an open-source, native image editor written in Rust.	PhotoCraft — een opensource, native afbeeldingseditor geschreven in Rust.
+	Niveta — an open-source, native image editor written in Rust.	Niveta — een opensource, native afbeeldingseditor geschreven in Rust.
 	Pin Depth:	Speldiepte:
 	Pixel Length:	Pixellengte:
 	Pixels/Centimeter	Pixels/centimeter
@@ -1609,7 +1609,7 @@
 	Pen Tilt	Penkanteling
 	Pen Tool	Pengereedschap
 	Photo	Foto
-	PhotoCraft website	Website van PhotoCraft
+	Niveta website	Website van Niveta
 	Picas	Pica's
 	Pillow Emboss	Kussenreliëf
 	Pixel Replacement	Pixelvervanging

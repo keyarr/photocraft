@@ -288,8 +288,8 @@ fn install_recovery(services: &mut Services, dir: &std::path::Path) {
 /// file (needs the storage grant), else the private exports dir (always
 /// writable). The path is shown on the sheet, so nothing is a surprise.
 fn export_base_dir(dir: &std::path::Path) -> String {
-    for root in ["/sdcard/Download/PhotoCraft", "/storage/emulated/0/Download/PhotoCraft"] {
-        let probe = std::path::Path::new(root).join(".photocraft-write-probe");
+    for root in ["/sdcard/Download/Niveta", "/storage/emulated/0/Download/Niveta"] {
+        let probe = std::path::Path::new(root).join(".niveta-write-probe");
         if std::fs::create_dir_all(root).is_ok() && std::fs::write(&probe, b"1").is_ok() {
             let _ = std::fs::remove_file(&probe);
             return root.to_string();
@@ -332,7 +332,7 @@ fn maybe_enable_gpu(app: &mut PhotocraftApp, cc: &eframe::CreationContext) {
 pub fn run(options: eframe::NativeOptions) -> eframe::Result {
     log::info!("photocraft-android: open set: {}", photocraft_io::open_extensions().join(","));
     eframe::run_native(
-        "PhotoCraft",
+        "Niveta",
         options,
         Box::new(|cc| {
             let (mut app, _inbox) = new_app();

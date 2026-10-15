@@ -157,7 +157,7 @@
 	Distort	Παραμόρφωση
 	Pixelate	Εικονοστοιχείωση
 	Render	Απόδοση
-	About PhotoCraft	Πληροφορίες για το PhotoCraft
+	About Niveta	Πληροφορίες για το Niveta
 
 # Consolidated Greek localization additions
 	Content-Aware Fill…	Γέμισμα βάσει περιεχομένου…
@@ -735,7 +735,7 @@
 	Perspective Warp is not active	Ο μετασχηματισμός προοπτικής δεν είναι ενεργός
 	Perspective Warp: draw planes along the image's perspective, then switch to Warp	Μετασχηματισμός προοπτικής: σχεδιάστε επίπεδα σύμφωνα με την προοπτική της εικόνας και έπειτα επιλέξτε Παραμόρφωση
 	PhotoCraft Manages Colors	Διαχείριση χρωμάτων από το PhotoCraft
-	PhotoCraft — an open-source, native image editor written in Rust.	PhotoCraft — εγγενής εφαρμογή επεξεργασίας εικόνας ανοικτού κώδικα, γραμμένη σε Rust.
+	Niveta — an open-source, native image editor written in Rust.	Niveta — εγγενής εφαρμογή επεξεργασίας εικόνας ανοικτού κώδικα, γραμμένη σε Rust.
 	Pixels/Centimeter	Εικονοστοιχεία/εκατοστό
 	Pixels/Inch	Εικονοστοιχεία/ίντσα
 	Position and Size	Θέση και μέγεθος
@@ -757,7 +757,7 @@
 	Quick Export As PNG	Γρήγορη εξαγωγή ως PNG
 	Radial Gradient	Ακτινική διαβάθμιση
 	Paints from the document's opening state	Ζωγραφίζει χρησιμοποιώντας την αρχική κατάσταση του εγγράφου
-	PhotoCraft website	Ιστότοπος PhotoCraft
+	Niveta website	Ιστότοπος Niveta
 	Pen Pressure	Πίεση γραφίδας
 	Pen Tilt	Κλίση γραφίδας
 	Portrait, 4 x 6	Κατακόρυφο, 4 × 6
@@ -2427,7 +2427,7 @@
 	Iris Blur…	Θόλωση ίριδας…
 	Italic	Πλάγια
 	Jag	Οδοντωτό
-	Join the ArtCraft Discord…	Συμμετοχή στο Discord του ArtCraft…
+	Join Discord…	Συμμετοχή στο Discord του …
 	Join us on Discord	Ελάτε στην κοινότητά μας στο Discord
 	Jpeg quality	Ποιότητα JPEG
 	Justification	Πλήρης στοίχιση
@@ -2668,8 +2668,8 @@
 	Performance	Επιδόσεις
 	Perspective Warp	Παραμόρφωση προοπτικής
 	Photo	Φωτογραφία
-	PhotoCraft Website	Ιστότοπος PhotoCraft
-	PhotoCraft on GitHub	PhotoCraft στο GitHub
+	Niveta Website	Ιστότοπος Niveta
+	Niveta on GitHub	Niveta στο GitHub
 	Photocopy	Φωτοαντίγραφο
 	Photography	Φωτογραφία
 	Photomerge	Συγχώνευση φωτογραφιών

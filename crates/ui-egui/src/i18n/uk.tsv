@@ -446,12 +446,12 @@
 	Hide All	Приховати все
 
 # Help
-	About PhotoCraft	Про PhotoCraft
-	PhotoCraft Website	Вебсайт PhotoCraft
-	PhotoCraft on GitHub	PhotoCraft на GitHub
+	About Niveta	Про Niveta
+	Niveta Website	Вебсайт Niveta
+	Niveta on GitHub	Niveta на GitHub
 	Report an Issue…	Повідомити про проблему…
 	ArtCraft Website	Вебсайт ArtCraft
-	Join the ArtCraft Discord…	Приєднатися до Discord ArtCraft…
+	Join Discord…	Приєднатися до Discord …
 	System Info…	Інформація про систему…
 
 # Tools and options bar
@@ -1535,7 +1535,7 @@
 	Reverse	Зворотний
 	Align with layer	Вирівняти за шаром
 	Join us on Discord	Приєднуйтеся до нас у Discord
-	PhotoCraft website	Вебсайт PhotoCraft
+	Niveta website	Вебсайт Niveta
 	ArtCraft	ArtCraft
 	GitHub	GitHub
 	No character style	Без стилю символів
@@ -2022,7 +2022,7 @@
 	Paint Overlay	Малювати накладання
 	Pattern Size	Розмір візерунка
 	PhotoCraft	PhotoCraft
-	PhotoCraft — an open-source, native image editor written in Rust.	PhotoCraft — нативний редактор зображень із відкритим кодом, написаний на Rust.
+	Niveta — an open-source, native image editor written in Rust.	Niveta — нативний редактор зображень із відкритим кодом, написаний на Rust.
 	Position and Size	Положення та розмір
 	Preserve Details	Зберігати деталі
 	Preserve Luminosity	Зберігати світність

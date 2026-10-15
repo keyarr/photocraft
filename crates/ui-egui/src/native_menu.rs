@@ -27,7 +27,7 @@ use crate::PhotocraftApp;
 use crate::i18n::{Lang, tr, tr_id};
 use crate::menus::MenuItem;
 
-pub const APP_NAME: &str = "PhotoCraft";
+pub const APP_NAME: &str = "Niveta";
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MenuBar {
@@ -761,7 +761,7 @@ mod tests {
     fn photocraft_gets_a_mac_app_menu() {
         let l = layout(true);
         let app = &l.bar.menus[0];
-        assert_eq!((app.title.as_str(), app.role), ("PhotoCraft", MenuRole::App));
+        assert_eq!((app.title.as_str(), app.role), ("Niveta", MenuRole::App));
         assert_eq!(
             ids(&app.children),
             [
@@ -781,8 +781,8 @@ mod tests {
             ]
         );
         let quit = l.bar.find("file.exit").unwrap();
-        assert_eq!((quit.label.as_str(), quit.shortcut.as_deref()), ("Quit PhotoCraft", Some("Cmd+Q")));
-        assert_eq!(l.bar.find("help.about").unwrap().label, "About PhotoCraft");
+        assert_eq!((quit.label.as_str(), quit.shortcut.as_deref()), ("Quit Niveta", Some("Cmd+Q")));
+        assert_eq!(l.bar.find("help.about").unwrap().label, "About Niveta");
     }
 
     #[test]
@@ -793,7 +793,7 @@ mod tests {
         assert!(!ids(&by("Help").children).contains(&"help.about".to_string()));
         assert!(!ids(&by("Edit").children).contains(&"[Preferences]".to_string()));
         let titles: Vec<&str> = l.bar.menus.iter().map(|m| m.title.as_str()).collect();
-        assert_eq!(titles, ["PhotoCraft", "File", "Edit", "Image", "Layer", "Type", "Select", "Filter", "View", "Window", "Help"]);
+        assert_eq!(titles, ["Niveta", "File", "Edit", "Image", "Layer", "Type", "Select", "Filter", "View", "Window", "Help"]);
     }
 
     /// PhotoCraft keeps Photoshop's ⌘H, ⌘M, ⌘W and ⌘, (Hide Layers): the system items give way.

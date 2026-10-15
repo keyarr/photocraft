@@ -708,11 +708,11 @@
 	Timeline	時間軸
 	Tool Presets	工具預設集
 	Tools	工具
-	About PhotoCraft	關於 PhotoCraft
-	PhotoCraft Website	PhotoCraft 網站
-	PhotoCraft on GitHub	GitHub 上的 PhotoCraft
+	About Niveta	關於 Niveta
+	Niveta Website	Niveta 網站
+	Niveta on GitHub	GitHub 上的 Niveta
 	ArtCraft Website	ArtCraft 網站
-	Join the ArtCraft Discord…	加入 ArtCraft Discord…
+	Join Discord…	加入 Discord…
 	Report an Issue…	回報問題…
 	WIA Support…	WIA 支援…
 	Apply	套用
@@ -1238,7 +1238,7 @@
 	Photo Filter	相片濾鏡
 	PhotoCraft	PhotoCraft
 	PhotoCraft Manages Colors	PhotoCraft 管理色彩
-	PhotoCraft — an open-source, native image editor written in Rust.	PhotoCraft — 以 Rust 撰寫的開放原始碼原生影像編輯器。
+	Niveta — an open-source, native image editor written in Rust.	Niveta — 以 Rust 撰寫的開放原始碼原生影像編輯器。
 	Pin Depth:	圖釘深度：
 	Pixel Length:	像素長度：
 	Pixels/Centimeter	像素/公分
@@ -1629,7 +1629,7 @@
 	Pen Tilt	筆傾斜
 	Pen Tool	筆型工具
 	Photo	相片
-	PhotoCraft website	PhotoCraft 網站
+	Niveta website	Niveta 網站
 	Picas	派卡
 	Pillow Emboss	枕狀浮雕
 	Pixel Replacement	像素取代

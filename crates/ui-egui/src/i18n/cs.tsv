@@ -708,11 +708,11 @@
 	Timeline	Časová osa
 	Tool Presets	Přednastavení nástrojů
 	Tools	Nástroje
-	About PhotoCraft	O aplikaci PhotoCraft
-	PhotoCraft Website	Web PhotoCraft
-	PhotoCraft on GitHub	PhotoCraft na GitHubu
+	About Niveta	O aplikaci Niveta
+	Niveta Website	Web Niveta
+	Niveta on GitHub	Niveta na GitHubu
 	ArtCraft Website	Web ArtCraft
-	Join the ArtCraft Discord…	Připojit se k Discordu ArtCraft…
+	Join Discord…	Připojit se k Discordu …
 	Report an Issue…	Nahlásit problém…
 	WIA Support…	Podpora WIA…
 	Apply	Použít
@@ -1247,7 +1247,7 @@
 	Photo Filter	Fotografický filtr
 	PhotoCraft	PhotoCraft
 	PhotoCraft Manages Colors	Barvy spravuje PhotoCraft
-	PhotoCraft — an open-source, native image editor written in Rust.	PhotoCraft — nativní editor obrázků s otevřeným zdrojovým kódem napsaný v jazyce Rust.
+	Niveta — an open-source, native image editor written in Rust.	Niveta — nativní editor obrázků s otevřeným zdrojovým kódem napsaný v jazyce Rust.
 	Pin Depth:	Hloubka špendlíku:
 	Pixel Length:	Délka v pixelech:
 	Pixels/Centimeter	Pixely/centimetr
@@ -1639,7 +1639,7 @@
 	Pen Tilt	Náklon pera
 	Pen Tool	Nástroj pero
 	Photo	Fotografie
-	PhotoCraft website	Web PhotoCraft
+	Niveta website	Web Niveta
 	Picas	Pica
 	Pillow Emboss	Polštářový reliéf
 	Pixel Replacement	Nahrazení pixelů
