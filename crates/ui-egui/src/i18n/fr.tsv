@@ -2725,3 +2725,8 @@ fontWeight	Italic	Italique
 	{n} h ago	il y a {n} h
 	{n} days ago	il y a {n} jours
 	1 day ago	il y a 1 jour
+	Interp:	Interp. :
+	Proportional	Conserver les proportions
+	Symmetric about pivot	Symétrique par rapport au point de référence
+	Snap 15°	Aimanter à 15°
+	Finger modifiers	Modificateurs au doigt

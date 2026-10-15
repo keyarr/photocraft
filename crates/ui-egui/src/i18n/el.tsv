@@ -3414,3 +3414,8 @@ fontWeight	Thin	Πολύ λεπτά
 	{n} h ago	πριν από {n} ώρες
 	{n} days ago	πριν από {n} ημέρες
 	1 day ago	πριν από 1 ημέρα
+	Interp:	Παρεμβ.:
+	Proportional	Διατήρηση αναλογίας διαστάσεων
+	Symmetric about pivot	Συμμετρικά ως προς το σημείο αναφοράς
+	Snap 15°	Προσκόλληση ανά 15°
+	Finger modifiers	Τροποποιητές δαχτύλου

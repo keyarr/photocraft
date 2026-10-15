@@ -2281,3 +2281,8 @@ fontWeight	Italic	斜體
 	{n} h ago	{n}小時前
 	{n} days ago	{n}天前
 	1 day ago	1天前
+	Interp:	內插：
+	Proportional	維持外觀比例
+	Symmetric about pivot	關於中心對稱
+	Snap 15°	靠齊至 15°
+	Finger modifiers	手指修飾鍵

@@ -320,12 +320,15 @@ pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
             ui.spacing_mut().item_spacing.y = 0.0;
             ui.set_width(200.0);
             crate::widgets::menu_scroll(ui, |ui| {
+                // 44 pt rows on phones (the 20 pt desktop rows are unhittable with a
+                // finger); the menu still clamps to the window above, so it fits 360 pt.
+                let row_h = if crate::mobile_ui::is_mobile(ui.ctx()) { 44.0 } else { 20.0 };
                 for row in rows(&menu) {
                     let Some((label, command)) = *row else {
                         ui.separator();
                         continue;
                     };
-                    let item = egui::Button::selectable(mode_checked(app, &menu, command), tl!(label)).min_size(egui::vec2(200.0, 20.0));
+                    let item = egui::Button::selectable(mode_checked(app, &menu, command), tl!(label)).min_size(egui::vec2(200.0, row_h));
                     if ui.add_enabled(entry_enabled(app, &menu, command), item).clicked() {
                         selected = Some(command);
                     }

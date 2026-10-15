@@ -2342,3 +2342,8 @@ fontWeight	Italic	Kursiv
 	{n} h ago	vor {n} Std.
 	{n} days ago	vor {n} Tagen
 	1 day ago	vor 1 Tag
+	Interp:	Interp.:
+	Proportional	Seitenverhältnis beibehalten
+	Symmetric about pivot	Symmetrisch zum Referenzpunkt
+	Snap 15°	Auf 15° einrasten
+	Finger modifiers	Fingermodifikatoren

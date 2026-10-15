@@ -2304,3 +2304,8 @@ fontWeight	Italic	Kurzíva
 	{n} h ago	před {n} h
 	{n} days ago	před {n} dny
 	1 day ago	před 1 dnem
+	Interp:	Interp.:
+	Proportional	Zachovat poměr stran
+	Symmetric about pivot	Symetricky kolem referenčního bodu
+	Snap 15°	Přichytávat po 15°
+	Finger modifiers	Modifikátory prstu

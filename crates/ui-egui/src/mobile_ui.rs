@@ -30,6 +30,14 @@ const SAFE_TOP: f32 = 30.0;
 #[cfg(not(target_os = "android"))]
 const SAFE_TOP: f32 = 0.0;
 
+/// Bottom counterpart: the Android gesture bar's height. egui can't read it either,
+/// so the tool bar keeps this under its buttons; the keyboard inset is unknown and
+/// the sheets stay dismissible instead.
+#[cfg(target_os = "android")]
+const SAFE_BOTTOM: i8 = 12;
+#[cfg(not(target_os = "android"))]
+const SAFE_BOTTOM: i8 = 0;
+
 /// Whether the compact mobile chrome is in charge this frame.
 pub fn is_mobile(ctx: &egui::Context) -> bool {
     ctx.content_rect().width() < MOBILE_WIDTH
@@ -169,6 +177,16 @@ pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     }
                     menu_item(ui, app, tl!("Save As…"), "file.saveAs", json!({}));
                     menu_item(ui, app, tl!("Redo"), "edit.redo", json!({}));
+                    ui.separator();
+                    menu_item(ui, app, tl!("Free Transform"), "edit.freeTransform", json!({}));
+                    menu_item(ui, app, tl!("Scale"), "edit.transform.scale", json!({}));
+                    menu_item(ui, app, tl!("Rotate"), "edit.transform.rotate", json!({}));
+                    menu_item(ui, app, tl!("Skew"), "edit.transform.skew", json!({}));
+                    menu_item(ui, app, tl!("Distort"), "edit.transform.distort", json!({}));
+                    menu_item(ui, app, tl!("Perspective"), "edit.transform.perspective", json!({}));
+                    menu_item(ui, app, tl!("Warp"), "edit.transform.warp", json!({}));
+                    menu_item(ui, app, tl!("Transform Selection"), "select.transformSelection", json!({}));
+                    ui.separator();
                     menu_item(ui, app, tl!("Fit on Screen"), "view.fitOnScreen", json!({}));
                     if ui.add_sized(vec2(280.0, 44.0), egui::Button::new(tl!("Search commands, tools and panels…"))).clicked() {
                         app.ui.palette_open = true;
@@ -199,10 +217,10 @@ pub fn options_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     // A transforming strip wraps its fields over rows instead of scrolling: the numeric
     // fields and the angle slider swallow the horizontal drag gesture.
-    // Three compact rows (coords, rotation/interp, commit/cancel/grid): 24pt fields +
-    // one 48pt touch row fits in 116pt, so the canvas keeps room with the sheet open.
+    // Three 48pt touch rows (coords, rotation/interp, commit/cancel/mode): 148pt, so the
+    // canvas keeps room with the sheet open.
     let transforming = app.ui.transform.is_some();
-    let h = if transforming { 116.0 } else { 48.0 };
+    let h = if transforming { 148.0 } else { 48.0 };
     egui::Panel::top("mobile_options").exact_size(h).frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(8, 0))).show(ui, |ui| {
         if transforming {
             crate::transform_tool::mobile_options_bar(app, ui);
@@ -228,8 +246,8 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     let t = Tokens::get(ui.ctx());
     egui::Panel::bottom("mobile_tools")
-        .exact_size(68.0)
-        .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin { left: 8, right: 8, top: 4, bottom: 12 }))
+        .exact_size(68.0 + SAFE_BOTTOM as f32)
+        .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin { left: 8, right: 8, top: 4, bottom: 12 + SAFE_BOTTOM }))
         .show(ui, |ui| {
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
@@ -268,7 +286,15 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                                 ui.ctx().request_repaint();
                             }
                             if resp.clicked() && ui.data(|d| d.get_temp::<Tool>(held_id)) != Some(tool) {
-                                app.ui.tool = tool;
+                                // Picking another tool auto-commits the box (`end_if_left`): on touch
+                                // that commit is invisible and accidental, so the tap only says so
+                                // and the box stays until its check/cancel buttons decide.
+                                if app.ui.transform.is_some() && app.ui.tool != tool {
+                                    app.ui.status = "Commit or cancel the transform first".into();
+                                    app.ui.status_error = false;
+                                } else {
+                                    app.ui.tool = tool;
+                                }
                             }
                             if ui.data(|d| d.get_temp::<Tool>(held_id)) == Some(tool) {
                                 egui::Area::new(egui::Id::new(("mobile-fav-tip", tool.label())))
@@ -333,7 +359,7 @@ pub fn tool_sheet(app: &mut PhotocraftApp, ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(tl!("Tools")).size(14.0).strong());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icons::button(ui, "x", 40.0, false, tl!("Close")).clicked() {
+                    if icons::button(ui, "x", 48.0, false, tl!("Close")).clicked() {
                         app.ui.mobile.tools_open = false;
                     }
                 });
@@ -400,9 +426,14 @@ fn tool_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, w: f32) {
     let g = ui.painter().layout_job(job);
     ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 44.0), g, fg);
     if resp.on_hover_text(full).clicked() {
-        app.ui.tool = tool;
-        app.ui.mobile.tools_open = false;
-        app.ui.mobile.tools_filter.clear();
+        if app.ui.transform.is_some() && app.ui.tool != tool {
+            app.ui.status = "Commit or cancel the transform first".into();
+            app.ui.status_error = false;
+        } else {
+            app.ui.tool = tool;
+            app.ui.mobile.tools_open = false;
+            app.ui.mobile.tools_filter.clear();
+        }
     }
 }
 
@@ -464,7 +495,7 @@ pub fn sheet(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     }
                 });
             });
-            if icons::button(ui, "x", 32.0, false, tl!("Close")).clicked() {
+            if icons::button(ui, "x", 48.0, false, tl!("Close")).clicked() {
                 app.ui.mobile.panel = None;
             }
         });

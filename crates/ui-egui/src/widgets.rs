@@ -196,7 +196,9 @@ pub fn value_field(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive
 /// returns the box with the number's response.
 fn value_field_in(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str, width: f32, trailing: f32) -> (Response, Rect) {
     let t = Tokens::get(ui.ctx());
-    let (rect, slot) = ui.allocate_exact_size(vec2(width, 24.0), Sense::hover());
+    // 48pt on phones: the 24pt desktop box is unhittable with a finger.
+    let h = if crate::mobile_ui::is_mobile(ui.ctx()) { 48.0 } else { 24.0 };
+    let (rect, slot) = ui.allocate_exact_size(vec2(width, h), Sense::hover());
     surface(ui, rect, t.field, false);
     if !t.bevel {
         ui.painter().rect_stroke(rect, t.radius_sm, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
@@ -484,7 +486,9 @@ fn second_click(ui: &Ui, resp: &Response) -> bool {
 fn slider_with(ui: &mut Ui, value: &mut f32, range: std::ops::RangeInclusive<f32>, gradient: Option<&[Color32]>, g: RowGestures) -> Response {
     let t = Tokens::get(ui.ctx());
     let width = ui.available_width().max(60.0);
-    let (rect, mut resp) = ui.allocate_exact_size(vec2(width, 18.0), Sense::click_and_drag());
+    // 48pt tall on phones: the 18pt desktop track is unhittable with a finger.
+    let h = if crate::mobile_ui::is_mobile(ui.ctx()) { 48.0 } else { 18.0 };
+    let (rect, mut resp) = ui.allocate_exact_size(vec2(width, h), Sense::click_and_drag());
     let (lo, hi) = (*range.start(), *range.end());
     let track = Rect::from_center_size(rect.center(), vec2(rect.width() - 14.0, if gradient.is_some() { 5.0 } else { 3.0 }));
     if let Some(p) = resp.interact_pointer_pos()
@@ -977,18 +981,24 @@ pub fn checker(painter: &egui::Painter, rect: Rect, cell: f32) {
 /// Spectrum-style checkbox (blue when checked).
 pub fn checkbox(ui: &mut Ui, on: &mut bool, label: &str) -> Response {
     let t = Tokens::get(ui.ctx());
+    // 48dp hit on phones: the 14px desktop box is unhittable with a finger. The
+    // visual box grows to 24px centred in the 48px hit area; the label stays clickable.
+    let touch = crate::mobile_ui::is_mobile(ui.ctx());
+    let (hit_w, hit_h, box_s) = if touch { (48.0, 48.0, 24.0) } else { (14.0, 14.0, 14.0) };
     let mut resp = ui
         .horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
-            let (rect, resp) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::click());
+            let (hit, resp) = ui.allocate_exact_size(vec2(hit_w, hit_h), Sense::click());
+            let rect = Rect::from_center_size(hit.center(), vec2(box_s, box_s));
             let p = ui.painter();
+            let k = box_s / 14.0;
             if *on {
                 p.rect_filled(rect, 2.0, t.accent);
-                let a = rect.left_center() + vec2(3.0, 0.5);
-                let b = rect.center_bottom() + vec2(-1.0, -3.5);
-                let c = rect.right_top() + vec2(-3.0, 3.5);
-                p.line_segment([a, b], Stroke::new(1.8, Color32::WHITE));
-                p.line_segment([b, c], Stroke::new(1.8, Color32::WHITE));
+                let a = rect.left_center() + vec2(3.0 * k, 0.5 * k);
+                let b = rect.center_bottom() + vec2(-k, -3.5 * k);
+                let c = rect.right_top() + vec2(-3.0 * k, 3.5 * k);
+                p.line_segment([a, b], Stroke::new(1.8 * k, Color32::WHITE));
+                p.line_segment([b, c], Stroke::new(1.8 * k, Color32::WHITE));
             } else {
                 p.rect_filled(rect, 2.0, t.field);
                 p.rect_stroke(rect, 2.0, Stroke::new(1.5, if resp.hovered() { t.text_dim } else { t.text_faint }), StrokeKind::Inside);

@@ -2372,3 +2372,8 @@ fontWeight	Italic	Cursiva
 	{n} h ago	hace {n} h
 	{n} days ago	hace {n} días
 	1 day ago	hace 1 día
+	Interp:	Interp.:
+	Proportional	Mantener la relación de aspecto
+	Symmetric about pivot	Simétrico respecto al punto de referencia
+	Snap 15°	Ajustar a 15°
+	Finger modifiers	Modificadores de dedo

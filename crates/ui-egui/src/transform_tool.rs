@@ -64,6 +64,8 @@ pub struct TransformPreview {
     split_placing: bool,
     /// Option-click places a split without a button armed.
     split_quick: bool,
+    /// Touch toggles from the mobile bar (see [`TouchMods`]).
+    pub touch: TouchMods,
     steps: Steps,
     /// The tool the session began with: picking another one applies the transform.
     tool: Tool,
@@ -82,6 +84,18 @@ pub const HANDLE_TOUCH_PX: f64 = 24.0;
 
 /// Minimum touch target for the transform quick actions (commit/cancel/grid), in points.
 pub const TOUCH_ACTION_PX: f32 = 48.0;
+
+/// Touch toggles from the mobile transform bar: what a finger drag does with no keys held.
+/// Lives on the in-memory preview (never serialised); [`pointer`] merges it into the drag.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TouchMods {
+    /// Corner/edge drags scale freely (keyboard ⇧).
+    pub free: bool,
+    /// Scale about the reference point (keyboard ⌥).
+    pub symmetric: bool,
+    /// Snap rotation to 15° steps and lock moves to axes (keyboard ⇧).
+    pub snap: bool,
+}
 
 /// [`HANDLE_PX`] in document pixels at the current zoom.
 pub fn handle_tolerance(app: &PhotocraftApp) -> f64 {
@@ -201,6 +215,7 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
         split_pointer: None,
         split_placing: false,
         split_quick: false,
+        touch: TouchMods::default(),
         steps: Steps::default(),
         tool: app.ui.tool,
         path: None,
@@ -219,6 +234,8 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
         made: None,
         mode: Default::default(),
     });
+    // The tool grid sits over the canvas: a new box dismisses it, so the handles stay visible.
+    app.ui.mobile.tools_open = false;
     start_steps(app);
     Ok(())
 }
@@ -337,6 +354,7 @@ fn begin_lone(
         split_pointer: None,
         split_placing: false,
         split_quick: false,
+        touch: TouchMods::default(),
         steps: Steps::default(),
         tool: app.ui.tool,
         path: None,
@@ -355,6 +373,8 @@ fn begin_lone(
         made: None,
         mode: Default::default(),
     });
+    // The tool grid sits over the canvas: a new box dismisses it, so the handles stay visible.
+    app.ui.mobile.tools_open = false;
     start_steps(app);
     Ok(())
 }
@@ -383,6 +403,7 @@ fn begin_path(app: &mut PhotocraftApp, ctx: &egui::Context, params: serde_json::
         split_pointer: None,
         split_placing: false,
         split_quick: false,
+        touch: TouchMods::default(),
         steps: Steps::default(),
         tool: app.ui.tool,
         path: Some(path),
@@ -401,6 +422,8 @@ fn begin_path(app: &mut PhotocraftApp, ctx: &egui::Context, params: serde_json::
         made: None,
         mode: Default::default(),
     });
+    // The tool grid sits over the canvas: a new box dismisses it, so the handles stay visible.
+    app.ui.mobile.tools_open = false;
     start_steps(app);
     Ok(())
 }
@@ -461,6 +484,7 @@ pub fn begin_selection(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(
         split_pointer: None,
         split_placing: false,
         split_quick: false,
+        touch: TouchMods::default(),
         steps: Steps::default(),
         tool: app.ui.tool,
         path: None,
@@ -479,6 +503,8 @@ pub fn begin_selection(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(
         made: None,
         mode: Default::default(),
     });
+    // The tool grid sits over the canvas: a new box dismisses it, so the handles stay visible.
+    app.ui.mobile.tools_open = false;
     start_steps(app);
     Ok(())
 }
@@ -492,7 +518,9 @@ pub fn begin_warp(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), St
     enter_warp(app);
     // Started in Warp: that is where Undo stops. Switching an open transform to Warp is a step.
     if fresh {
-        start_steps(app);
+        // The tool grid sits over the canvas: a new box dismisses it, so the handles stay visible.
+    app.ui.mobile.tools_open = false;
+    start_steps(app);
     }
     Ok(())
 }
@@ -845,7 +873,8 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) ->
             }
             let legacy = app.session.prefs().general.use_legacy_free_transform;
             if let (Some(g), Some(s)) = (g, app.ui.transform.as_mut()) {
-                apply_drag(s, g, [x, y], mode_mods(t.mode, g.hit, legacy_mods(legacy, g.hit, mods)));
+                let base = mode_mods(t.mode, g.hit, legacy_mods(legacy, g.hit, mods));
+                apply_drag(s, g, [x, y], touch_drag_mods(pv.touch, g.hit, base));
             }
         }
     }
@@ -884,6 +913,19 @@ fn mode_mods(mode: TransformMode, hit: Hit, mut mods: egui::Modifiers) -> egui::
 /// In Distort mode only corner drags (and moving the box from inside) do anything.
 fn distort_allows(mode: TransformMode, h: Hit) -> bool {
     mode != TransformMode::Distort || !matches!(h, Hit::Outside | Hit::Edge(_))
+}
+
+/// Touch toggles as drag modifiers, applied after the keyboard-derived ones so the bar wins:
+/// Symmetric is ⌥, Snap is ⇧ everywhere, and Proportional-off is ⇧ for handle drags only
+/// (a finger still locks moves and snaps rotation independently of it).
+fn touch_drag_mods(touch: TouchMods, hit: Hit, mut mods: egui::Modifiers) -> egui::Modifiers {
+    if touch.symmetric {
+        mods.alt = true;
+    }
+    if touch.snap || (touch.free && matches!(hit, Hit::Corner(_) | Hit::Edge(_))) {
+        mods.shift = true;
+    }
+    mods
 }
 
 /// The turn at each corner of a quad (cross products of consecutive edges): all the same sign
@@ -1622,19 +1664,20 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     transform_actions(app, &mut row, t.warp.is_some());
 }
 
-/// Compact transform bar for phones: three rows instead of a horizontal scroll. The fields
+/// Compact transform bar for phones: three 48pt rows instead of a horizontal scroll. The fields
 /// are almost entirely `click_and_drag` widgets, which swallow the scroll gesture that the tool
 /// bar's `click` buttons leave alone, so on a 360 pt screen the strip never scrolled.
 /// Row 1 is coordinates (X Y link W H), row 2 rotation + interpolation, row 3 the quick
-/// actions at a 48pt touch size. Each label stays glued to its field inside an inner
-/// `horizontal` group, so the wrap splits between groups, never inside "H: 100%".
+/// actions at a 48pt touch size plus the mode/modifier popup (no room for a fourth row).
+/// Each label stays glued to its field inside an inner `horizontal` group, so the wrap
+/// splits between groups, never inside "H: 100%".
 pub fn mobile_options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let Some(t) = app.ui.transform.clone() else { return };
     if let Some(w) = t.warp.clone() {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing.x = 8.0;
             warp_fields(app, ui, &w);
-            transform_actions(app, ui, true);
+            mobile_transform_actions(app, ui, true);
         });
         return;
     }
@@ -1648,6 +1691,7 @@ pub fn mobile_options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 
 /// Row 1: X Y link W H. Every label+field pair is one inner row, so "H:" never
 /// separates from its "100%"; the dark discreet input boxes are `value_field`.
+/// Narrower than desktop so the five groups fit one 360 pt line at 48pt tall.
 fn mobile_coord_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSession) {
     let tk = crate::theme::Tokens::get(ui.ctx());
     let (sx, sy, _, _) = readout(t);
@@ -1659,33 +1703,35 @@ fn mobile_coord_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSes
     let link_id = egui::Id::new("transform-link");
     let mut link: bool = ui.data(|d| d.get_temp(link_id)).unwrap_or(true);
     let mut moved = (false, false);
+    // `horizontal_top`, not `horizontal`: centred inner groups stagger down the
+    // wrapped row (each one sinks a few points), blowing the 148pt strip.
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
-        ui.horizontal(|ui| {
+        ui.horizontal_top(|ui| {
             ui.label(egui::RichText::new("X:").color(tk.text_dim).size(12.0));
-            if crate::widgets::value_field(ui, &mut px, -POSITION_LIMIT_PX..=POSITION_LIMIT_PX, "px", 64.0).changed() {
+            if crate::widgets::value_field(ui, &mut px, -POSITION_LIMIT_PX..=POSITION_LIMIT_PX, "px", 52.0).changed() {
                 moved.0 = true;
             }
         });
-        ui.horizontal(|ui| {
+        ui.horizontal_top(|ui| {
             ui.label(egui::RichText::new("Y:").color(tk.text_dim).size(12.0));
-            if crate::widgets::value_field(ui, &mut py, -POSITION_LIMIT_PX..=POSITION_LIMIT_PX, "px", 64.0).changed() {
+            if crate::widgets::value_field(ui, &mut py, -POSITION_LIMIT_PX..=POSITION_LIMIT_PX, "px", 52.0).changed() {
                 moved.1 = true;
             }
         });
-        if crate::icons::button(ui, if link { "link" } else { "unlink" }, 28.0, link, tl!("Maintain aspect ratio")).clicked() {
+        if crate::icons::button(ui, if link { "link" } else { "unlink" }, TOUCH_ACTION_PX, link, tl!("Maintain aspect ratio")).clicked() {
             link = !link;
             ui.data_mut(|d| d.insert_temp(link_id, link));
         }
-        ui.horizontal(|ui| {
+        ui.horizontal_top(|ui| {
             ui.label(egui::RichText::new("W:").color(tk.text_dim).size(12.0));
-            if crate::widgets::value_field(ui, &mut w, -wlim..=wlim, "%", 58.0).changed() {
+            if crate::widgets::value_field(ui, &mut w, -wlim..=wlim, "%", 46.0).changed() {
                 apply_mobile_scale(app, link, Some(w), None, sx, sy, (wlim, hlim));
             }
         });
-        ui.horizontal(|ui| {
+        ui.horizontal_top(|ui| {
             ui.label(egui::RichText::new("H:").color(tk.text_dim).size(12.0));
-            if crate::widgets::value_field(ui, &mut h, -hlim..=hlim, "%", 58.0).changed() {
+            if crate::widgets::value_field(ui, &mut h, -hlim..=hlim, "%", 46.0).changed() {
                 apply_mobile_scale(app, link, None, Some(h), sx, sy, (wlim, hlim));
             }
         });
@@ -1717,29 +1763,31 @@ fn apply_mobile_scale(app: &mut PhotocraftApp, link: bool, w: Option<f32>, h: Op
 }
 
 /// Row 2: rotation field + finger slider on the left, interpolation dropdown on the right.
+/// Compact widths so it stays one 360 pt line next to the 48pt fields.
 fn mobile_adjust_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSession) {
     let tk = crate::theme::Tokens::get(ui.ctx());
     let (_, _, angle, _) = readout(t);
+    let snap = app.transform_preview.as_ref().is_some_and(|pv| pv.touch.snap);
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         ui.horizontal(|ui| {
-            let (r, resp) = ui.allocate_exact_size(vec2(18.0, 24.0), egui::Sense::hover());
+            let (r, resp) = ui.allocate_exact_size(vec2(18.0, 48.0), egui::Sense::hover());
             crate::icons::paint(ui, r, "rotate-cw", 13.0, tk.text_dim);
             resp.on_hover_text(tl!("Rotate"));
             let mut a = angle as f32;
-            if crate::widgets::value_field(ui, &mut a, -180.0..=180.0, "°", 56.0).changed() {
+            if crate::widgets::value_field(ui, &mut a, -180.0..=180.0, "°", 48.0).changed() {
                 rotate_about_pivot(app, (a as f64 - angle).to_radians());
             }
             let fresh = app.ui.transform.as_ref().map(readout).map(|(_, _, an, _)| an).unwrap_or(angle);
             let mut v = fresh as f32;
-            let slider = ui.allocate_ui(vec2(110.0, 24.0), |ui| {
+            let slider = ui.allocate_ui(vec2(80.0, 48.0), |ui| {
                 let r = crate::widgets::slider(ui, &mut v, -180.0..=180.0, None);
                 r.widget_info(|| egui::WidgetInfo::slider(ui.is_enabled(), f64::from(v), "Rotate angle"));
                 r
             });
             if slider.inner.changed() {
                 let mut target = f64::from(v);
-                if ui.input(|i| i.modifiers.shift) {
+                if snap || ui.input(|i| i.modifiers.shift) {
                     target = (target / 15.0).round() * 15.0;
                 }
                 let d = rotation_delta(fresh, target);
@@ -1752,7 +1800,7 @@ fn mobile_adjust_row(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSe
             ui.label(egui::RichText::new(tl!("Interp:")).color(tk.text_dim).size(12.0));
             let mut interp = t.interpolation.clone();
             let opts = [("bicubic".to_string(), tl!("Bicubic")), ("bilinear".to_string(), tl!("Bilinear")), ("nearest".to_string(), tl!("Nearest Neighbor"))];
-            if crate::widgets::dropdown(ui, "transform-interp-mobile", &mut interp, &opts, 110.0)
+            if crate::widgets::dropdown(ui, "transform-interp-mobile", &mut interp, &opts, 84.0)
                 && let Some(s) = app.ui.transform.as_mut()
             {
                 s.interpolation = interp;
@@ -1950,8 +1998,10 @@ fn warp_grid_id(mesh: &BezierMesh) -> &'static str {
 }
 
 /// One of the three Split icons. `on` is the armed tool: the line then follows the pointer.
+/// Full 48pt on phones (the warp bar is finger-driven there); 22pt on desktop.
 fn split_icon(ui: &mut egui::Ui, kind: &str, tip: &str, on: bool) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(22.0, 22.0), egui::Sense::click());
+    let s = if crate::mobile_ui::is_mobile(ui.ctx()) { TOUCH_ACTION_PX } else { 22.0 };
+    let (rect, resp) = ui.allocate_exact_size(vec2(s, s), egui::Sense::click());
     let ink = crate::icons::button_chrome(ui, rect, on, resp.hovered());
     let c = rect.center();
     let stroke = Stroke::new(1.15, ink);
@@ -2011,21 +2061,19 @@ fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool) 
 }
 
 /// Row 3: quick actions at a 48pt touch size (16dp inner padding each side of a
-/// ~16pt glyph), so cancel/confirm/grid never take false taps on a phone.
+/// ~16pt glyph), so cancel/confirm/grid never take false taps on a phone. The fourth
+/// button opens the mode/modifier popup: no room for those rows in the 148pt strip, and
+/// no keyboard for ⌥/⇧ on touch. Desktop key hints are dropped here: no Enter/Esc.
 fn mobile_transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 12.0;
-        let commit_tip = if warping {
-            crate::i18n::fmt(tl!("Commit warp ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
-        } else {
-            crate::i18n::fmt(tl!("Commit transform ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
-        };
+        let commit_tip = if warping { "Commit warp".to_string() } else { "Commit transform".to_string() };
         let commit_btn = crate::icons::button_with_icon_size(ui, "check", TOUCH_ACTION_PX, 22.0, false, &commit_tip);
         commit_btn.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Commit transform"));
         if commit_btn.clicked() {
             commit(app);
         }
-        let cancel_tip = if warping { tl!("Cancel warp (Esc)") } else { tl!("Cancel transform (Esc)") };
+        let cancel_tip = if warping { "Cancel warp" } else { "Cancel transform" };
         let cancel_btn = crate::icons::button_with_icon_size(ui, "ban", TOUCH_ACTION_PX, 22.0, false, cancel_tip);
         cancel_btn.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Cancel transform"));
         if cancel_btn.clicked() {
@@ -2039,6 +2087,51 @@ fn mobile_transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping:
             } else {
                 enter_warp(app);
             }
+        }
+        if !warping {
+            mobile_mode_button(app, ui);
+        }
+    });
+}
+
+/// Fourth action: the box mode (Free/Skew/Distort/Perspective) and the finger equivalents
+/// of the keyboard modifiers, in a popup over the canvas. Long-press on the canvas opens
+/// the same modes; this is the discoverable entry point.
+fn mobile_mode_button(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    use crate::state::TransformMode;
+    let mode_name = match app.ui.transform.as_ref().map(|t| t.mode).unwrap_or_default() {
+        TransformMode::Skew => "Skew",
+        TransformMode::Distort => "Distort",
+        TransformMode::Perspective => "Perspective",
+        TransformMode::Free => "Free",
+    };
+    let btn = crate::icons::button_with_icon_size(ui, "sliders-horizontal", TOUCH_ACTION_PX, 22.0, false, mode_name);
+    btn.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Transform mode"));
+    let popup = egui::Popup::from_toggle_button_response(&btn).close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+    popup.show(|ui| {
+        ui.set_min_width(260.0);
+        ui.spacing_mut().item_spacing.y = 8.0;
+        ui.label(egui::RichText::new(tl!("Mode")).strong());
+        let mut mode = app.ui.transform.as_ref().map(|t| t.mode).unwrap_or_default();
+        let opts = [
+            (TransformMode::Free, "Free"),
+            (TransformMode::Skew, "Skew"),
+            (TransformMode::Distort, "Distort"),
+            (TransformMode::Perspective, "Perspective"),
+        ];
+        if crate::widgets::dropdown(ui, "transform-mode-mobile", &mut mode, &opts, 160.0)
+            && let Some(s) = app.ui.transform.as_mut()
+        {
+            s.mode = mode;
+        }
+        ui.label(egui::RichText::new(tl!("Finger modifiers")).strong());
+        if let Some(pv) = app.transform_preview.as_mut() {
+            let mut prop = !pv.touch.free;
+            if crate::widgets::checkbox(ui, &mut prop, tl!("Proportional")).changed() {
+                pv.touch.free = !prop;
+            }
+            crate::widgets::checkbox(ui, &mut pv.touch.symmetric, tl!("Symmetric about pivot"));
+            crate::widgets::checkbox(ui, &mut pv.touch.snap, tl!("Snap 15°"));
         }
     });
 }
@@ -2064,6 +2157,17 @@ fn rotate_about_pivot(app: &mut PhotocraftApp, da: f64) {
         let (x, y) = (q[0] - c[0], q[1] - c[1]);
         [c[0] + x * cs - y * sn, c[1] + x * sn + y * cs]
     });
+}
+
+/// A two-finger twist while transforming: turn the box about the reference point instead of
+/// the view. Warp has no box rotation, so it keeps the gesture for navigation.
+pub(crate) fn twist(app: &mut PhotocraftApp, radians: f64) {
+    if !radians.is_finite() {
+        return;
+    }
+    if app.ui.transform.as_ref().is_some_and(|t| t.warp.is_none()) {
+        rotate_about_pivot(app, radians);
+    }
 }
 
 /// Shortest signed step from the current box angle to the slider's target, in degrees. The
@@ -3257,9 +3361,10 @@ mod tests {
         use egui_kittest::kittest::Queryable;
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.ui.transform = Some(session());
-        // Same 116pt as the transforming strip in `mobile_ui::options_strip`: two compact
-        // field rows plus the 48pt touch action row.
-        let mut h = Harness::builder().with_size(vec2(360.0, 116.0)).build_ui_state(
+        // Same 148pt as the transforming strip in `mobile_ui::options_strip`: three 48pt
+        // touch rows (coords, rotation/interp, commit/cancel/mode), plus the harness's
+        // 8pt outer margin.
+        let mut h = Harness::builder().with_size(vec2(360.0, 156.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
@@ -3273,7 +3378,7 @@ mod tests {
         for label in ["Commit transform", "Cancel transform", "Switch between free transform and warp modes"] {
             let r = h.get_by_label(label).rect();
             assert!(r.max.x <= 360.0, "{label} inside the phone width: {r:?}");
-            assert!(r.max.y <= 116.0, "{label} inside the taller strip: {r:?}");
+            assert!(r.max.y <= 156.0, "{label} inside the taller strip: {r:?}");
             assert!(r.width() >= 47.0 && r.height() >= 47.0, "{label} keeps the 48pt touch target: {r:?}");
         }
     }
