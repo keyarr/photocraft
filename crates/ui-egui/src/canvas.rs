@@ -3799,9 +3799,13 @@ fn selection_shown_offset(app: &PhotocraftApp) -> Option<(i32, i32)> {
 fn finish_selection_drag(app: &mut PhotocraftApp, floating: bool, start: [f64; 2], end: [f64; 2]) {
     let (dx, dy) = ((end[0] - start[0]).round(), (end[1] - start[1]).round());
     let unmoved = app.session.active().and_then(photocraft_engine::float_cmds::floating).is_some_and(|f| f.offset == (0, 0));
+    // A long-press that opened the context menu never moved: it is not a tap, so the
+    // selection stays for the menu's command (Rotate, Free Transform…).
+    let tapped_out = app.ui.canvas_tool_menu.is_some();
     let r = match (floating, dx == 0.0 && dy == 0.0) {
         (true, true) if unmoved => app.run("select.drop", json!({})),
         (true, true) => return,
+        (false, true) if tapped_out => return,
         (false, true) if app.session.is_enabled("select.deselect") => app.run("select.deselect", json!({})),
         (false, true) => return,
         (true, false) => app.run("select.float", json!({"dx": dx, "dy": dy})),
@@ -3856,7 +3860,8 @@ pub(crate) fn finish_gesture(app: &mut PhotocraftApp, d: Drag) {
             let (a, b) = marquee_corners(&app.ui.tool_options, &d, [end[0], end[1]]);
             let [x0, y0, x1, y1] = marquee_px(a, b);
             if x1 - x0 < 2.0 || y1 - y0 < 2.0 {
-                if app.session.is_enabled("select.deselect") {
+                // A long-press that opened the context menu is a menu gesture, not a tap.
+                if app.ui.canvas_tool_menu.is_none() && app.session.is_enabled("select.deselect") {
                     let _ = app.run("select.deselect", json!({}));
                 }
                 return;
@@ -3881,7 +3886,7 @@ pub(crate) fn finish_gesture(app: &mut PhotocraftApp, d: Drag) {
                 if made.is_ok() && d.tool != Tool::Lasso {
                     crate::retouch_ui::patch_hint(app);
                 }
-            } else if app.session.is_enabled("select.deselect") {
+            } else if app.ui.canvas_tool_menu.is_none() && app.session.is_enabled("select.deselect") {
                 let _ = app.run("select.deselect", json!({}));
             }
         }
@@ -4150,6 +4155,32 @@ mod tests {
                 std::thread::sleep(std::time::Duration::from_millis(1));
             }
             assert_eq!(app.session.active().unwrap().doc.mode, photocraft_color::ColorMode::Rgb);
+        }
+    }
+
+    /// A tap with the Lasso clears the selection, but the long-press that opened the context
+    /// menu must not: the menu's command (Rotate, Free Transform…) needs the selection.
+    #[test]
+    fn long_press_menu_keeps_the_selection_while_a_tap_deselects() {
+        for menu_open in [false, true] {
+            let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+            app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+            app.run("select.rect", json!({"x": 10, "y": 10, "width": 20, "height": 20})).unwrap();
+            app.ui.tool = Tool::Lasso;
+            if menu_open {
+                app.ui.canvas_tool_menu = Some(crate::canvas_tool_menu::CanvasToolMenu {
+                    pos: [0.0, 0.0],
+                    tool: Tool::Lasso,
+                    has_selection: true,
+                    has_path: false,
+                    path_name: None,
+                    transform: false,
+                });
+            }
+            // A press that never moved: the long-press that summoned the menu.
+            let d = Drag::new(Tool::Lasso, [5.0, 5.0], vec![[5.0, 5.0, 1.0]], egui::Modifiers::NONE, false);
+            finish_gesture(&mut app, d);
+            assert_eq!(app.session.active().unwrap().doc.selection.is_some(), menu_open, "menu_open={menu_open}");
         }
     }
 

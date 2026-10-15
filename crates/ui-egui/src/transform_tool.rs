@@ -1581,6 +1581,26 @@ fn transform_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSes
     if crate::widgets::value_field(ui, &mut a, -180.0..=180.0, "°", 60.0).changed() {
         rotate_about_pivot(app, (a as f64 - angle).to_radians());
     }
+    // A drag slider for the same angle, so a finger can turn the layer
+    // without pixel-hunting the box handles. It drives the live session like the field;
+    // commit stays one history step. Shift snaps to 15°.
+    let fresh = app.ui.transform.as_ref().map(readout).map(|(_, _, an, _)| an).unwrap_or(angle);
+    let mut v = fresh as f32;
+    let slider = ui.allocate_ui(vec2(120.0, 22.0), |ui| {
+        let r = crate::widgets::slider(ui, &mut v, -180.0..=180.0, None);
+        r.widget_info(|| egui::WidgetInfo::slider(ui.is_enabled(), f64::from(v), "Rotate angle"));
+        r
+    });
+    if slider.inner.changed() {
+        let mut target = f64::from(v);
+        if ui.input(|i| i.modifiers.shift) {
+            target = (target / 15.0).round() * 15.0;
+        }
+        let d = rotation_delta(fresh, target);
+        if d.abs() > 1e-9 {
+            rotate_about_pivot(app, d.to_radians());
+        }
+    }
     crate::widgets::vline(ui, 22.0);
     lbl(ui, tl!("Interpolation:"));
     let mut interp = t.interpolation.clone();
@@ -1782,6 +1802,12 @@ fn rotate_about_pivot(app: &mut PhotocraftApp, da: f64) {
     });
 }
 
+/// Shortest signed step from the current box angle to the slider's target, in degrees. The
+/// readout wraps at ±180, so going 179 → −179 is +2, not −358.
+fn rotation_delta(current: f64, target: f64) -> f64 {
+    (target - current + 540.0).rem_euclid(360.0) - 180.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1923,6 +1949,55 @@ mod tests {
     fn drag(s: &mut TransformSession, from: [f64; 2], to: [f64; 2], mods: egui::Modifiers) {
         let g = Gesture { hit: hit(s, from, 8.0), start: from, quad0: s.quad, pivot0: s.pivot };
         apply_drag(s, g, to, mods);
+    }
+
+    #[test]
+    fn rotation_delta_takes_the_short_way_around() {
+        assert!((rotation_delta(0.0, 90.0) - 90.0).abs() < 1e-9);
+        assert!((rotation_delta(0.0, -90.0) + 90.0).abs() < 1e-9);
+        assert!((rotation_delta(179.0, -179.0) - 2.0).abs() < 1e-9);
+        assert!((rotation_delta(-179.0, 179.0) + 2.0).abs() < 1e-9);
+        assert!(rotation_delta(30.0, 30.0).abs() < 1e-9);
+    }
+
+    /// The options-bar angle slider turns the live box (no history step: commit does that).
+    #[test]
+    fn rotate_slider_drags_the_box_without_touching_history() {
+        use egui_kittest::Harness;
+        use egui_kittest::kittest::{NodeT, Queryable};
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.ui.transform = Some(session());
+        let mut h = Harness::builder().with_size(vec2(900.0, 48.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                ui.horizontal_centered(|ui| options_bar(app, ui));
+            },
+            app,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        h.run_steps(6);
+        let slider = h
+            .query_all_by_role(egui::accesskit::Role::Slider)
+            .find(|n| n.accesskit_node().label().as_deref() == Some("Rotate angle"))
+            .map(|n| n.rect())
+            .expect("the rotate slider");
+        let from = slider.center();
+        let to = slider.right_center() - vec2(7.0, 0.0);
+        h.hover_at(from);
+        h.run_steps(1);
+        h.drag_at(from);
+        h.run_steps(1);
+        for i in 1..=6 {
+            h.hover_at(from + (to - from) * (i as f32 / 6.0));
+            h.run_steps(1);
+        }
+        h.drop_at(to);
+        h.run_steps(3);
+        let t = h.state().ui.transform.clone().unwrap();
+        let (_, _, angle, _) = readout(&t);
+        assert!(angle.abs() > 30.0, "dragged right, got {angle}");
     }
 
     fn close(a: [[f64; 2]; 4], b: [[f64; 2]; 4]) -> bool {

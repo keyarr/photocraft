@@ -413,12 +413,21 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
         }
         "edit.freeTransform"
         | "edit.transform.scale"
-        | "edit.transform.rotate"
         | "edit.transform.skew"
         | "edit.transform.distort"
         | "edit.transform.perspective" => {
-            // While a box is up, Scale / Rotate / Skew / Distort / Perspective (and Free Transform)
+            // While a box is up, Scale / Skew / Distort / Perspective (and Free Transform)
             // switch its mode; otherwise they start one in that mode.
+            if app.ui.transform.is_none() {
+                crate::transform_tool::begin(app, ctx)?;
+            }
+            if let Some(t) = app.ui.transform.as_mut() {
+                t.mode = crate::state::TransformMode::for_command(id);
+            }
+            Ok(json!({"transform": app.ui.transform}))
+        }
+        // Edit › Transform › Rotate from the menu: the interactive box (with `angle`: the engine).
+        "edit.transform.rotate" if params.as_object().is_none_or(|o| !o.contains_key("angle")) => {
             if app.ui.transform.is_none() {
                 crate::transform_tool::begin(app, ctx)?;
             }

@@ -417,17 +417,116 @@ fn transform(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(json!({"rect": rect}))
 }
 
+/// Edit › Transform › Rotate with an angle: the same pixels `edit.transform` moves (linked masks
+/// follow, the selection outline moves too), as one "Rotate" history step. The options-bar slider
+/// drives the live session instead; this is the headless single-shot (CLI, MCP, actions).
+fn rotate(s: &mut Session, p: &Value) -> Result<Value> {
+    const CMD: &str = "edit.transform.rotate";
+    let deg = p.get("angle").and_then(Value::as_f64).ok_or_else(|| EngineError::BadParams {
+        cmd: CMD.into(),
+        msg: "missing `angle` (-360..=360, degrees clockwise)".into(),
+    })?;
+    if !deg.is_finite() || deg.abs() > 360.0 {
+        return Err(EngineError::BadParams { cmd: CMD.into(), msg: format!("angle {deg} is outside -360..=360") });
+    }
+    if deg.rem_euclid(360.0) < 1e-9 || deg.rem_euclid(360.0) > 360.0 - 1e-9 {
+        return Ok(json!({"angle": 0.0}));
+    }
+    let st = s.active().ok_or(EngineError::NoDocument)?;
+    let id = match p.get("layer").and_then(Value::as_u64) {
+        Some(v) => Some(LayerId(v)),
+        None => st.active_layer,
+    };
+    let lone = lone_target(&st.doc, id, p)?;
+    let id = match (id, lone.is_some() && crate::channel_cmds::is_channel_target(p)) {
+        (_, true) => None,
+        (Some(id), false) => Some(id),
+        (None, false) => return Err(EngineError::Other("no active layer".into())),
+    };
+    let bounds = match (lone, id) {
+        (Some(surf), _) => target_bounds(&st.doc, surf),
+        (None, Some(id)) => transform_bounds(&st.doc, st.doc.layer(id).ok_or(EngineError::NoLayer(id))?),
+        (None, None) => Rect::EMPTY,
+    };
+    if bounds.is_empty() {
+        return Err(EngineError::Other("nothing to transform".into()));
+    }
+    let pivot = match p.get("pivot").and_then(Value::as_array) {
+        Some(a) if a.len() == 2 => {
+            let (Some(x), Some(y)) = (a.first().and_then(Value::as_f64), a.get(1).and_then(Value::as_f64)) else {
+                return Err(EngineError::BadParams { cmd: CMD.into(), msg: "pivot must be [x, y]".into() });
+            };
+            if !x.is_finite() || !y.is_finite() {
+                return Err(EngineError::BadParams { cmd: CMD.into(), msg: "pivot must be [x, y]".into() });
+            }
+            [x, y]
+        }
+        Some(_) => {
+            return Err(EngineError::BadParams { cmd: CMD.into(), msg: "pivot must be [x, y]".into() });
+        }
+        None => [(bounds.x0 + bounds.x1) as f64 / 2.0, (bounds.y0 + bounds.y1) as f64 / 2.0],
+    };
+    // Clockwise on screen (y down), about the pivot.
+    let (sn, cs) = deg.to_radians().sin_cos();
+    let [cx, cy] = pivot;
+    let h = Homography([cs, -sn, cx - cx * cs + cy * sn, sn, cs, cy - cx * sn - cy * cs, 0.0, 0.0, 1.0]);
+    let m = h.0;
+    let affine = (m[6].abs() < 1e-12 && m[7].abs() < 1e-12).then(|| Affine { m: [m[0] / m[8], m[3] / m[8], m[1] / m[8], m[4] / m[8], m[2] / m[8], m[5] / m[8]] });
+    let interp = Interp::parse(p.get("interpolation").and_then(Value::as_str).unwrap_or("bicubic"));
+    let lone = lone.is_some();
+    s.edit("Rotate", |doc, _| {
+        let sel = doc.selection.clone();
+        if lone {
+            let (surf, _) = crate::channel_cmds::target_surface(doc, id, p)?;
+            *surf = match &sel {
+                Some(sel) => warp_gray_selected(surf, sel, &h, interp),
+                None => warp_gray(surf, &h, interp),
+            };
+            if let Some(sel) = &doc.selection {
+                doc.selection = Some(warp_gray(sel, &h, Interp::Bilinear)).filter(|s| !s.content_bounds().is_empty());
+            }
+            return Ok(());
+        }
+        let id = id.ok_or_else(|| EngineError::Other("no active layer".into()))?;
+        let is_group = doc.layer(id).is_some_and(Layer::is_group);
+        let group = group_locks(doc, id);
+        let l = doc.layer_mut(id).ok_or(EngineError::NoLayer(id))?;
+        transform_layer(if is_group { None } else { sel.as_ref() }, group, l, &h, affine, interp)?;
+        let snapshot = doc.clone();
+        if let Some(l) = doc.layer_mut(id) {
+            refresh_text(&snapshot, l);
+        }
+        if let Some(sel) = &doc.selection {
+            doc.selection = Some(warp_gray(sel, &h, Interp::Bilinear)).filter(|s| !s.content_bounds().is_empty());
+        }
+        Ok(())
+    })?;
+    Ok(json!({"angle": deg, "pivot": pivot}))
+}
+
 pub fn specs() -> Vec<CommandSpec> {
-    vec![CommandSpec {
-        id: "edit.transform",
-        label: "Free Transform",
-        menu: &[],
-        shortcut: None,
-        params: r##"{"layer":id?,"rect":[x0,y0,x1,y1]? (source frame; default = layer content ∩ selection),"quad":[[x,y]×4]? (where the frame's corners go, clockwise from top-left),"matrix":[a,b,c,d,e,f]? (affine alternative),"interpolation":"bicubic|bilinear|nearest"="bicubic","target":"pixels"|"mask"|"quickMask"|{"channel":i}=Channels panel target (an unlinked mask, an alpha channel or the Quick Mask transforms alone; a linked mask moves with its layer)}"##,
-        enabled: has_layer,
-        journal: true,
-        run: transform,
-    }]
+    vec![
+        CommandSpec {
+            id: "edit.transform",
+            label: "Free Transform",
+            menu: &[],
+            shortcut: None,
+            params: r##"{"layer":id?,"rect":[x0,y0,x1,y1]? (source frame; default = layer content ∩ selection),"quad":[[x,y]×4]? (where the frame's corners go, clockwise from top-left),"matrix":[a,b,c,d,e,f]? (affine alternative),"interpolation":"bicubic|bilinear|nearest"="bicubic","target":"pixels"|"mask"|"quickMask"|{"channel":i}=Channels panel target (an unlinked mask, an alpha channel or the Quick Mask transforms alone; a linked mask moves with its layer)}"##,
+            enabled: has_layer,
+            journal: true,
+            run: transform,
+        },
+        CommandSpec {
+            id: "edit.transform.rotate",
+            label: "Rotate",
+            menu: &["Edit", "Transform"],
+            shortcut: None,
+            params: r##"{"angle":-360..360 (degrees, clockwise on screen),"pivot":[x,y]? (document px; default = centre of the layer content ∩ selection),"layer":id?,"interpolation":"bicubic|bilinear|nearest"="bicubic","target":"pixels"|"mask"|"quickMask"|{"channel":i}=Channels panel target}"##,
+            enabled: has_layer,
+            journal: true,
+            run: rotate,
+        },
+    ]
 }
 
 #[cfg(test)]
@@ -691,5 +790,46 @@ mod tests {
         let mut sel = Surface::new(PixelFormat::GRAY8);
         sel.fill_rect(Rect::new(0, 0, 4, 4), &[1.0]);
         assert!(split_gray_selected(&s, &sel).is_none());
+    }
+
+    #[test]
+    fn rotate_by_angle_turns_the_layer_and_undoes() {
+        let mut s = session();
+        let past = s.active().unwrap().history.past_len();
+        s.execute("edit.transform.rotate", json!({"angle": 90})).unwrap();
+        assert_eq!(s.active().unwrap().history.past_len(), past + 1);
+        let b = active_bounds(&s);
+        assert_eq!((b.width(), b.height()), (10, 20), "{b:?}");
+        s.undo();
+        assert_eq!(active_bounds(&s), Rect::new(10, 10, 30, 20));
+    }
+
+    #[test]
+    fn rotate_rejects_bad_params_without_a_history_step() {
+        let mut s = session();
+        let past = s.active().unwrap().history.past_len();
+        for p in [
+            json!({}),
+            json!({"angle": "lots"}),
+            json!({"angle": 45, "pivot": [0]}),
+            json!({"angle": 45, "pivot": ["x", 0]}),
+            json!({"angle": 720}),
+            json!({"angle": f64::NAN}),
+        ] {
+            assert!(s.execute("edit.transform.rotate", p).is_err());
+            assert_eq!(s.active().unwrap().history.past_len(), past);
+        }
+        // A full turn is a noop without a history step.
+        s.execute("edit.transform.rotate", json!({"angle": 360})).unwrap();
+        assert_eq!(s.active().unwrap().history.past_len(), past);
+    }
+
+    #[test]
+    fn rotate_moves_the_selection_outline_with_the_pixels() {
+        let mut s = session();
+        s.execute("select.rect", json!({"x": 10, "y": 10, "width": 20, "height": 10})).unwrap();
+        s.execute("edit.transform.rotate", json!({"angle": 90, "interpolation": "nearest"})).unwrap();
+        let sel = s.active().unwrap().doc.selection.as_ref().unwrap().content_bounds();
+        assert_eq!((sel.width(), sel.height()), (10, 20), "{sel:?}");
     }
 }
