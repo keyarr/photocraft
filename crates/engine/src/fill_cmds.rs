@@ -152,6 +152,9 @@ pub fn fill(s: &mut Session, p: &Value) -> Result<Value> {
         blend_into(surf, area, &source, sel.as_ref(), Blend { mode, opacity, keep_alpha: preserve || lock, restore });
         Ok(())
     })?;
+    if let Some(st) = s.active_mut() {
+        st.last_damage = Some(area);
+    }
     Ok(out)
 }
 

@@ -7,7 +7,7 @@
 //! commands, tools and panel bodies as the desktop layout: nothing is a mock and nothing
 //! hides a feature, it is just packed for touch.
 
-use egui::{Align2, Rect, RichText, Sense, pos2, vec2};
+use egui::{Align2, Rect, RichText, Sense, StrokeKind, pos2, vec2};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -142,15 +142,35 @@ pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let title =
                     app.session.active().map(|st| format!("{}{}", st.doc.name, if st.is_dirty() { " *" } else { "" })).unwrap_or_else(|| "PhotoCraft".into());
                 // Whatever the right-hand buttons take, the title gets the rest, truncated.
-                let right_reserve = if has_doc { 64.0 } else { 0.0 } + 48.0 + 12.0;
+                let right_reserve = if has_doc { 72.0 } else { 0.0 } + 48.0 + 12.0;
                 let avail = (ui.available_width() - right_reserve).max(48.0);
                 ui.add_sized(vec2(avail, 48.0), egui::Label::new(RichText::new(title).color(t.text).size(13.0)).truncate());
                 if has_doc {
-                    // No save picker on phones: saving happens automatically
-                    // (autosave + on exit), so the header offers Export instead.
-                    let export_on = crate::menus::is_enabled(app, "file.export.exportAs");
-                    if ui.add_enabled_ui(export_on, |ui| widgets::secondary_button(ui, tl!("Export"), 64.0)).inner.clicked() {
-                        crate::mobile_export::open(app);
+                    if app.ui.transform.is_some() {
+                        let warping = app.ui.transform.as_ref().is_some_and(|t| t.warp.is_some());
+                        let cancel_tip = if warping { tl!("Cancel warp (Esc)") } else { tl!("Cancel transform (Esc)") };
+                        let commit_tip = if warping {
+                            crate::i18n::fmt(tl!("Commit warp ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
+                        } else {
+                            crate::i18n::fmt(tl!("Commit transform ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
+                        };
+                        let cancel_btn = icons::button_with_icon_size(ui, "ban", 34.0, 18.0, false, cancel_tip);
+                        cancel_btn.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Cancel transform"));
+                        if cancel_btn.clicked() {
+                            crate::transform_tool::cancel(app);
+                        }
+                        let commit_btn = icons::button_with_icon_size(ui, "check", 34.0, 18.0, false, &commit_tip);
+                        commit_btn.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Commit transform"));
+                        if commit_btn.clicked() {
+                            crate::transform_tool::commit(app);
+                        }
+                    } else {
+                        // No save picker on phones: saving happens automatically
+                        // (autosave + on exit), so the header offers Export instead.
+                        let export_on = crate::menus::is_enabled(app, "file.export.exportAs");
+                        if ui.add_enabled_ui(export_on, |ui| widgets::secondary_button(ui, tl!("Export"), 64.0)).inner.clicked() {
+                            crate::mobile_export::open(app);
+                        }
                     }
                 }
                 let more = icons::button(ui, "ellipsis", 48.0, false, tl!("Options"));
@@ -199,33 +219,82 @@ fn menu_item(ui: &mut egui::Ui, app: &mut PhotocraftApp, label: &str, id: &str, 
     }
 }
 
-/// The active tool's options, horizontally scrollable: the same controls
-/// as the desktop options bar, so every tool keeps its settings on a phone.
-/// The tool itself is already marked in the bottom bar, so no icon or name here.
+/// The active tool's options, horizontally scrollable: single-line container with smooth
+/// horizontal scrolling and hidden scrollbar so controls are never clipped abruptly.
 pub fn options_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if app.session.active().is_none() {
         return;
     }
     let t = Tokens::get(ui.ctx());
-    // A transforming strip wraps its fields over rows instead of scrolling: the numeric
-    // fields and the angle slider swallow the horizontal drag gesture.
-    // Three compact rows (coords, rotation/interp, commit/cancel/grid): 24pt fields +
-    // one 48pt touch row fits in 116pt, so the canvas keeps room with the sheet open.
-    let transforming = app.ui.transform.is_some();
-    let h = if transforming { 116.0 } else { 48.0 };
-    egui::Panel::top("mobile_options").exact_size(h).frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(8, 0))).show(ui, |ui| {
-        if transforming {
-            crate::transform_tool::mobile_options_bar(app, ui);
-            return;
-        }
-        let rest = ui.available_width().max(80.0);
-        egui::ScrollArea::horizontal().id_salt("mobile-options-scroll").auto_shrink([false, false]).max_width(rest).show(ui, |ui| {
-            crate::panels::options_content(app, ui);
-            // Right padding inside the scroll: the last field (Opacity/Flow) ended
-            // exactly at the panel edge and read as clipped.
-            ui.add_space(12.0);
+    egui::Panel::top("mobile_options")
+        .exact_size(48.0)
+        .frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(8, 0)))
+        .show(ui, |ui| {
+            let rest = ui.available_width().max(80.0);
+            egui::ScrollArea::horizontal()
+                .id_salt("mobile-options-scroll")
+                .auto_shrink([false, false])
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+                .max_width(rest)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 8.0;
+                        if app.ui.transform.is_some() {
+                            crate::transform_tool::mobile_options_bar(app, ui);
+                        } else {
+                            crate::panels::options_content(app, ui);
+                        }
+                        ui.add_space(24.0);
+                    });
+                });
         });
-    });
+}
+
+/// Floating pill centered at the bottom of the canvas for Transform confirm and cancel actions.
+pub fn transform_floating_pill(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    if app.ui.transform.is_none() || !is_mobile(ctx) || app.session.active().is_none() {
+        return;
+    }
+    let screen = ctx.content_rect();
+    let offset_y = if app.ui.mobile.panel.is_some() {
+        - (screen.height() * 0.45).clamp(260.0, 420.0) - 16.0
+    } else {
+        -76.0
+    };
+    egui::Area::new(egui::Id::new("mobile-transform-pill"))
+        .order(egui::Order::Foreground)
+        .anchor(Align2::CENTER_BOTTOM, vec2(0.0, offset_y))
+        .show(ctx, |ui| {
+            let t = Tokens::get(ui.ctx());
+            egui::Frame::popup(ui.style())
+                .fill(t.chrome)
+                .stroke(egui::Stroke::new(1.0, t.separator))
+                .corner_radius(20.0)
+                .inner_margin(egui::Margin::symmetric(14, 6))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 16.0;
+                        let warping = app.ui.transform.as_ref().is_some_and(|t| t.warp.is_some());
+                        let cancel_tip = if warping { tl!("Cancel warp (Esc)") } else { tl!("Cancel transform (Esc)") };
+                        let cancel_btn = icons::button_with_icon_size(ui, "ban", 36.0, 20.0, false, cancel_tip);
+                        cancel_btn.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Cancel transform"));
+                        if cancel_btn.clicked() {
+                            crate::transform_tool::cancel(app);
+                        }
+                        widgets::vline(ui, 20.0);
+                        let commit_tip = if warping {
+                            crate::i18n::fmt(tl!("Commit warp ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
+                        } else {
+                            crate::i18n::fmt(tl!("Commit transform ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
+                        };
+                        let commit_btn = icons::button_with_icon_size(ui, "check", 36.0, 20.0, false, &commit_tip);
+                        commit_btn.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Commit transform"));
+                        if commit_btn.clicked() {
+                            crate::transform_tool::commit(app);
+                        }
+                    });
+                });
+        });
 }
 
 /// Favourite tools, touch-sized and scrollable, with the panel shortcuts beside them.
@@ -243,12 +312,24 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .show(ui, |ui| {
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
-                if icons::button_with_icon_size(ui, "grid-2x2", 48.0, 22.0, app.ui.mobile.tools_open, tl!("Tools")).clicked() {
+                // Tools modal toggle button: uses neutral card style when open, never tool-accent selection border.
+                let tools_open = app.ui.mobile.tools_open;
+                let (tools_rect, tools_resp) = ui.allocate_exact_size(vec2(48.0, 48.0), Sense::click());
+                if tools_open {
+                    ui.painter().rect_filled(tools_rect, t.radius_sm, t.card);
+                    ui.painter().rect_stroke(tools_rect, t.radius_sm, egui::Stroke::new(1.0, t.card_border), StrokeKind::Inside);
+                } else if tools_resp.hovered() {
+                    ui.painter().rect_filled(tools_rect, t.radius_sm, t.hover);
+                }
+                let tools_tint = if tools_open || tools_resp.hovered() { t.text } else { t.icon };
+                icons::paint(ui, tools_rect, "grid-2x2", 22.0, tools_tint);
+                if tools_resp.on_hover_text(tl!("Tools")).clicked() {
                     app.ui.mobile.tools_open = !app.ui.mobile.tools_open;
                     if app.ui.mobile.tools_open {
                         app.ui.mobile.tools_filter.clear();
                     }
                 }
+
                 // Fixed buttons after the scrolled row: grid, three panel shortcuts.
                 let rest = (ui.available_width() - 3.0 * 48.0 - 4.0).max(64.0);
                 egui::ScrollArea::horizontal().id_salt("mobile-tools-scroll").auto_shrink([false, false]).max_width(rest).show(ui, |ui| {
@@ -256,16 +337,42 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         ui.spacing_mut().item_spacing.x = 4.0;
                         let mut favs = favourites().to_vec();
                         if !favs.contains(&app.ui.tool) {
-                            favs.insert(0, app.ui.tool);
+                            let mut replaced = false;
+                            for fav in favs.iter_mut() {
+                                if crate::panels::tool_subtools(*fav).contains(&app.ui.tool) {
+                                    *fav = app.ui.tool;
+                                    replaced = true;
+                                    break;
+                                }
+                            }
+                            if !replaced {
+                                favs.insert(0, app.ui.tool);
+                            }
                         }
                         let held_id = egui::Id::new("mobile-fav-held");
+                        let subtool_popover_id = egui::Id::new("mobile-subtool-popover");
+                        let mut active_popover: Option<Tool> = ui.data(|d| d.get_temp(subtool_popover_id));
+
                         if ui.input(|i| i.pointer.any_pressed()) {
                             ui.data_mut(|d| d.remove::<Tool>(held_id));
                         }
                         for tool in favs {
                             let tip = tl!(tool.label()).to_string();
-                            let resp = icons::button_with_icon_size(ui, icons::tool_icon(tool), 48.0, 24.0, app.ui.tool == tool, &tip);
-                            // Touch has no hover: a press-and-hold names the tool without selecting it.
+                            let is_active_tool = app.ui.tool == tool;
+                            let subtools = crate::panels::tool_subtools(tool);
+                            let has_subtools = subtools.len() > 1;
+
+                            // Exclusive blue accent border ONLY for the active editing tool
+                            let resp = icons::button_with_icon_size(ui, icons::tool_icon(tool), 48.0, 24.0, is_active_tool, &tip);
+
+                            if has_subtools {
+                                let c = resp.rect.right_bottom() - vec2(3.0, 3.0);
+                                let triangle = [c - vec2(5.0, 0.0), c, c - vec2(0.0, 5.0)];
+                                let tri_tint = if is_active_tool { t.accent_text } else { t.text_faint };
+                                ui.painter().add(egui::Shape::convex_polygon(triangle.to_vec(), tri_tint, egui::Stroke::NONE));
+                            }
+
+                            // Touch has no hover: hold or repeat tap opens subtools or names the tool
                             let held_for = resp.is_pointer_button_down_on().then(|| ui.input(|i| i.pointer.press_start_time().map(|t0| i.time - t0))).flatten();
                             if let Some(seconds) = held_for
                                 && seconds < 0.35
@@ -273,14 +380,28 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                                 ui.ctx().request_repaint_after(std::time::Duration::from_secs_f64(0.35 - seconds));
                             }
                             let long_press = held_for.is_some_and(|seconds| seconds >= 0.35);
-                            if long_press {
+                            if long_press && has_subtools {
+                                active_popover = Some(tool);
+                                ui.data_mut(|d| d.insert_temp(subtool_popover_id, tool));
+                                ui.data_mut(|d| d.insert_temp(held_id, tool));
+                                ui.ctx().request_repaint();
+                            } else if long_press {
                                 ui.data_mut(|d| d.insert_temp(held_id, tool));
                                 ui.ctx().request_repaint();
                             }
+
                             if resp.clicked() && ui.data(|d| d.get_temp::<Tool>(held_id)) != Some(tool) {
-                                app.ui.tool = tool;
+                                if is_active_tool && has_subtools {
+                                    active_popover = if active_popover == Some(tool) { None } else { Some(tool) };
+                                    ui.data_mut(|d| d.insert_temp(subtool_popover_id, active_popover));
+                                } else {
+                                    app.ui.tool = tool;
+                                    active_popover = None;
+                                    ui.data_mut(|d| d.remove::<Tool>(subtool_popover_id));
+                                }
                             }
-                            if ui.data(|d| d.get_temp::<Tool>(held_id)) == Some(tool) {
+
+                            if ui.data(|d| d.get_temp::<Tool>(held_id)) == Some(tool) && active_popover != Some(tool) {
                                 egui::Area::new(egui::Id::new(("mobile-fav-tip", tool.label())))
                                     .order(egui::Order::Tooltip)
                                     .fixed_pos(resp.rect.left_top() + vec2(-4.0, -40.0))
@@ -292,6 +413,40 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                                         });
                                     });
                             }
+
+                            if active_popover == Some(tool) && has_subtools {
+                                egui::Area::new(egui::Id::new(("mobile-subtools-popover", tool.label())))
+                                    .order(egui::Order::Tooltip)
+                                    .fixed_pos(resp.rect.left_top() + vec2(0.0, -((subtools.len() as f32 * 40.0) + 16.0)))
+                                    .constrain(true)
+                                    .show(ui.ctx(), |ui| {
+                                        egui::Frame::popup(ui.style()).inner_margin(egui::Margin::symmetric(6, 6)).show(ui, |ui| {
+                                            ui.set_min_width(160.0);
+                                            ui.vertical(|ui| {
+                                                ui.spacing_mut().item_spacing.y = 3.0;
+                                                for &sub in subtools {
+                                                    let is_sel = app.ui.tool == sub;
+                                                    let sub_lbl = tl!(sub.label());
+                                                    let (sr, sresp) = ui.allocate_exact_size(vec2(160.0, 36.0), Sense::click());
+                                                    if is_sel {
+                                                        ui.painter().rect_filled(sr, t.radius_sm, t.accent_soft);
+                                                        ui.painter().rect_stroke(sr, t.radius_sm, egui::Stroke::new(1.0, t.accent_border), StrokeKind::Inside);
+                                                    } else if sresp.hovered() {
+                                                        ui.painter().rect_filled(sr, t.radius_sm, t.hover);
+                                                    }
+                                                    let sub_tint = if is_sel { t.accent_text } else if sresp.hovered() { t.text } else { t.icon };
+                                                    icons::paint(ui, Rect::from_center_size(pos2(sr.left() + 18.0, sr.center().y), vec2(20.0, 20.0)), icons::tool_icon(sub), 18.0, sub_tint);
+                                                    let text_color = if is_sel { t.accent_text } else { t.text };
+                                                    ui.painter().text(pos2(sr.left() + 36.0, sr.center().y), Align2::LEFT_CENTER, sub_lbl, egui::FontId::proportional(12.5), text_color);
+                                                    if sresp.clicked() {
+                                                        app.ui.tool = sub;
+                                                        ui.data_mut(|d| d.remove::<Tool>(subtool_popover_id));
+                                                    }
+                                                }
+                                            });
+                                        });
+                                    });
+                            }
                         }
                     });
                 });
@@ -300,11 +455,18 @@ pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     ("sliders-horizontal", tl!("Properties"), crate::dock::Group::Properties),
                     ("layers", tl!("Layers"), crate::dock::Group::Layers),
                 ] {
-                    // Panel shortcuts use the quiet rail style on purpose: the accent fill
-                    // is reserved for the active canvas tool above, so brush + open panel
-                    // never read as two selected tools.
+                    // Panel shortcuts use distinct filled style + bottom indicator dot (never tool blue selection border)
                     let on = app.ui.mobile.panel == Some(group);
-                    if icons::rail_button(ui, icon, 48.0, on, name).clicked() {
+                    let (rect, resp) = ui.allocate_exact_size(vec2(48.0, 48.0), Sense::click());
+                    if on {
+                        ui.painter().rect_filled(rect, t.radius_sm, t.card);
+                        ui.painter().circle_filled(pos2(rect.center().x, rect.bottom() - 5.0), 2.5, t.accent);
+                    } else if resp.hovered() {
+                        ui.painter().rect_filled(rect, t.radius_sm, t.hover);
+                    }
+                    let tint = if on || resp.hovered() { t.text } else { t.text_faint };
+                    icons::paint(ui, rect, icon, 24.0, tint);
+                    if resp.on_hover_text(name).clicked() {
                         app.ui.mobile.panel = if on { None } else { Some(group) };
                     }
                 }
@@ -318,16 +480,17 @@ fn favourites() -> [Tool; 10] {
     [Move, RectMarquee, Lasso, Brush, Eraser, Gradient, CloneStamp, Type, Hand, Zoom]
 }
 
-/// The full tool list over the canvas: every tool with its name, in desktop-toolbar
-/// groups, with a filter. The old 6-column icon grid was unreadable on touch (no hover
-/// ever shows the tooltip), so each card names its tool. No new `tl!` literals:
-/// everything here reuses strings the catalogs already translate.
+/// The full tool list over the canvas: high-density 3-4 column grid with subtools grouped
+/// by slot, fluid vertical scrolling, and search fixed at the top.
 pub fn tool_sheet(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if !app.ui.mobile.tools_open || app.session.active().is_none() {
         return;
     }
     let screen = ctx.content_rect();
     let list_w = (screen.width() - 48.0).clamp(280.0, 420.0);
+    let cols = if list_w >= 340.0 { 4 } else { 3 };
+    let gap = 6.0;
+    let card_w = ((list_w - 32.0 - (cols as f32 - 1.0) * gap) / cols as f32).clamp(48.0, 160.0);
     egui::Window::new(tl!("Tools"))
         .id(egui::Id::new("mobile-tools"))
         .anchor(Align2::CENTER_BOTTOM, vec2(0.0, -84.0))
@@ -338,8 +501,7 @@ pub fn tool_sheet(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             ui.set_min_width(list_w);
             ui.set_max_width(list_w);
-            // Custom header: title left, X on the same row right. The default title
-            // bar plus a second row with a lone X wasted a full row of height.
+            // Custom header: title left, X on the same row right.
             ui.horizontal(|ui| {
                 ui.label(RichText::new(tl!("Tools")).size(14.0).strong());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -351,64 +513,84 @@ pub fn tool_sheet(app: &mut PhotocraftApp, ctx: &egui::Context) {
             ui.add_space(4.0);
             let avail = ui.available_width().max(200.0);
             ui.add_sized(
-                vec2(avail, 48.0),
-                egui::TextEdit::singleline(&mut app.ui.mobile.tools_filter).hint_text(tl!("Search commands, tools and panels…")).desired_width(f32::INFINITY).margin(vec2(12.0, 12.0)),
+                vec2(avail, 40.0),
+                egui::TextEdit::singleline(&mut app.ui.mobile.tools_filter).hint_text(tl!("Search commands, tools and panels…")).desired_width(f32::INFINITY).margin(vec2(10.0, 10.0)),
             );
-            ui.add_space(8.0);
-            // Fixed width from the window size: deriving it from available_width
-            // inside the grid fed the grid's own sizing back into itself and the
-            // window blew up past the screen (only its bottom showed on-device).
-            let card_w = ((list_w - 32.0 - 8.0) / 2.0).clamp(48.0, 200.0);
-            egui::ScrollArea::vertical().id_salt("mobile-tools-list").auto_shrink([false, false]).max_height((screen.height() * 0.5).clamp(200.0, 420.0)).show(
+            ui.add_space(6.0);
+            egui::ScrollArea::vertical().id_salt("mobile-tools-list").auto_shrink([false, false]).max_height((screen.height() * 0.55).clamp(220.0, 480.0)).show(
                 ui,
                 |ui| {
-                    // Top/bottom breathing room: first/last cards were clipped by the
-                    // scroll viewport edge.
-                    ui.add_space(16.0);
+                    ui.add_space(8.0);
                     let q = app.ui.mobile.tools_filter.trim().to_lowercase();
                     let sections = crate::panels::visible_sections(&app.session.prefs().toolbar.hidden);
-                    let tools: Vec<Tool> = sections
-                        .iter()
-                        .flat_map(|section| section.iter().flat_map(|(_, slot)| slot.iter().copied()))
-                        .filter(|tool| q.is_empty() || tl!(tool.label()).to_lowercase().contains(&q))
-                        .collect();
-                    if tools.is_empty() {
-                        ui.label(RichText::new(tl!("No matching commands")).color(Tokens::get(ui.ctx()).text_faint));
-                        return;
-                    }
-                    egui::Grid::new("mobile-tools-grid").num_columns(2).spacing([8.0, 8.0]).show(ui, |ui| {
-                        for (i, tool) in tools.iter().enumerate() {
-                            tool_card(app, ui, *tool, card_w);
-                            if i % 2 == 1 {
+                    if !q.is_empty() {
+                        let tools: Vec<Tool> = sections
+                            .iter()
+                            .flat_map(|section| section.iter().flat_map(|(_, slot)| slot.iter().copied()))
+                            .filter(|tool| tl!(tool.label()).to_lowercase().contains(&q))
+                            .collect();
+                        if tools.is_empty() {
+                            ui.label(RichText::new(tl!("No matching commands")).color(Tokens::get(ui.ctx()).text_faint));
+                            return;
+                        }
+                        egui::Grid::new("mobile-tools-grid").num_columns(cols).spacing([gap, gap]).show(ui, |ui| {
+                            for (i, tool) in tools.iter().enumerate() {
+                                tool_card(app, ui, *tool, card_w, false);
+                                if (i + 1) % cols == 0 {
+                                    ui.end_row();
+                                }
+                            }
+                            if !tools.len().is_multiple_of(cols) {
                                 ui.end_row();
                             }
-                        }
-                        if tools.len() % 2 == 1 {
-                            ui.end_row();
-                        }
-                    });
-                    ui.add_space(16.0);
+                        });
+                    } else {
+                        let slots: Vec<Vec<Tool>> = sections
+                            .iter()
+                            .flat_map(|section| section.iter().map(|(_, slot)| slot.clone()))
+                            .collect();
+                        egui::Grid::new("mobile-tools-grid").num_columns(cols).spacing([gap, gap]).show(ui, |ui| {
+                            for (i, slot) in slots.iter().enumerate() {
+                                let active_in_slot = slot.iter().find(|&&t| t == app.ui.tool).copied();
+                                let display_tool = active_in_slot.unwrap_or(slot[0]);
+                                let has_subtools = slot.len() > 1;
+                                tool_card(app, ui, display_tool, card_w, has_subtools);
+                                if (i + 1) % cols == 0 {
+                                    ui.end_row();
+                                }
+                            }
+                            if !slots.len().is_multiple_of(cols) {
+                                ui.end_row();
+                            }
+                        });
+                    }
+                    ui.add_space(12.0);
                 },
             );
         });
 }
 
-/// One touch card: 24px icon over the short name ("Mover", not "Ferramenta Mover").
-/// 48x68pt minimum, two columns show 8-10 tools without immediate scrolling.
-/// `w` is fixed by the caller: measuring it per cell breaks the grid's sizing.
-fn tool_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, w: f32) {
+/// One compact touch card: 20px icon over the short name.
+fn tool_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, w: f32, has_subtools: bool) {
     let t = Tokens::get(ui.ctx());
     let full = tl!(tool.label()).to_string();
     let short = Tool::short_display(tl!(tool.label())).to_string();
-    let (r, resp) = ui.allocate_exact_size(vec2(w, 68.0), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(vec2(w, 54.0), Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, full.clone()));
-    let tint = icons::button_chrome(ui, r, app.ui.tool == tool, resp.hovered());
-    icons::paint(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 24.0), vec2(32.0, 32.0)), icons::tool_icon(tool), 24.0, tint);
-    let fg = if app.ui.tool == tool { t.accent_text } else { t.text };
-    let mut job = egui::text::LayoutJob::simple_singleline(short, egui::FontId::proportional(12.5), fg);
-    job.wrap = egui::text::TextWrapping::truncate_at_width((r.width() - 12.0).max(1.0));
+    let is_sel = app.ui.tool == tool;
+    let tint = icons::button_chrome(ui, r, is_sel, resp.hovered());
+    icons::paint(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 18.0), vec2(24.0, 24.0)), icons::tool_icon(tool), 20.0, tint);
+    if has_subtools {
+        let c = r.right_bottom() - vec2(3.0, 3.0);
+        let triangle = [c - vec2(4.0, 0.0), c, c - vec2(0.0, 4.0)];
+        let tri_tint = if is_sel { t.accent_text } else { t.text_faint };
+        ui.painter().add(egui::Shape::convex_polygon(triangle.to_vec(), tri_tint, egui::Stroke::NONE));
+    }
+    let fg = if is_sel { t.accent_text } else { t.text };
+    let mut job = egui::text::LayoutJob::simple_singleline(short, egui::FontId::proportional(11.0), fg);
+    job.wrap = egui::text::TextWrapping::truncate_at_width((r.width() - 6.0).max(1.0));
     let g = ui.painter().layout_job(job);
-    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 44.0), g, fg);
+    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 35.0), g, fg);
     if resp.on_hover_text(full).clicked() {
         app.ui.tool = tool;
         app.ui.mobile.tools_open = false;
@@ -429,17 +611,18 @@ pub fn sheet(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let h = (screen.height() * 0.45).clamp(260.0, 420.0);
     let t = Tokens::get(ui.ctx());
     egui::Panel::bottom("mobile_sheet").exact_size(h).frame(egui::Frame::NONE.fill(t.dock).inner_margin(egui::Margin { left: 12, right: 12, top: 6, bottom: 6 })).show(ui, |outer| {
-        // The contents live in a child pinned to the sheet's rect, clipped at its bottom.
-        // A bottom panel whose content runs past `exact_size` keeps its bottom edge but
-        // reports its top as `overflowed bottom - size`, so the canvas grew down by the
-        // overflow and painted over the group pills (on-device: ppp 2.57, pt-BR labels).
         let body = outer.max_rect();
         let clip = outer.clip_rect();
         let mut inner = outer.new_child(egui::UiBuilder::new().max_rect(body).layout(egui::Layout::top_down(egui::Align::Min)));
         inner.set_clip_rect(Rect::from_min_max(pos2(clip.min.x, body.min.y.max(clip.min.y)), pos2(clip.max.x, body.max.y.min(clip.max.y))));
         let ui = &mut inner;
-        // Fixed 40pt header row: the 24pt pills and the close button share one center
-        // line. A bare `horizontal` top-aligns them (X sat below the baseline).
+
+        let pro = Tokens::get(ui.ctx()).pro;
+        let tabs = group.tabs(pro);
+        let has_subtabs = tabs.len() > 1;
+
+        // Unified 40pt header row: horizontally scrolling group pills with safety margin,
+        // compact dropdown selector for subtabs, and fixed Close button on the right.
         let row_w = ui.available_width();
         ui.allocate_ui_with_layout(vec2(row_w, 40.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
@@ -453,72 +636,48 @@ pub fn sheet(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if app.ui.panels.character {
                 groups.push((crate::dock::Group::Character, tl!("Character")));
             }
-            // The pills plus Close don't fit in 360 pt: scroll them instead of
-            // clipping Navigator and Close off-screen. Shrunk to the content: an
-            // unshrunk horizontal scroll takes the whole panel height and pushes
-            // the tabs and the body out from under the canvas.
-            let rest = (row_w - 40.0 - ui.spacing().item_spacing.x).max(64.0);
+            let right_reserve = 32.0 + if has_subtabs { 100.0 } else { 0.0 } + 16.0;
+            let rest = (row_w - right_reserve).max(64.0);
             egui::ScrollArea::horizontal()
                 .id_salt("mobile-sheet-groups")
                 .auto_shrink([true, true])
                 .max_width(rest)
-                // No scrollbar: when the pills overflow it cut through their middles.
                 .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
                 .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 4.0;
-                    for (g, label) in groups {
-                        if widgets::pill_tab(ui, label, group == g).clicked() {
-                            app.ui.mobile.panel = if group == g { None } else { Some(g) };
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 4.0;
+                        for (g, label) in groups {
+                            if widgets::pill_tab(ui, label, group == g).clicked() {
+                                app.ui.mobile.panel = if group == g { None } else { Some(g) };
+                            }
                         }
-                    }
+                        ui.add_space(8.0);
+                    });
                 });
-            });
+
+            if has_subtabs {
+                let mut sel = tab_index(&app.ui.dock_tabs, group).min(tabs.len().saturating_sub(1));
+                let opts: Vec<(usize, &str)> = tabs.iter().enumerate().map(|(i, &tab_name)| (i, tl!(tab_name))).collect();
+                if widgets::dropdown(ui, "mobile-sheet-subtab", &mut sel, &opts, 92.0) {
+                    *tab_index_mut(&mut app.ui.dock_tabs, group) = sel;
+                }
+            }
+
             if icons::button(ui, "x", 32.0, false, tl!("Close")).clicked() {
                 app.ui.mobile.panel = None;
             }
         });
-        // The group's own tabs (Layers | Channels | Paths, …), as in the desktop dock.
-        // This segmented control is the only "Properties" label kept: no extra header below it.
-        // The Color group's own "Color" tab duplicates the group pill above it, so the
-        // sheet only offers Swatches | Gradients | Patterns (its content stays the body).
-        let pro = Tokens::get(ui.ctx()).pro;
-        let tabs = group.tabs(pro);
-        let sel = tab_index(&app.ui.dock_tabs, group).min(tabs.len().saturating_sub(1));
-        // Same as above: one row, so the body keeps the rest of the sheet.
-        // Panel tabs scroll instead of clipping ("Navegad" cutoff on 360pt).
-        // Shrunk to the content, like the group row above.
-        egui::ScrollArea::horizontal()
-            .id_salt(("mobile-sheet-tabs", group.key()))
-            .auto_shrink([true, true])
-            // Same as the group pills above: no scrollbar through the tabs.
-            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 4.0;
-                    for (i, tab) in tabs.iter().enumerate() {
-                        if group == crate::dock::Group::Color && *tab == "Color" {
-                            continue;
-                        }
-                        if widgets::pill_tab(ui, tab, sel == i).clicked() {
-                            *tab_index_mut(&mut app.ui.dock_tabs, group) = i;
-                        }
-                    }
-                });
-            });
+
         let tab = tab_index(&app.ui.dock_tabs, group).min(tabs.len().saturating_sub(1));
         if group.scrolls_itself(tab) {
             crate::panels::dock_body(app, ui, group, tab);
         } else {
             egui::ScrollArea::vertical().id_salt(("mobile-sheet", group.key())).auto_shrink([false, false]).show(ui, |ui| {
-                // Top padding: the first size fields started at the scroll origin and
-                // read as cut in half by the tab row above.
                 ui.add_space(8.0);
                 crate::panels::dock_body(app, ui, group, tab);
                 ui.add_space(8.0);
             });
         }
-        // Report exactly the sheet's rect, never the overflow.
         outer.expand_to_include_rect(body);
     });
 }

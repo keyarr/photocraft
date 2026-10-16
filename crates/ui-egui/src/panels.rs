@@ -51,6 +51,18 @@ fn slot_tool(ui: &egui::Ui, current: Tool, slot: &[Tool], key: egui::Id) -> Tool
     ui.data(|d| d.get_temp::<Tool>(key)).filter(|t| slot.contains(t)).unwrap_or(slot[0])
 }
 
+/// Returns the tools sharing a slot with `tool` (including `tool` itself), or empty if not in any slot.
+pub fn tool_subtools(tool: Tool) -> &'static [Tool] {
+    for section in TOOL_SECTIONS {
+        for slot in *section {
+            if slot.contains(&tool) {
+                return slot;
+            }
+        }
+    }
+    &[]
+}
+
 /// [`TOOL_SECTIONS`] without the tools hidden in Edit › Toolbar (`hidden` holds tool names: the
 /// dialog writes `Tool` debug names, `edit.toolbar` takes any name `Tool::from_name` reads). A
 /// slot keeps only its visible tools, so its flyout lists just those; a slot with none left is
@@ -1810,23 +1822,21 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ctx.data_mut(|d| d.remove::<FxDrag>(fx_drag_key()));
     }
     if crate::mobile_ui::is_mobile(ui.ctx()) {
-        // Touch footer: the desktop panel_footer is a 30pt right-to-left bar, so the
-        // 56pt cells overflowed it onto the bottom nav and its direction hid buttons
-        // off the left edge. Own row instead: labeled cells left to right, the same
-        // visual order as desktop (Link first, Delete last), scrolling past 360pt.
         widgets::hairline(ui);
         ui.add_space(4.0);
-        // No scrollbar: when the cells overflow it painted a 1px strip across the
-        // group pills above the tabs. Touch scrolls by drag, wheels still scroll.
+        let avail = ui.available_width();
+        let gap = 2.0;
+        let cell_w = ((avail - 6.0 * gap) / 7.0).clamp(40.0, 52.0);
+        let cell_size = vec2(cell_w, 48.0);
         egui::ScrollArea::horizontal().id_salt("layer-footer-scroll").auto_shrink([true, true]).scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden).show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 4.0;
+                ui.spacing_mut().item_spacing.x = gap;
                 // Photoshop's footer starts with Link Layers (enabled with two or more layers selected).
                 let can_link = app.session.is_enabled("layer.linkLayers");
-                if ui.add_enabled_ui(can_link, |ui| layer_footer_cell(ui, "link-2", tl!("Link"), tl!("Link layers"))).inner.clicked() {
+                if ui.add_enabled_ui(can_link, |ui| layer_footer_cell(ui, "link-2", tl!("Link"), tl!("Link layers"), cell_size)).inner.clicked() {
                     actions.push(("layer.linkLayers".into(), json!({})));
                 }
-                let fx = layer_footer_fx_cell(ui, tl!("FX"), tl!("Add a layer style"));
+                let fx = layer_footer_fx_cell(ui, tl!("FX"), tl!("Add a layer style"), cell_size);
                 egui::Popup::menu(&fx).open_memory(footer_menu_right_click(&fx)).show(|ui| {
                     ui.set_min_width(180.0);
                     if ui.button(tl!("Blending Options…")).clicked() {
@@ -1842,11 +1852,11 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     }
                 });
                 let mask_tip = crate::i18n::fmt(tl!("Add a mask  (from the selection; {key} inverts)"), &[("key", &crate::shortcuts::pretty("Alt"))]);
-                if layer_footer_cell(ui, "layer-mask", tl!("Mask"), &mask_tip).clicked() {
+                if layer_footer_cell(ui, "layer-mask", tl!("Mask"), &mask_tip, cell_size).clicked() {
                     let alt = ui.input(|i| i.modifiers.alt);
                     actions.push((crate::layer_menu_ui::add_mask_command(doc.selection.is_some(), alt).into(), json!({})));
                 }
-                let adj = layer_footer_menu_cell(ui, "adjustment-layer", tl!("Adjust"), tl!("Create new fill or adjustment layer"));
+                let adj = layer_footer_menu_cell(ui, "adjustment-layer", tl!("Adjust"), tl!("Create new fill or adjustment layer"), cell_size);
                 egui::Popup::menu(&adj).open_memory(footer_menu_right_click(&adj)).show(|ui| {
                     ui.set_min_width(190.0);
                     for c in photocraft_engine::command_specs().iter().filter(|c| c.id.starts_with("layer.newAdjustmentLayer.")) {
@@ -1865,25 +1875,26 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         ui.close();
                     }
                 });
-                let group = layer_footer_cell(ui, "folder", tl!("Group"), tl!("Create a new group"));
+                let group = layer_footer_cell(ui, "folder", tl!("Group"), tl!("Create a new group"), cell_size);
                 if group.clicked() {
                     actions.push(("layer.new.group".into(), json!({})));
                 }
                 actions.extend(footer_drop(ui, &group, footer_drag, "layer.groupLayers"));
-                let new_layer = layer_footer_cell(ui, "square-plus", tl!("New"), &crate::shortcuts::tip_label(app, "Create a new layer", "layer.new.layer"));
+                let new_layer = layer_footer_cell(ui, "square-plus", tl!("New"), &crate::shortcuts::tip_label(app, "Create a new layer", "layer.new.layer"), cell_size);
                 if new_layer.clicked() {
                     actions.push(("layer.new.layer".into(), json!({})));
                 }
                 actions.extend(footer_drop(ui, &new_layer, footer_drag, "layer.duplicate"));
-                let trash = layer_footer_cell(ui, "trash", tl!("Delete"), tl!("Delete layer"));
+                let trash = layer_footer_cell(ui, "trash", tl!("Delete"), tl!("Delete layer"), cell_size);
                 if trash.clicked() {
                     actions.push(("layer.delete".into(), json!({})));
                 }
                 actions.extend(footer_drop(ui, &trash, footer_drag, "layer.delete"));
+                ui.add_space(4.0);
             });
         });
         // Gap + divider before the app's bottom nav, so a footer tap never hits it.
-        ui.add_space(12.0);
+        ui.add_space(10.0);
         widgets::hairline(ui);
         ui.add_space(4.0);
     } else {
@@ -2049,46 +2060,45 @@ fn fx_button(ui: &mut egui::Ui, size: f32, tip: &str) -> egui::Response {
 }
 
 /// Height the touch Layers footer reserves in the rows scroll: its hairlines, gaps
-/// and the 56pt cells. Must match the block in [`layers`] below.
-const MOBILE_FOOTER_H: f32 = 1.0 + 4.0 + 56.0 + 12.0 + 1.0 + 4.0;
+/// and compact cells. Must match the block in [`layers`] below.
+const MOBILE_FOOTER_H: f32 = 1.0 + 4.0 + 48.0 + 10.0 + 1.0 + 4.0;
 
-/// Touch footer cell: 56x56pt icon over a short label, so each of the 7 layer
-/// actions reads without a tooltip and never sits on the app's bottom nav.
-fn layer_footer_cell(ui: &mut egui::Ui, icon: &str, short: &str, tip: &str) -> egui::Response {
+/// Touch footer cell: compact icon over a short label, fitting narrow screens.
+fn layer_footer_cell(ui: &mut egui::Ui, icon: &str, short: &str, tip: &str, size: egui::Vec2) -> egui::Response {
     let t = Tokens::get(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(vec2(56.0, 56.0), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(size, Sense::click());
     if resp.hovered() {
         ui.painter().rect_filled(r, t.radius_sm, t.hover);
     }
-    icons::paint(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 20.0), vec2(28.0, 28.0)), icon, 20.0, t.icon);
-    let mut job = egui::text::LayoutJob::simple_singleline(tl!(short).to_owned(), egui::FontId::proportional(11.0), t.text);
-    job.wrap = egui::text::TextWrapping::truncate_at_width(52.0);
+    icons::paint(ui, Rect::from_center_size(pos2(r.center().x, r.top() + 16.0), vec2(20.0, 20.0)), icon, 18.0, t.icon);
+    let mut job = egui::text::LayoutJob::simple_singleline(tl!(short).to_owned(), egui::FontId::proportional(10.0), t.text);
+    job.wrap = egui::text::TextWrapping::truncate_at_width((size.x - 2.0).max(1.0));
     let g = ui.painter().layout_job(job);
-    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 38.0), g, t.text);
+    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 32.0), g, t.text);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip.to_string()));
     resp.on_hover_text(tip)
 }
 
-fn layer_footer_menu_cell(ui: &mut egui::Ui, icon: &str, short: &str, tip: &str) -> egui::Response {
-    let resp = layer_footer_cell(ui, icon, short, tip);
+fn layer_footer_menu_cell(ui: &mut egui::Ui, icon: &str, short: &str, tip: &str, size: egui::Vec2) -> egui::Response {
+    let resp = layer_footer_cell(ui, icon, short, tip, size);
     footer_menu_arrow(ui, resp.rect);
     resp
 }
 
-fn layer_footer_fx_cell(ui: &mut egui::Ui, short: &str, tip: &str) -> egui::Response {
+fn layer_footer_fx_cell(ui: &mut egui::Ui, short: &str, tip: &str, size: egui::Vec2) -> egui::Response {
     let t = Tokens::get(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(vec2(56.0, 56.0), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(size, Sense::click());
     if resp.hovered() {
         ui.painter().rect_filled(r, t.radius_sm, t.hover);
     }
     let mut job = egui::text::LayoutJob::default();
-    job.append("fx", 0.0, egui::TextFormat { font_id: egui::FontId::proportional(15.0), color: t.icon, italics: true, ..Default::default() });
+    job.append("fx", 0.0, egui::TextFormat { font_id: egui::FontId::proportional(14.0), color: t.icon, italics: true, ..Default::default() });
     let g = ui.painter().layout_job(job);
-    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 12.0), g, t.icon);
-    let mut job = egui::text::LayoutJob::simple_singleline(tl!(short).to_owned(), egui::FontId::proportional(11.0), t.text);
-    job.wrap = egui::text::TextWrapping::truncate_at_width(52.0);
+    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 10.0), g, t.icon);
+    let mut job = egui::text::LayoutJob::simple_singleline(tl!(short).to_owned(), egui::FontId::proportional(10.0), t.text);
+    job.wrap = egui::text::TextWrapping::truncate_at_width((size.x - 2.0).max(1.0));
     let g = ui.painter().layout_job(job);
-    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 38.0), g, t.text);
+    ui.painter().galley(pos2(r.center().x - g.size().x / 2.0, r.top() + 32.0), g, t.text);
     footer_menu_arrow(ui, r);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip.to_string()));
     resp.on_hover_text(tip)
