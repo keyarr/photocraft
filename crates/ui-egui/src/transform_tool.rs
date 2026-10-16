@@ -98,6 +98,12 @@ pub(crate) fn cancel_gesture(app: &mut PhotocraftApp) {
     }
 }
 
+/// A box or warp drag is in progress: egui's long-touch clears its own drag state after
+/// holding still, so the canvas follows the pointer directly while this is true.
+pub(crate) fn gesture_active(app: &PhotocraftApp) -> bool {
+    app.transform_preview.as_ref().is_some_and(|pv| pv.gesture.is_some() || pv.warp_drag.is_some())
+}
+
 /// The box as one undo step restores it.
 #[derive(Clone, Debug, PartialEq)]
 struct Step {
@@ -147,6 +153,28 @@ impl Steps {
 
 fn corners(r: [f64; 4]) -> [[f64; 2]; 4] {
     [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]]
+}
+
+/// Marching ants during a pixel Free Transform / Distort / Perspective: the cached outline
+/// through the box's rect-to-quad, so resizing the box resizes the ants live. `None` when the
+/// box collapsed or holds non-finite numbers (nothing sane to draw).
+pub fn transformed_outline(segs: &[crate::outline::Segment], rect: [f64; 4], quad: [[f64; 2]; 4]) -> Option<Vec<crate::outline::Segment>> {
+    if !rect.iter().all(|v| v.is_finite()) || !quad.iter().flatten().all(|v| v.is_finite()) {
+        return None;
+    }
+    let h = Homography::rect_to_quad(rect, quad)?;
+    if h.inverse().is_none() || !h.0.iter().all(|v| v.is_finite()) {
+        return None;
+    }
+    Some(
+        segs.iter()
+            .map(|(a, b)| {
+                let (ax, ay) = h.apply(f64::from(a[0]), f64::from(a[1]));
+                let (bx, by) = h.apply(f64::from(b[0]), f64::from(b[1]));
+                ([ax.round() as i32, ay.round() as i32], [bx.round() as i32, by.round() as i32])
+            })
+            .collect(),
+    )
 }
 
 /// Start Free Transform on the active layer (or its selected pixels), or on the targeted unlinked
@@ -2506,6 +2534,18 @@ mod tests {
         drag(&mut s, [100.0, 0.0], [120.0, -10.0], egui::Modifiers::COMMAND);
         assert_eq!(s.quad[1], [120.0, -10.0]);
         assert_eq!(s.quad[0], [0.0, 0.0]);
+    }
+
+    #[test]
+    fn transform_preview_moves_the_ants_with_the_box() {
+        // A 16×16 square outline over rect 8,8,24,24, scaled 2× about its centre to 0,0,32,32:
+        // the ants double too instead of staying put.
+        let segs = vec![([8, 8], [24, 8]), ([24, 8], [24, 24]), ([24, 24], [8, 24]), ([8, 24], [8, 8])];
+        let out = transformed_outline(&segs, [8.0, 8.0, 24.0, 24.0], [[0.0, 0.0], [32.0, 0.0], [32.0, 32.0], [0.0, 32.0]]).unwrap();
+        assert_eq!(out, vec![([0, 0], [32, 0]), ([32, 0], [32, 32]), ([32, 32], [0, 32]), ([0, 32], [0, 0])]);
+        // A collapsed box has nothing sane to draw.
+        assert!(transformed_outline(&segs, [8.0, 8.0, 24.0, 24.0], [[0.0, 0.0]; 4]).is_none());
+        assert!(transformed_outline(&segs, [8.0, 8.0, 24.0, 24.0], [[f64::NAN, 0.0], [32.0, 0.0], [32.0, 32.0], [0.0, 32.0]]).is_none());
     }
 
     #[test]

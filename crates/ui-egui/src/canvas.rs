@@ -2264,8 +2264,10 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             if let Some((dx, dy)) = selection_shown_offset(app) {
                 shown.center = [xf.center[0] - dx as f32, xf.center[1] - dy as f32];
             }
-            marching_ants_segments(&painter, &shown, segs, time);
-            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+            if app.ui.transform.as_ref().is_none_or(|t| t.path.is_some()) {
+                marching_ants_segments(&painter, &shown, segs, time);
+                ctx.request_repaint_after(std::time::Duration::from_millis(100));
+            }
         }
     }
 
@@ -2335,15 +2337,19 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     // (or a pinch) for a lift. The tracker itself decides what counts as a tap.
     let raw_touch = ctx.input(|i| i.multi_touch());
     let any_touch = ctx.input(|i| i.any_touches());
-    app.touch_active = any_touch || crate::mobile_ui::is_mobile(&ctx);
+    app.touch_active = app.touch_active || any_touch || crate::mobile_ui::is_mobile(&ctx);
     // Set by the previous frame once two fingers land; the leftover finger must not paint
     // until every finger lifts, or its release click covers the tap's undo with a new dot.
     let paint_locked = app.touch_lock;
 
     // Two-finger tap: left half undoes, right half redoes. Short and steady only;
-    // anything longer or farther kept panning and pinching above.
+    // anything longer or farther kept panning and pinching above. Suppressed while
+    // transforming (the box owns undo there) or typing in a field, where a tap
+    // would undo by accident.
     let mut tap_fired = false;
     if primary
+        && app.ui.transform.is_none()
+        && !ctx.text_edit_focused()
         && let Some(side) = crate::mobile_ui::two_finger_tap(&mut app.touch_tap, ctx.input(|i| i.time), rect, raw_touch.as_ref())
     {
         tap_fired = true;
@@ -2437,8 +2443,10 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         // (Preferences › Tools, `paint_mouse`).
         crate::paint_mouse::sync_tool_brush(app);
         let mut buttons = crate::paint_mouse::canvas_buttons(app, &response, tool);
+        let held_id = egui::Id::new(crate::canvas_tool_menu::HELD_ID);
+        let held = ctx.data(|d| d.get_temp::<bool>(held_id)).unwrap_or(false);
         // A two-finger gesture is navigation: it must not start, move or end a tool gesture.
-        if touch_nav {
+        if touch_nav || held || app.ui.canvas_tool_menu.is_some() {
             buttons = crate::paint_mouse::Buttons::default();
         }
         // The Crop tool's frame is edited from the press (before egui's drag threshold), so the
@@ -2466,43 +2474,88 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                 tool_event(app, ToolEvent::Down { x: d[0], y: d[1], pressure: app.stylus.pressure() }, press_mods);
             }
         }
-        // Right-click while transforming: switch the box's mode (Free Transform, Scale, Rotate,
-        // Skew, Distort, Perspective).
-        let transforming = app.ui.transform.as_ref().is_some_and(|t| t.warp.is_none());
-        if response.secondary_clicked()
-            && transforming
-            && let Some(p) = response.interact_pointer_pos()
+        let held_for = (app.touch_active || response.long_touched())
+            && response.is_pointer_button_down_on()
+            && !response.dragged();
+        let held_for = held_for.then(|| ui.input(|i| i.pointer.press_start_time().map(|t0| i.time - t0))).flatten();
+        if let Some(seconds) = held_for
+            && seconds < 0.35
         {
-            crate::canvas_tool_menu::open_transform(app, [p.x, p.y]);
+            ctx.request_repaint_after(std::time::Duration::from_secs_f64(0.35 - seconds));
         }
-        let lasso_retracted = response.secondary_clicked()
+        let long_press = held_for.is_some_and(|s| s >= 0.35) || response.long_touched();
+        let secondary = response.secondary_clicked() || long_press;
+        let menu_open = app.ui.canvas_tool_menu.is_some();
+        let p_pos = response.interact_pointer_pos().or_else(|| ui.input(|i| i.pointer.latest_pos()));
+        let mut opened_menu = false;
+        // Right-click while transforming: switch the box's mode (Free Transform, Scale, Rotate,
+        // Skew, Distort, Perspective). A touch long-press on a handle (or inside the box to move
+        // it) is a drag, not the menu: opening it here would steal the gesture (`held` zeroes
+        // `buttons` until release). Real right-clicks still open it anywhere; the menu stays
+        // reachable on touch via a long-press outside the box.
+        let transforming = app.ui.transform.as_ref().is_some_and(|t| t.warp.is_none());
+        let press_on_box = transforming
+            && ui
+                .input(|i| i.pointer.press_origin())
+                .or(p_pos)
+                .is_some_and(|p| {
+                    let d = xf.to_doc(p);
+                    app.ui.transform.as_ref().is_some_and(|t| {
+                        !matches!(crate::transform_tool::hit(t, d, crate::transform_tool::handle_tolerance(app)), crate::transform_tool::Hit::Outside)
+                    })
+                });
+        // egui's own long-touch also reports `secondary_clicked`: on a handle that is a
+        // drag being aimed, not the menu, so only a real mouse right-click opens it anywhere.
+        let transform_secondary = (response.secondary_clicked() && !response.long_touched()) || (long_press && !press_on_box);
+        if transform_secondary
+            && !menu_open
+            && transforming
+            && let Some(p) = p_pos
+        {
+            opened_menu = crate::canvas_tool_menu::open_transform(app, [p.x, p.y]);
+        }
+        let lasso_retracted = secondary
             && match tool {
                 Tool::Lasso => crate::lasso_ui::undo_last_vertex(app),
                 Tool::PolygonLasso => polygon_retract(app),
                 _ => false,
             };
-        if tool == Tool::Lasso {
+        if tool == Tool::Lasso && app.ui.transform.is_none() {
             crate::lasso_ui::canvas_input(app, &ctx, &xf, &response);
             (buttons.started, buttons.dragged, buttons.stopped, buttons.clicked) = (false, false, false, false);
         }
         // Right-click with the Move tool, or ⌘/Ctrl+right-click: the layers under the pointer.
-        if response.secondary_clicked()
+        if secondary
             && !lasso_retracted
             && !transforming
             && crate::layer_pick_ui::is_gesture(tool, mods)
-            && let Some(p) = response.interact_pointer_pos()
+            && let Some(p) = p_pos
         {
             let d = xf.to_doc(p);
             app.ui.canvas_tool_menu = None;
-            crate::layer_pick_ui::open(app, [p.x, p.y], d[0], d[1]);
+            opened_menu = crate::layer_pick_ui::open(app, [p.x, p.y], d[0], d[1]);
         }
-        if response.secondary_clicked()
+        if secondary
+            && !menu_open
             && !lasso_retracted
             && !transforming
             && !crate::layer_pick_ui::is_gesture(tool, mods)
-            && let Some(p) = response.interact_pointer_pos()
+            && let Some(p) = p_pos
         {
-            crate::canvas_tool_menu::open(app, tool, [p.x, p.y]);
+            opened_menu = crate::canvas_tool_menu::open(app, tool, [p.x, p.y]);
+        }
+        if opened_menu {
+            (buttons.started, buttons.dragged, buttons.stopped, buttons.clicked) = (false, false, false, false);
+            if app.drag.is_some() {
+                app.drag = None;
+                app.live_stroke = None;
+                app.press_stroke = false;
+                app.trail = None;
+            }
+            if long_press {
+                ctx.data_mut(|d| d.insert_temp(held_id, true));
+                ctx.request_repaint();
+            }
         }
         // The (temporary) Hand pans above; its gestures never reach the tool underneath.
         if tool == Tool::Hand {
@@ -2538,7 +2591,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             app.press_stroke = app.drag.is_some();
         }
         let press_stroke = app.press_stroke;
-        if press_stroke {
+        if press_stroke || crate::transform_tool::gesture_active(app) {
             buttons.started = false;
         }
         if buttons.started
@@ -2550,6 +2603,32 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             let d = xf.to_doc(p);
             let press_mods = if tool.is_type() { ctx.data(|d| d.get_temp(type_press)).unwrap_or(mods) } else { mods };
             tool_event(app, ToolEvent::Down { x: d[0], y: d[1], pressure: app.stylus.pressure() }, press_mods);
+        }
+        // The box grabs on press, before egui's click-versus-drag decision: a finger that
+        // holds still to aim would otherwise become a long-touch (which clears the drag
+        // state) and the later move would never reach the box. A second Down on the
+        // drag-started frame just re-arms the same grab.
+        if app.ui.transform.is_some()
+            && response.is_pointer_button_down_on()
+            && ui.input(|i| i.pointer.primary_pressed())
+            && let Some(p) = ui.input(|i| i.pointer.press_origin()).filter(|p| rect.contains(*p))
+        {
+            let d = xf.to_doc(p);
+            tool_event(app, ToolEvent::Down { x: d[0], y: d[1], pressure: app.stylus.pressure() }, mods);
+        }
+        // Move-tool controls enter the box on press too, so a touch tap never waits for
+        // the drag threshold that a hold would cancel.
+        if tool == Tool::Move
+            && app.ui.transform.is_none()
+            && response.is_pointer_button_down_on()
+            && ui.input(|i| i.pointer.primary_pressed())
+            && let Some(p) = ui.input(|i| i.pointer.press_origin()).filter(|p| rect.contains(*p))
+        {
+            begin_transform_controls_at(app, &ctx, &xf, p);
+            if app.ui.transform.is_some() {
+                let d = xf.to_doc(p);
+                tool_event(app, ToolEvent::Down { x: d[0], y: d[1], pressure: app.stylus.pressure() }, mods);
+            }
         }
         if buttons.dragged || buttons.stopped {
             // Feed every pointer move the OS delivered this frame, not just the latest position, so
@@ -2601,6 +2680,31 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             if let Some(d) = p {
                 tool_event(app, ToolEvent::Up { x: d[0], y: d[1] }, mods);
             }
+        }
+        // A held finger becomes a long-touch, which clears egui's drag state: the box then
+        // follows the pointer directly until release, or a hold-to-aim would freeze it.
+        // Duplicates with the drag path above just re-apply the same point.
+        if crate::transform_tool::gesture_active(app)
+            && !buttons.dragged
+            && !buttons.stopped
+            && ui.input(|i| i.pointer.primary_down())
+            && ui.input(|i| i.pointer.press_origin()).is_some_and(|o| rect.contains(o))
+            && let Some(p) = response.interact_pointer_pos().or_else(|| ui.input(|i| i.pointer.latest_pos()))
+        {
+            let d = xf.to_doc(p);
+            tool_event(app, ToolEvent::Move { x: d[0], y: d[1], pressure: app.stylus.pressure() }, mods);
+        }
+        // The release after a long-touch never reports `drag_stopped` (no drag started), so
+        // end the grab on the release edge itself. A second Up is a no-op (no gesture).
+        if crate::transform_tool::gesture_active(app)
+            && ui.input(|i| i.pointer.primary_released())
+            && let Some(p) = response
+                .interact_pointer_pos()
+                .or_else(|| ui.input(|i| i.pointer.latest_pos()))
+                .or_else(|| ui.input(|i| i.pointer.press_origin()))
+        {
+            let d = xf.to_doc(p);
+            tool_event(app, ToolEvent::Up { x: d[0], y: d[1] }, mods);
         }
         // A stroke started on the press ends with the release, whether egui saw a drag, a click,
         // or neither (a long press that never moved).
@@ -2678,6 +2782,9 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         draw_transform_controls(app, &painter, &xf);
         crate::layer_pick_ui::show(app, &ctx);
         crate::canvas_tool_menu::show(app, &ctx);
+        if ui.input(|i| i.pointer.any_released()) {
+            ctx.data_mut(|d| d.remove::<bool>(held_id));
+        }
         crate::snap_ui::draw(app, &painter, &xf);
         // The canvas edge isn't outlined while the pixels past it show (Photoshop's crop preview).
         if border == photocraft_engine::prefs::CanvasBorder::Line && !beyond {
@@ -2685,6 +2792,22 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         }
         crate::type_tool::draw_overlay(app, &painter, &xf);
         crate::transform_tool::draw_overlay(app, &painter, &xf);
+        if let (Some(t), Some(_)) = (&app.ui.transform, &app.transform_preview)
+            && t.path.is_none()
+            && t.warp.is_none()
+            && doc.selection.is_some()
+            && app.ui.view.shows(app.ui.view.show.selection_edges)
+            && !polygon_replaces_selection(app)
+            && let Some((d, _, segs)) = &app.outline_cache
+            && *d == doc.id
+        {
+            let untouched = t.quad == [[t.rect[0], t.rect[1]], [t.rect[2], t.rect[1]], [t.rect[2], t.rect[3]], [t.rect[0], t.rect[3]]];
+            let moved = if untouched { Some(segs.as_slice().to_vec()) } else { crate::transform_tool::transformed_outline(segs, t.rect, t.quad) };
+            if let Some(m) = moved {
+                marching_ants_segments(&painter, &xf, &m, ui.input(|i| i.time));
+                ctx.request_repaint_after(std::time::Duration::from_millis(100));
+            }
+        }
         crate::distort_ui::draw_overlay(app, &painter, &xf);
         crate::retouch_ui::draw_source_marker(app, &painter, &xf);
         crate::vector_ui::draw_overlay(app, &painter, &xf, &doc);
@@ -2853,8 +2976,9 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         app.ui.views[idx] = view.clone();
         // The lock clears only once every finger is gone (or a fresh press starts a new
         // stroke): updated here, after painting used the previous frame's value, so the
-        // gesture's own release click is still swallowed on the lift frame.
-        if touch.is_some() || tap_fired {
+        // gesture's own release click is still swallowed on the lift frame. While
+        // transforming the box stays finger-ready right after a pinch, so no lock.
+        if (touch.is_some() && app.ui.transform.is_none()) || tap_fired {
             app.touch_lock = true;
         } else if ctx.input(|i| i.pointer.primary_pressed()) || !any_touch {
             app.touch_lock = false;

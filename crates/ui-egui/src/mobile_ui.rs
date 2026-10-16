@@ -169,6 +169,16 @@ pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     }
                     menu_item(ui, app, tl!("Save As…"), "file.saveAs", json!({}));
                     menu_item(ui, app, tl!("Redo"), "edit.redo", json!({}));
+                    ui.separator();
+                    menu_item(ui, app, tl!("Free Transform"), "edit.freeTransform", json!({}));
+                    menu_item(ui, app, tl!("Scale"), "edit.transform.scale", json!({}));
+                    menu_item(ui, app, tl!("Rotate"), "edit.transform.rotate", json!({}));
+                    menu_item(ui, app, tl!("Skew"), "edit.transform.skew", json!({}));
+                    menu_item(ui, app, tl!("Distort"), "edit.transform.distort", json!({}));
+                    menu_item(ui, app, tl!("Perspective"), "edit.transform.perspective", json!({}));
+                    menu_item(ui, app, tl!("Warp"), "edit.transform.warp", json!({}));
+                    menu_item(ui, app, tl!("Transform Selection"), "select.transformSelection", json!({}));
+                    ui.separator();
                     menu_item(ui, app, tl!("Fit on Screen"), "view.fitOnScreen", json!({}));
                     if ui.add_sized(vec2(280.0, 44.0), egui::Button::new(tl!("Search commands, tools and panels…"))).clicked() {
                         app.ui.palette_open = true;

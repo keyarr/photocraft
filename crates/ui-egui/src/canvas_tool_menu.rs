@@ -295,11 +295,18 @@ fn choose_pen(app: &mut PhotocraftApp, ctx: &Context, menu: &CanvasToolMenu, com
     Ok(())
 }
 
+pub const HELD_ID: &str = "canvas-tool-menu-held";
+
 pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
     let Some(menu) = app.ui.canvas_tool_menu.clone() else { return };
     if ctx.input(|i| i.key_pressed(egui::Key::Escape)) || app.ui.tool != menu.tool || (menu.transform && app.ui.transform.is_none()) {
         app.ui.canvas_tool_menu = None;
         return;
+    }
+    let held_id = egui::Id::new(HELD_ID);
+    let held = ctx.data(|d| d.get_temp::<bool>(held_id)).unwrap_or(false);
+    if ctx.input(|i| i.pointer.any_released()) {
+        ctx.data_mut(|d| d.remove::<bool>(held_id));
     }
     let id = egui::Id::new("canvas-selection-menu");
     let screen = ctx.content_rect();
@@ -333,6 +340,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
             });
         });
     });
+    if held {
+        selected = None;
+    }
     if let Some(command) = selected {
         choose(app, ctx, command);
     } else if ctx.input(|i| i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p| !area.response.rect.contains(p))) {
@@ -413,6 +423,34 @@ mod tests {
         assert!(h.state().ui.canvas_tool_menu.is_none());
         right_click(&mut h, center, Modifiers::COMMAND);
         assert!(h.state().ui.canvas_tool_menu.is_none(), "command right-click belongs to layer picker");
+    }
+
+    #[test]
+    fn touch_long_press_opens_menu_without_dismiss_or_deselect() {
+        let mut app = app();
+        app.ui.tool = Tool::RectMarquee;
+        app.touch_active = true;
+        app.run("select.rect", json!({"x": 1, "y": 1, "width": 8, "height": 8})).unwrap();
+        let mut h = harness(app);
+        let center = h.state().last_canvas_rect.center();
+        let revision = h.state().session.active().unwrap().revision;
+
+        h.input_mut().time = Some(1.0);
+        h.event(egui::Event::PointerMoved(center));
+        h.event(egui::Event::PointerButton { pos: center, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
+        h.run_steps(1);
+        assert!(h.state().ui.canvas_tool_menu.is_none(), "menu should not open before hold timer");
+
+        h.input_mut().time = Some(1.4);
+        h.run_steps(1);
+        assert!(h.state().ui.canvas_tool_menu.is_some(), "long press opens canvas tool menu");
+
+        h.input_mut().time = Some(1.5);
+        h.event(egui::Event::PointerButton { pos: center, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+        h.run_steps(2);
+
+        assert!(h.state().ui.canvas_tool_menu.is_some(), "releasing finger must not dismiss or execute menu item");
+        assert_eq!(h.state().session.active().unwrap().revision, revision, "releasing long press must not alter selection");
     }
 
     fn labels(rows: &[Row]) -> Vec<Option<&str>> {
