@@ -149,6 +149,18 @@ impl PhotocraftApp {
                 return Ok(Vec::new());
             }
         }
+        self.open_clean_path(path)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn open_path(&mut self, path: &str) -> Result<Vec<String>, String> {
+        Err(format!("cannot open paths on the web: {path}"))
+    }
+
+    /// Read and open the file at `path` directly from disk, bypassing any
+    /// in-memory document or crash-recovery cache.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn open_clean_path(&mut self, path: &str) -> Result<Vec<String>, String> {
         // Documents opening in the background are read on the worker too (a 2 GB PSB read
         // would block the window). Preset files (brushes, gradients) go the usual way.
         let ext = std::path::Path::new(path).extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
@@ -157,11 +169,15 @@ impl PhotocraftApp {
             return Ok(Vec::new());
         }
         let bytes = photocraft_format::read_file(std::path::Path::new(path)).map_err(|e| format!("{path}: {e}"))?;
-        self.open_file(path, &bytes)
+        let r = self.open_file(path, &bytes);
+        if r.is_ok() {
+            self.ui.chrome.home = None;
+        }
+        r
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn open_path(&mut self, path: &str) -> Result<Vec<String>, String> {
+    pub fn open_clean_path(&mut self, path: &str) -> Result<Vec<String>, String> {
         Err(format!("cannot open paths on the web: {path}"))
     }
 

@@ -72,6 +72,7 @@ pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 pub fn home_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let mut open: Option<String> = None;
+    let mut open_clean: Option<String> = None;
     let mut new_edit = false;
     let mut see_all = false;
     egui::ScrollArea::vertical().id_salt("home-scroll").auto_shrink([false, false]).show(ui, |ui| {
@@ -112,7 +113,7 @@ pub fn home_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     });
                 });
                 ui.add_space(10.0);
-                photos_grid(app, ui, content_w, &mut open, &mut see_all);
+                photos_grid(app, ui, content_w, &mut open_clean, &mut see_all);
                 ui.add_space(24.0);
             });
         });
@@ -122,6 +123,11 @@ pub fn home_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     if let Some(path) = open
         && let Err(e) = app.open_path(&path)
+    {
+        app.open_failed(&crate::file_open::display_name(&path), &e);
+    }
+    if let Some(path) = open_clean
+        && let Err(e) = app.open_clean_path(&path)
     {
         app.open_failed(&crate::file_open::display_name(&path), &e);
     }

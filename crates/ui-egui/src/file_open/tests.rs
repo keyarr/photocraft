@@ -714,3 +714,33 @@ fn open_path_prefers_the_recovery_over_the_file_on_disk() {
     assert_eq!(app.ui.recent_files.first(), Some(&path));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn open_clean_path_reads_disk_bypassing_cache_and_recovery() {
+    use std::sync::Mutex;
+    let (dir, paths) = files("clean-path", &["cat.psd"], b"x");
+    let path = paths[0].clone();
+    let (mut app, _) = app_with(Vec::new());
+    let imports = Rc::new(RefCell::new(0usize));
+    let n = imports.clone();
+    let disk_name = "cat.psd".to_string();
+    app.services.import = Some(Box::new(move |name: &str, bytes: &[u8]| {
+        *n.borrow_mut() += 1;
+        assert_eq!(name, disk_name);
+        assert_eq!(bytes, b"x");
+        Ok((Document::new(name, Size::new(4, 4), ColorMode::Rgb, SampleType::U8), Vec::new()))
+    }));
+    let mut edited = Document::new("cat.psd", Size::new(4, 4), ColorMode::Rgb, SampleType::U8);
+    edited.name = "cat-edited".into();
+    let recovered = crate::Recovered { key: "k1".into(), path: Some(path.clone()), doc: edited };
+    let queue = Rc::new(Mutex::new(vec![recovered]));
+    let q = queue.clone();
+    app.services.recover = Some(Box::new(move || std::mem::take(&mut *q.lock().unwrap())));
+    app.ui.chrome.home = Some(1);
+    app.open_clean_path(&path).unwrap();
+    assert_eq!(*imports.borrow(), 1, "disk file was read");
+    let st = app.session.active().unwrap();
+    assert_eq!(st.doc.name, "cat.psd", "clean disk copy opened");
+    assert!(app.ui.chrome.home.is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
