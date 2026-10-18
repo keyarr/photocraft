@@ -133,6 +133,7 @@ pub fn load(app: &mut PhotocraftApp) {
         if n > 0 {
             app.sync_views();
             app.ui.status = format!("Recovered {n} document{}", if n == 1 { "" } else { "s" });
+            app.ui.chrome.home = Some(n);
         }
     }
 }
@@ -2224,6 +2225,30 @@ mod tests {
         assert!(app.ui.dialogs.iter().all(|d| d.id != id));
         assert_eq!(app.session.prefs().cursors.painting, prefs::PaintingCursor::FullSizeTip);
         assert_eq!(app.session.prefs().units_and_rulers.rulers, prefs::Unit::Inches);
+    }
+
+    #[test]
+    fn recovered_documents_leave_home_screen_active() {
+        use photocraft_doc::{ColorMode, Document, SampleType, Size};
+        let mut app = PhotocraftApp::new(
+            photocraft_engine::Session::new(),
+            crate::Services {
+                recover: Some(Box::new(|| {
+                    vec![crate::Recovered {
+                        key: "k1".into(),
+                        path: Some("/tmp/cat.psd".into()),
+                        doc: Document::new("cat.psd", Size::new(4, 4), ColorMode::Rgb, SampleType::U8),
+                    }]
+                })),
+                ..Default::default()
+            },
+        );
+        assert_eq!(app.session.documents().len(), 1);
+        assert_eq!(app.ui.chrome.home, Some(1));
+        assert!(app.ui.chrome.shows_home(1, true));
+        app.open_path("/tmp/cat.psd").unwrap();
+        assert!(app.ui.chrome.home.is_none());
+        assert!(!app.ui.chrome.shows_home(1, true));
     }
 
     #[test]
