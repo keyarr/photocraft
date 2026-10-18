@@ -136,7 +136,7 @@ pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     let on = app.ui.chrome.shows_home(n, app.session.prefs().general.auto_show_home_screen);
                     if icons::button_with_icon_size(ui, "house", 48.0, 22.0, on, tl!("Home")).clicked() {
                         if !on && app.services.file_dialog.is_none() {
-                            crate::prefs_ui::save_all_for_exit(app);
+                            crate::prefs_ui::autosave_now(app);
                         }
                         app.ui.chrome.home = if on { None } else { Some(n) };
                     }
