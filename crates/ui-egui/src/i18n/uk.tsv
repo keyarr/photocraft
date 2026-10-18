@@ -1096,7 +1096,7 @@
 # Clone Source panel
 	Source: not set ({key}-click with Clone Stamp)	Джерело: не задано ({key}+клацання клонувальним штампом)
 	Clone source {n} ({key}-click with Clone Stamp to set)	Джерело клонування {n} ({key}+клацання клонувальним штампом для встановлення)
-	{key}-click to set the source	{key}+клацання, щоб установити джерело
+	Set Source	Задати джерело
 	Option-click to define a source point to clone from	Option+клацання, щоб визначити точку джерела клонування
 	Show Overlay	Показати накладання
 	Auto-Hide	Автоматично приховувати

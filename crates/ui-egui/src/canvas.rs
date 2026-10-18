@@ -376,8 +376,9 @@ pub(crate) fn pencil_cursor_rect(xf: &ViewXform, doc: [f64; 2], size: f32, ppp: 
 }
 
 /// Whether a brush-tip circle draws its centre mark.
-/// Clone Stamp and Healing Brush stay an empty circle until Option is held, the source-point
-/// cursor. Other brushes follow the cursor preference, the large-tip mark, or the Background Eraser.
+/// Clone Stamp and Healing Brush stay an empty circle until Option is held or the options bar's
+/// Set Source toggle is armed, the source-point cursor. Other brushes follow the cursor
+/// preference, the large-tip mark, or the Background Eraser.
 fn brush_tip_centre(tool: Tool, option: bool, show_crosshair: bool, radius: f32) -> bool {
     if tool == Tool::QuickSelection {
         return false;
@@ -2888,7 +2889,9 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                             egui::CursorIcon::None
                         }
                         _ => {
-                            let centre = brush_tip_centre(tool, alt || app.ui.shell.sticky_alt, cur.show_crosshair_in_brush_tip, r);
+                            // The armed Set Source toggle shows the source-point centre too.
+                            let pick = matches!(tool, Tool::CloneStamp | Tool::Healing) && app.ui.clone_pick_source;
+                            let centre = brush_tip_centre(tool, alt || app.ui.shell.sticky_alt || pick, cur.show_crosshair_in_brush_tip, r);
                             crate::tool_cursor::circle(&painter, p, r, centre)
                         }
                     }
@@ -3684,8 +3687,8 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
     match ev {
         ToolEvent::Down { x, y, pressure } => {
             // Painting a type, shape, Smart Object or fill layer asks to rasterize it first
-            // (⌥-click with the Clone Stamp or Healing Brush only sets the source).
-            let sets_source = matches!(tool, Tool::CloneStamp | Tool::Healing) && mods.alt;
+            // (⌥-click, or the options bar's armed Set Source toggle, only sets the source).
+            let sets_source = matches!(tool, Tool::CloneStamp | Tool::Healing) && (mods.alt || app.ui.clone_pick_source);
             // Painting on or moving a hidden layer is refused at the press, as in Photoshop (#571).
             if !sets_source && let Some(why) = hidden_target(app, tool) {
                 app.ui.status = why.into();
@@ -3741,7 +3744,7 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
                     crate::vector_ui::pen_down(app, x, y);
                     return;
                 }
-                Tool::CloneStamp | Tool::Healing if mods.alt => {
+                Tool::CloneStamp | Tool::Healing if sets_source => {
                     crate::retouch_ui::set_source(app, x, y);
                     return;
                 }

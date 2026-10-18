@@ -1958,7 +1958,7 @@
 	Reset GPU Backend	GPU バックエンドをリセット
 	Applies at next launch.	次回の起動時に適用されます。
 	Click to sample the foreground colour  ·  {key}-click for background	クリックで描画色を取得 · {key}+クリックで背景色を取得
-	{key}-click to set the source	{key}+クリックでソースを設定
+	Set Source	ソースを設定
 	{key} to subtract	{key} で削除
 	Clone source {n} ({key}-click with Clone Stamp to set)	コピーソース {n}({key}+クリックでコピースタンプのソースを設定)
 	Source: not set ({key}-click with Clone Stamp)	ソース: 未設定({key}+クリックでコピースタンプ)

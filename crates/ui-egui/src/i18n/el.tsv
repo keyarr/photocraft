@@ -3116,7 +3116,7 @@
 	shortcut	συντόμευση
 	{added}, {removed} subtracted	{added}, αφαιρέθηκαν {removed}
 	{key} to subtract	{key} για αφαίρεση
-	{key}-click to set the source	{key}-κλικ για ορισμό πηγής
+	Set Source	Ορισμός πηγής
 	{mode} Color · {bits} bit	Χρώμα {mode} · {bits} bit
 	{name} Properties	Ιδιότητες: {name}
 	{name} options	Επιλογές: {name}

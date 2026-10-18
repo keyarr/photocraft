@@ -1931,7 +1931,7 @@
 	Reset GPU Backend	GPU-backend herstellen
 	Applies at next launch.	Wordt toegepast bij de volgende start.
 	Click to sample the foreground colour  ·  {key}-click for background	Klik om de voorgrondkleur te bemonsteren  ·  {key}-klik voor achtergrond
-	{key}-click to set the source	{key}-klik om de bron in te stellen
+	Set Source	Bron instellen
 	{key} to subtract	{key} om af te trekken
 	Clone source {n} ({key}-click with Clone Stamp to set)	Kloonbron {n} ({key}-klik met kloonstempel om in te stellen)
 	Source: not set ({key}-click with Clone Stamp)	Bron: niet ingesteld ({key}-klik met kloonstempel)

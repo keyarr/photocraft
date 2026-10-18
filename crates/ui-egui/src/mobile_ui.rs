@@ -1234,6 +1234,7 @@ mod tests {
         h.run_steps(6);
         assert!(h.query_all_by_label_contains("Clone Stamp Tool").next().is_none(), "the strip no longer repeats the active tool");
         assert!(h.query_all_by_label_contains("Aligned").next().is_some(), "the Clone Stamp options stay");
+        assert!(h.query_all_by_label_contains("Set Source").next().is_some(), "the touch Set Source toggle is there");
     }
 
     /// With no document open the strip draws nothing: there is no tool context.

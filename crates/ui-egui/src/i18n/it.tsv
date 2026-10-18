@@ -1951,7 +1951,7 @@
 	Reset GPU Backend	Reimposta backend GPU
 	Applies at next launch.	Si applica al prossimo avvio.
 	Click to sample the foreground colour  ·  {key}-click for background	Click per campionare colore primo piano · {key}-click per sfondo
-	{key}-click to set the source	{key}-click per impostare sorgente
+	Set Source	Imposta sorgente
 	{key} to subtract	{key} per sottrarre
 	Clone source {n} ({key}-click with Clone Stamp to set)	Sorgente clone {n} ({key}-click con Timbro clone per impostare)
 	Source: not set ({key}-click with Clone Stamp)	Sorgente: non impostata ({key}-click con Timbro clone)

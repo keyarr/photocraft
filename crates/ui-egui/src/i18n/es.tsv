@@ -1953,7 +1953,7 @@
 	Reset GPU Backend	Restablecer el backend de GPU
 	Applies at next launch.	Se aplicará en el próximo inicio.
 	Click to sample the foreground colour  ·  {key}-click for background	Clic para muestrear el color frontal  ·  {key}-clic para el de fondo
-	{key}-click to set the source	{key}-clic para establecer el origen
+	Set Source	Establecer origen
 	{key} to subtract	{key} para sustraer
 	Clone source {n} ({key}-click with Clone Stamp to set)	Origen de clonado {n} ({key}-clic con Sello de clonar para establecer)
 	Source: not set ({key}-click with Clone Stamp)	Origen: no establecido ({key}-clic con Sello de clonar)

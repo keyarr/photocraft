@@ -1969,7 +1969,7 @@
 	Reset GPU Backend	Obnovit grafický backend
 	Applies at next launch.	Projeví se při příštím spuštění.
 	Click to sample the foreground colour  ·  {key}-click for background	Kliknutím nasnímáte barvu popředí  ·  {key}+kliknutím barvu pozadí
-	{key}-click to set the source	{key}+kliknutím nastavíte zdroj
+	Set Source	Nastavit zdroj
 	{key} to subtract	{key} pro odebrání
 	Clone source {n} ({key}-click with Clone Stamp to set)	Zdroj klonování {n} (nastavíte {key}+kliknutím klonovacím razítkem)
 	Source: not set ({key}-click with Clone Stamp)	Zdroj: nenastaven ({key}+kliknutí klonovacím razítkem)

@@ -1951,7 +1951,7 @@
 	Reset GPU Backend	重設 GPU 後端
 	Applies at next launch.	下次啟動時套用。
 	Click to sample the foreground colour  ·  {key}-click for background	按一下以取樣前景色 · {key}+按一下取樣背景色
-	{key}-click to set the source	{key}+按一下以設定來源
+	Set Source	設定來源
 	{key} to subtract	按 {key} 以減去
 	Clone source {n} ({key}-click with Clone Stamp to set)	仿製來源 {n} (使用仿製印章時 {key}+按一下以設定)
 	Source: not set ({key}-click with Clone Stamp)	來源：未設定 (使用仿製印章時 {key}+按一下)

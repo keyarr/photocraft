@@ -1105,7 +1105,7 @@
 # Clone Source panel
 	Source: not set ({key}-click with Clone Stamp)	Источник: не задан ({key}-клик штампом)
 	Clone source {n} ({key}-click with Clone Stamp to set)	Источник клонирования {n} ({key}-клик штампом, чтобы задать)
-	{key}-click to set the source	{key}-клик, чтобы задать источник
+	Set Source	Задать источник
 	Option-click to define a source point to clone from	Option-клик, чтобы задать точку источника клонирования
 	Show Overlay	Показать наложение
 	Auto-Hide	Автоскрытие

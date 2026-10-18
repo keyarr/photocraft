@@ -1920,7 +1920,7 @@
 	Reset GPU Backend	Réinitialiser le moteur GPU
 	Applies at next launch.	Prend effet au prochain démarrage.
 	Click to sample the foreground colour  ·  {key}-click for background	Cliquez pour prélever la couleur de premier plan  ·  {key}-clic pour l'arrière-plan
-	{key}-click to set the source	{key}-clic pour définir la source
+	Set Source	Définir la source
 	{key} to subtract	{key} pour soustraire
 	Clone source {n} ({key}-click with Clone Stamp to set)	Source de clonage {n} ({key}-clic avec le tampon de clonage pour la définir)
 	Source: not set ({key}-click with Clone Stamp)	Source : non définie ({key}-clic avec le tampon de clonage)

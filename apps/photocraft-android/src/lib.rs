@@ -284,11 +284,11 @@ fn install_recovery(services: &mut Services, dir: &std::path::Path) {
     services.export_base_dir = Some(export_base_dir(dir));
 }
 
-/// Where picker-free exports land: shared Download/PhotoCraft when it takes a
+/// Where picker-free exports land: shared DCIM/Niveta when it takes a
 /// file (needs the storage grant), else the private exports dir (always
 /// writable). The path is shown on the sheet, so nothing is a surprise.
 fn export_base_dir(dir: &std::path::Path) -> String {
-    for root in ["/sdcard/Download/Niveta", "/storage/emulated/0/Download/Niveta"] {
+    for root in ["/sdcard/DCIM/Niveta", "/storage/emulated/0/DCIM/Niveta"] {
         let probe = std::path::Path::new(root).join(".niveta-write-probe");
         if std::fs::create_dir_all(root).is_ok() && std::fs::write(&probe, b"1").is_ok() {
             let _ = std::fs::remove_file(&probe);

@@ -1914,7 +1914,7 @@
 	Reset GPU Backend	Reset Backend GPU
 	Applies at next launch.	Berlaku saat dibuka berikutnya.
 	Click to sample the foreground colour  ·  {key}-click for background	Klik untuk mengambil sampel warna foreground  ·  {key}-klik untuk background
-	{key}-click to set the source	{key}-klik untuk mengatur sumber
+	Set Source	Atur sumber
 	{key} to subtract	{key} untuk mengurangi
 	Clone source {n} ({key}-click with Clone Stamp to set)	Sumber clone {n} ({key}-klik dengan Clone Stamp untuk mengatur)
 	Source: not set ({key}-click with Clone Stamp)	Sumber: belum diatur ({key}-klik dengan Clone Stamp)

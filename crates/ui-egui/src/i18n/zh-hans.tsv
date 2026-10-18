@@ -2012,7 +2012,7 @@ cameraRaw	Blending	混合
 	Reset GPU Backend	重置 GPU 后端
 	Applies at next launch.	下次启动时生效。
 	Click to sample the foreground colour  ·  {key}-click for background	单击拾取前景色  ·  按 {key} 单击拾取背景色
-	{key}-click to set the source	按 {key} 单击设置源点
+	Set Source	设置源点
 	{key} to subtract	按 {key} 从选区中减去
 	Clone source {n} ({key}-click with Clone Stamp to set)	仿制源 {n}（使用仿制图章时按 {key} 单击设置）
 	Source: not set ({key}-click with Clone Stamp)	源点：未设置（使用仿制图章时按 {key} 单击）

@@ -223,8 +223,10 @@ pub fn finish_object_selection(app: &mut PhotocraftApp, start: [f64; 2], end: [f
     );
 }
 
-/// ⌥-click with Clone Stamp / Healing Brush sets the source.
+/// ⌥-click (or the options bar's Set Source toggle) with Clone Stamp / Healing Brush sets the
+/// source and disarms the toggle.
 pub fn set_source(app: &mut PhotocraftApp, x: f64, y: f64) {
+    app.ui.clone_pick_source = false;
     app.ui.clone_source = Some([x.round(), y.round()]);
     app.ui.clone_offset = None;
     let _ = app.run("cloneSource.set", json!({"source": [x.round(), y.round()]}));
@@ -313,6 +315,13 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
             pattern_stamp_options(app, ui);
         }
         Tool::Healing | Tool::CloneStamp => {
+            // Touch has no ⌥-click: the toggle arms the next canvas tap to set the source. It
+            // comes first so a phone reaches it without scrolling the options strip.
+            let mut pick = app.ui.clone_pick_source;
+            if crate::widgets::checkbox(ui, &mut pick, tl!("Set Source")).clicked() {
+                app.ui.clone_pick_source = pick;
+            }
+            crate::widgets::vline(ui, 22.0);
             crate::widgets::checkbox(ui, &mut o.clone_aligned, tl!("Aligned"));
             opt(ui, tl!("Sample:"));
             let opts = [
@@ -321,10 +330,6 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
                 ("all".to_string(), tl!("All Layers")),
             ];
             crate::widgets::dropdown(ui, "clone-sample", &mut o.clone_sample, &opts, 130.0);
-            if app.ui.clone_source.is_none() {
-                crate::widgets::vline(ui, 22.0);
-                opt(ui, &crate::i18n::fmt(tl!("{key}-click to set the source"), &[("key", &crate::shortcuts::pretty("Alt"))]));
-            }
         }
         Tool::Dodge | Tool::Burn => {
             opt(ui, tl!("Range:"));
@@ -709,6 +714,51 @@ mod tests {
         app.ui.pattern_stamp_phase = None;
         assert!(finish_stroke(&mut app, Tool::PatternStamp, &[[70.0, 30.0, 1.0]], egui::Modifiers::NONE));
         assert!(app.ui.pattern_stamp_phase.is_none(), "unaligned strokes do not keep phase");
+    }
+
+    #[test]
+    fn set_source_toggle_arms_the_next_tap() {
+        let mut app = app();
+        app.ui.tool = Tool::CloneStamp;
+        app.ui.clone_pick_source = true;
+        let m = egui::Modifiers::NONE;
+        tool_event(&mut app, ToolEvent::Down { x: 30.0, y: 10.0, pressure: 1.0 }, m);
+        tool_event(&mut app, ToolEvent::Up { x: 30.0, y: 10.0 }, m);
+        assert_eq!(app.ui.clone_source, Some([30.0, 10.0]));
+        assert!(!app.ui.clone_pick_source, "the toggle is one-shot");
+        assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("cloneSource.set"));
+        // The next stroke paints from the source instead of moving it.
+        tool_event(&mut app, ToolEvent::Down { x: 30.0, y: 10.0, pressure: 1.0 }, m);
+        tool_event(&mut app, ToolEvent::Move { x: 50.0, y: 10.0, pressure: 1.0 }, m);
+        tool_event(&mut app, ToolEvent::Up { x: 50.0, y: 10.0 }, m);
+        assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("paint.cloneStamp"));
+    }
+
+    #[test]
+    fn options_bar_set_source_toggle_arms_the_tap() {
+        use crate::theme::ThemeKind;
+        use egui::vec2;
+        use egui_kittest::kittest::Queryable;
+        let mut app = app();
+        app.ui.tool = Tool::CloneStamp;
+        let mut h = egui_kittest::Harness::builder().with_size(vec2(1400.0, 60.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                crate::panels::options_bar(app, ui);
+            },
+            app,
+        );
+        PhotocraftApp::setup_context(&h.ctx, ThemeKind::Studio);
+        h.run_steps(4);
+        assert!(!h.state().ui.clone_pick_source);
+        h.get_by_label("Set Source").click();
+        h.run_steps(2);
+        assert!(h.state().ui.clone_pick_source, "the toggle arms the next canvas tap");
+        h.get_by_label("Set Source").click();
+        h.run_steps(2);
+        assert!(!h.state().ui.clone_pick_source, "clicking it again disarms");
     }
 
     #[test]

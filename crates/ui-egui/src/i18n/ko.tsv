@@ -1916,7 +1916,7 @@
 	Reset GPU Backend	GPU 백엔드 초기화
 	Applies at next launch.	다음 실행 시 적용됩니다.
 	Click to sample the foreground colour  ·  {key}-click for background	클릭하여 전경색 샘플링 · {key} 키를 누른 채 클릭하여 배경색 샘플링
-	{key}-click to set the source	{key} 키를 누른 채 클릭하여 원본 설정
+	Set Source	원본 설정
 	{key} to subtract	{key} 키로 빼기
 	Clone source {n} ({key}-click with Clone Stamp to set)	복제 원본 {n} (복제 도장으로 {key} 키를 누른 채 클릭하여 설정)
 	Source: not set ({key}-click with Clone Stamp)	원본: 설정되지 않음(복제 도장으로 {key} 키를 누른 채 클릭)

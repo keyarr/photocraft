@@ -64,7 +64,7 @@ fn base_dir(app: &PhotocraftApp) -> Option<String> {
     if let Some(b) = app.services.export_base_dir.clone() {
         return Some(b);
     }
-    for root in ["/sdcard/Download/PhotoCraft", "/storage/emulated/0/Download/PhotoCraft"] {
+    for root in ["/sdcard/DCIM/Niveta", "/storage/emulated/0/DCIM/Niveta"] {
         if std::fs::create_dir_all(root).is_ok() {
             return Some(root.into());
         }

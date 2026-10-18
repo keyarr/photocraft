@@ -826,6 +826,10 @@ pub struct UiState {
     pub clone_source: Option<[f64; 2]>,
     #[serde(default)]
     pub clone_offset: Option<[f64; 2]>,
+    /// The options bar's Set Source toggle armed: the next canvas tap sets the clone source
+    /// instead of painting (touch has no ⌥-click).
+    #[serde(default, skip_deserializing)]
+    pub clone_pick_source: bool,
     /// Pattern Stamp aligned origin in document pixels, kept across strokes.
     #[serde(default)]
     pub pattern_stamp_phase: Option<[f32; 2]>,
@@ -1000,6 +1004,7 @@ impl Default for UiState {
             tool_brushes: Vec::new(),
             clone_source: None,
             clone_offset: None,
+            clone_pick_source: false,
             pattern_stamp_phase: None,
             extras: Extras::default(),
             view: Default::default(),
