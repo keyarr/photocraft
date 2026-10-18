@@ -178,7 +178,7 @@ fn recent_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mu
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = gap;
             for item in row {
-                if recent_card(ui, item, cell_w, thumb_h, card_h, &mut budget).clicked() {
+                if recent_card(app, ui, item, cell_w, thumb_h, card_h, &mut budget).clicked() {
                     *open = Some(item.path.clone());
                 }
             }
@@ -188,7 +188,7 @@ fn recent_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mu
 }
 
 /// One recent-edit card: uniform thumbnail, name, modification age or folder.
-fn recent_card(ui: &mut egui::Ui, item: &Recent, w: f32, thumb_h: f32, h: f32, budget: &mut usize) -> egui::Response {
+fn recent_card(app: &PhotocraftApp, ui: &mut egui::Ui, item: &Recent, w: f32, thumb_h: f32, h: f32, budget: &mut usize) -> egui::Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(vec2(w, h), Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, item.name.clone()));
@@ -200,7 +200,7 @@ fn recent_card(ui: &mut egui::Ui, item: &Recent, w: f32, thumb_h: f32, h: f32, b
     }
     let thumb = Rect::from_min_size(rect.min + vec2(6.0, 6.0), vec2(w - 12.0, thumb_h));
     ui.painter().rect_filled(thumb, t.radius_sm, t.field);
-    match thumb_for(ui, &item.path, budget) {
+    match thumb_for(app, ui, &item.path, budget) {
         Some(tex) => paint_cover(ui, thumb, &tex),
         None => crate::icons::paint(ui, thumb, "image", 26.0, t.text_faint),
     }
@@ -250,7 +250,6 @@ fn photos_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mu
         }
         return;
     }
-    let _ = app;
     let gap = 8.0;
     let cell = ((content_w - 2.0 * gap) / 3.0).clamp(80.0, 240.0);
     let mut budget = frame_budget(ui.ctx());
@@ -263,7 +262,7 @@ fn photos_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mu
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, name.clone()));
                 let resp = resp.on_hover_text(&p.path).on_hover_cursor(egui::CursorIcon::PointingHand);
                 ui.painter().rect_filled(rect, t.radius_sm, t.field);
-                match thumb_for(ui, &p.path, &mut budget) {
+                match thumb_for(app, ui, &p.path, &mut budget) {
                     Some(tex) => paint_cover(ui, rect, &tex),
                     None => crate::icons::paint(ui, rect, "image", 24.0, t.text_faint),
                 }
@@ -575,7 +574,32 @@ fn thumb_failed_id() -> egui::Id {
 
 /// Cached grid thumbnail for `path`; decodes at most `*budget` misses per
 /// frame and repaints while visible thumbs are still pending.
-fn thumb_for(ui: &egui::Ui, path: &str, budget: &mut usize) -> Option<egui::TextureHandle> {
+fn thumb_for(app: &PhotocraftApp, ui: &egui::Ui, path: &str, budget: &mut usize) -> Option<egui::TextureHandle> {
+    // A document open with unsaved edits is what the user is working on: the card
+    // must show the editor's composite, not the file it was opened from.
+    if let Some(st) = app.session.documents().iter().find(|d| d.path.as_deref() == Some(path) && d.is_dirty()) {
+        let key = egui::Id::new(("home-edited-thumb", st.doc.id.0));
+        // Keyed by document, holding the revision: an edit replaces the texture, so
+        // a session's worth of revisions costs one thumbnail, not one each.
+        if let Some((rev, tex)) = ui.ctx().data(|d| d.get_temp::<(u64, egui::TextureHandle)>(key))
+            && rev == st.revision
+        {
+            return Some(tex);
+        }
+        if *budget == 0 {
+            ui.ctx().request_repaint();
+            return None;
+        }
+        *budget -= 1;
+        let img = photocraft_compose::thumbnail(&st.doc, THUMB_SIDE);
+        let tex = ui.ctx().load_texture(
+            format!("home-edited-{}", st.doc.id.0),
+            egui::ColorImage::from_rgba_unmultiplied([img.width as usize, img.height as usize], &img.pixels),
+            egui::TextureOptions { mipmap_mode: Some(egui::TextureFilter::Linear), ..egui::TextureOptions::LINEAR },
+        );
+        ui.ctx().data_mut(|d| d.insert_temp(key, (st.revision, tex.clone())));
+        return Some(tex);
+    }
     let (size, fingerprint) = fingerprint_of(path);
     if size == Some(0) || size.is_some_and(|n| n > MAX_THUMB_BYTES) {
         return None;
@@ -723,17 +747,57 @@ mod tests {
         assert!(truncate("a-very-long-file-name.png", 8).ends_with('…'));
     }
 
+    /// One frame of `thumb_for` for `path`: whether the grid got something to paint, and the
+    /// image it uploaded (nothing on a cache hit).
+    fn thumbnail_frame(ctx: &egui::Context, app: &PhotocraftApp, path: &str) -> (bool, Option<egui::ColorImage>) {
+        let mut budget = 4;
+        let mut found = false;
+        let egui::FullOutput { mut textures_delta, .. } = ctx.run_ui(Default::default(), |ui| {
+            found = thumb_for(app, ui, path, &mut budget).is_some();
+        });
+        // The frame draws no widgets, so the one texture it may upload is the thumbnail.
+        let img = textures_delta.set.values().flatten().next().map(|d| {
+            let egui::ImageData::Color(c) = &d.image;
+            egui::ColorImage { size: c.size, source_size: c.source_size, pixels: c.pixels.clone() }
+        });
+        textures_delta.clear();
+        (found, img)
+    }
+
     #[test]
     fn missing_files_have_no_thumbnail() {
+        let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
-        let mut budget = 4;
-        let mut found = true;
-        ctx.run_ui(Default::default(), |ui| {
-            found = thumb_for(ui, "/no/such/photo-anywhere.png", &mut budget).is_some();
-        })
-        .textures_delta
-        .clear();
-        assert!(!found);
+        ctx.run_ui(Default::default(), |_| {}).textures_delta.clear(); // the font atlas uploads once
+        assert!(!thumbnail_frame(&ctx, &app, "/no/such/photo-anywhere.png").0);
+    }
+
+    /// A document open with unsaved edits shows its own pixels: the card must not keep
+    /// showing the file it was opened from (or its icon, when the file moved) after an edit.
+    #[test]
+    fn open_documents_show_their_edits_on_the_grid() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", serde_json::json!({"width": 32, "height": 32})).unwrap();
+        // The grid finds the open document by its path; no such file exists on disk.
+        let path = "/no/such/photo-anywhere.png";
+        app.session.active_mut().unwrap().path = Some(path.into());
+        let ctx = egui::Context::default();
+        ctx.run_ui(Default::default(), |_| {}).textures_delta.clear();
+        let (found, img) = thumbnail_frame(&ctx, &app, path);
+        assert!(!found && img.is_none(), "a clean document reads the file, which is missing");
+        app.run("edit.fill", serde_json::json!({"color": "#ff0000"})).unwrap();
+        let (found, img) = thumbnail_frame(&ctx, &app, path);
+        assert!(found, "the edited document renders without the file");
+        let img = img.expect("the composite is uploaded");
+        let mid = img.pixels[(img.size[1] / 2) * img.size[0] + img.size[0] / 2];
+        assert_eq!((mid.r(), mid.g(), mid.b(), mid.a()), (255, 0, 0, 255), "the fill shows on the card");
+        // Seen again without an edit: the cached texture, not a fresh render.
+        assert!(thumbnail_frame(&ctx, &app, path).1.is_none());
+        // Saved (or restored): the file is the thumbnail source again, and it is still missing.
+        let st = app.session.active_mut().unwrap();
+        st.saved_revision = st.revision;
+        let (found, img) = thumbnail_frame(&ctx, &app, path);
+        assert!(!found && img.is_none());
     }
 
     #[test]
