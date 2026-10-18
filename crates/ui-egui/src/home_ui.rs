@@ -319,6 +319,16 @@ fn recent_photos(ctx: &egui::Context) -> (Vec<Photo>, bool) {
         }
         let id = egui::Id::new("home-recent-photos");
         let job_id = egui::Id::new("home-recent-photos-scan");
+        let perm_id = egui::Id::new("home-recent-photos-perm");
+        let permitted = device_dirs_readable();
+        let was_permitted = ctx.data(|d| d.get_temp::<bool>(perm_id));
+        if was_permitted != Some(permitted) {
+            ctx.data_mut(|d| {
+                d.insert_temp(perm_id, permitted);
+                d.remove_temp::<(f64, Stored, bool)>(id);
+                d.remove_temp::<ScanSlot>(job_id);
+            });
+        }
         let now = ctx.input(|i| i.time);
         let entry = ctx.data(|d| d.get_temp::<(f64, Stored, bool)>(id));
         if let Some((_, cached, _)) = entry.as_ref().filter(|(at, _, dirty)| now - *at < PHOTOS_TTL && !*dirty) {
@@ -917,5 +927,41 @@ mod tests {
             assert!((120..=135).contains(&p.g()), "green averages to grey, got {}", p.g());
             assert!((120..=135).contains(&p.b()), "blue averages to grey, got {}", p.b());
         }
+    }
+
+    #[test]
+    fn recent_photos_invalidates_cache_on_permission_change() {
+        let ctx = egui::Context::default();
+        let id = egui::Id::new("home-recent-photos");
+        let perm_id = egui::Id::new("home-recent-photos-perm");
+        let opposing_perm = !device_dirs_readable();
+
+        ctx.data_mut(|d| {
+            d.insert_temp(perm_id, opposing_perm);
+            d.insert_temp(id, (0.0f64, vec![("fake.png".to_string(), 0u64, 0u32, 0u64)], false));
+        });
+
+        let (photos, pending) = recent_photos(&ctx);
+        assert!(pending);
+        assert!(photos.is_empty());
+        assert_eq!(ctx.data(|d| d.get_temp::<bool>(perm_id)), Some(device_dirs_readable()));
+    }
+
+    #[test]
+    fn recent_photos_retains_cache_when_permission_unchanged() {
+        let ctx = egui::Context::default();
+        let id = egui::Id::new("home-recent-photos");
+        let perm_id = egui::Id::new("home-recent-photos-perm");
+        let current_perm = device_dirs_readable();
+
+        ctx.data_mut(|d| {
+            d.insert_temp(perm_id, current_perm);
+            d.insert_temp(id, (0.0f64, vec![("fake.png".to_string(), 0u64, 0u32, 0u64)], false));
+        });
+
+        let (photos, pending) = recent_photos(&ctx);
+        assert!(!pending);
+        assert_eq!(photos.len(), 1);
+        assert_eq!(photos[0].path, "fake.png");
     }
 }
