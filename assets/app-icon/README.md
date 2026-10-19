@@ -1,4 +1,4 @@
-# PhotoCraft app icon
+# Niveta app icon
 
 A **nine-tailed kitsune with a brow diamond**: an engraving portrait, seated, looking back at the
 viewer, in the Crafting Apps' owl-template framing (full-bleed field, head and body filling the
@@ -12,7 +12,7 @@ Exactly three colours:
 |---|---|---|
 | Ink | `#0b0b0c` | line work and contours |
 | Paper | `#efe9dc` | the figure |
-| PhotoCraft blue (app colour) | `#2f7bf5` | the full-bleed field |
+| Niveta blue (app colour) | `#2f7bf5` | the full-bleed field |
 
 ## Geometry
 

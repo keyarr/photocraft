@@ -1,6 +1,6 @@
 # Rendering
 
-PhotoCraft has two compositors with distinct roles:
+Niveta has two compositors with distinct roles:
 
 - `photocraft-compose` is the CPU compositor and correctness oracle used by export and tests.
 - `photocraft-gpu` plans and executes supported canvas composition through wgpu.

@@ -1,6 +1,6 @@
 # MCP conventions
 
-PhotoCraft follows the same conventions as FilmCraft #28. Start a headless session:
+Niveta follows the same conventions as FilmCraft #28. Start a headless session:
 
 ```sh
 photocraft-cli mcp --automation-read-root /work/project --automation-write-root /work/project

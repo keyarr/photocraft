@@ -1,6 +1,6 @@
 # Automation overview
 
-PhotoCraft automation has three entry styles:
+Niveta automation has three entry styles:
 
 1. `photocraft-cli` runs finite convert, inspect, command, batch, and droplet jobs.
 2. `photocraft-cli serve` keeps a headless session alive over JSON lines on stdio or loopback TCP.

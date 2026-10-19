@@ -49,7 +49,7 @@ Phones render on the CPU compositor by default; Preferences › Performance › 
 
 On device there is no log file: the app's `log` records go to logcat under the `photocraft-android` tag. `cargo xtask android log` tails exactly that (`adb logcat photocraft-android:I *:S`); attach it to a bug report. The host dev loop (`cargo run -p photocraft-android`) logs to standard error instead.
 
-By default PhotoCraft's own crates log at `info` and everything else at `warn`. `RUST_LOG` replaces that with env_logger-style directives, for example `RUST_LOG=debug`, `RUST_LOG=warn,photocraft_gpu=trace` or `RUST_LOG=info,wgpu_core=warn`; a directive ending in `*` covers every target starting with it (`photocraft*=debug`).
+By default Niveta's own crates log at `info` and everything else at `warn`. `RUST_LOG` replaces that with env_logger-style directives, for example `RUST_LOG=debug`, `RUST_LOG=warn,photocraft_gpu=trace` or `RUST_LOG=info,wgpu_core=warn`; a directive ending in `*` covers every target starting with it (`photocraft*=debug`).
 
 ## Environment variables
 
@@ -145,7 +145,7 @@ translations do not affect the denominator. Unregistered locale TSV files are ig
 
 ## Scorecard and performance budgets
 
-[`docs/scorecard.md`](scorecard.md) says, with numbers, where PhotoCraft stands per area. It is
+[`docs/scorecard.md`](scorecard.md) says, with numbers, where Niveta stands per area. It is
 generated; never edit it by hand.
 
 ```sh

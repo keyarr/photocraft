@@ -1,6 +1,6 @@
 # Format overview
 
-External bytes enter PhotoCraft through four main paths:
+External bytes enter Niveta through four main paths:
 
 - `photocraft-psd` parses and writes PSD and PSB structures.
 - `photocraft-codecs` decodes and encodes flat raster formats.

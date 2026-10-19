@@ -1,6 +1,6 @@
 # Building
 
-PhotoCraft uses the Rust workspace at the repository root. Install the stable Rust toolchain, clone the repository, and run commands from that root.
+Niveta uses the Rust workspace at the repository root. Install the stable Rust toolchain, clone the repository, and run commands from that root.
 
 ```sh
 cargo build --workspace

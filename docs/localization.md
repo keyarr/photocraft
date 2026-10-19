@@ -1,6 +1,6 @@
 # UI localisation and live language switching
 
-PhotoCraft uses the same Rust catalog implementation in the native egui shell and the
+Niveta uses the same Rust catalog implementation in the native egui shell and the
 WebAssembly build. English source strings are lookup keys. UTF-8 TSV catalogs supply plain,
 contextual, command-ID and plural translations; missing entries fall back to English.
 
@@ -103,7 +103,7 @@ detection remain separate outstanding work. Switching catalogs does not supply m
 2. Register its code, native name and plural rule in `i18n::LANGUAGES`.
 3. Translate the meaning of the English source keys. Preserve `{name}` placeholders, escaped
    characters and the trailing `…` on dialog commands. Use `@id` to disambiguate a command
-   label and `@plural` for count-sensitive text. Keep product names such as PhotoCraft.
+   label and `@plural` for count-sensitive text. Keep product names such as Niveta.
 4. Set `complete_menus` when the catalog covers all enforced keys. Add source and license
    attribution for translation assets, then run the catalog and shell tests.
 
@@ -117,5 +117,5 @@ cargo xtask wasm
 
 Render representative dialogs with the offscreen `snapshot` example, including a sequence
 of language changes in one process. Inspect the PNGs for missing glyphs and truncated labels.
-Translations are original work or reuse the open PhotoCraft contributions credited in
+Translations are original work or reuse the open Niveta contributions credited in
 [ATTRIBUTION.md](../ATTRIBUTION.md); no proprietary localisation resources are used.

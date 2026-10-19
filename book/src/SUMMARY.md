@@ -1,6 +1,6 @@
 # Summary
 
-[PhotoCraft Documentation](README.md)
+[Niveta Documentation](README.md)
 
 # Getting started
 

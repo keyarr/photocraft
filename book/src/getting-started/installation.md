@@ -1,6 +1,6 @@
 # Installation
 
-PhotoCraft is currently an early-alpha project. Release artifacts, when available, are published through the repository's GitHub Releases page. Verify the release notes and checksums before running downloaded artifacts.
+Niveta is currently an early-alpha project. Release artifacts, when available, are published through the repository's GitHub Releases page. Verify the release notes and checksums before running downloaded artifacts.
 
 For source builds, continue to [Building](building.md). The desktop application, headless CLI, and web target are separate workspace applications:
 
