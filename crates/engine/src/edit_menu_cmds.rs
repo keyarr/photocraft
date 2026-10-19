@@ -413,6 +413,13 @@ fn content_aware_fill_as(s: &mut Session, p: &Value, cmd: &'static str, label: &
                 }
             }
             ctx.check()?;
+            // Patches come only from the sampling area outside the fill area. With none (a
+            // Rectangular `margin` of 0, a Custom area inside the selection or off the canvas)
+            // the fill would be black (#6532), so refuse instead. The workspace's preview builds
+            // the same plan and may show an empty area while the Sampling Brush adds to it.
+            if !source.iter().any(|s| *s) {
+                return Err(bad(cmd, "nothing to sample from: the sampling area has no pixels outside the fill area"));
+            }
             let filled = ctx.stage(0.05, 1.0, label, |ctl| fill_with(w, h, n, &img, &hole, &source, &opts, ctl)).map_err(|_| EngineError::Cancelled)?;
             Ok((img, cover, hole, filled))
         },

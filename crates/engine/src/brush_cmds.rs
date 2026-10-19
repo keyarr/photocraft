@@ -639,7 +639,11 @@ fn define_from_selection(s: &mut Session, p: &Value) -> Result<Value> {
     }
     // Paint amount = darkness × alpha × selection (black = full paint, like Photoshop).
     let (w, h) = (area.width() as usize, area.height() as usize);
-    let mut v = vec![0.0f32; w * h];
+    // The tip buffer is one f32 per pixel, and the selection bounds come from params, so the
+    // multiply is checked: on a 32-bit target (wasm32) it can overflow before the crop below
+    // would ever have made it small.
+    let len = w.checked_mul(h).ok_or_else(|| bad(cmd, format!("the selection is too large ({w}x{h})")))?;
+    let mut v = vec![0.0f32; len];
     let sc = sel.channels();
     let sv = sel.read_region(area);
     for y in 0..h {
