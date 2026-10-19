@@ -75,6 +75,7 @@ pub fn home_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut open_clean: Option<String> = None;
     let mut new_edit = false;
     let mut see_all = false;
+    let storage = storage_access(app);
     egui::ScrollArea::vertical().id_salt("home-scroll").auto_shrink([false, false]).show(ui, |ui| {
         let avail = ui.available_width();
         let content_w = (avail - 32.0).clamp(280.0, 720.0);
@@ -113,7 +114,7 @@ pub fn home_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     });
                 });
                 ui.add_space(10.0);
-                photos_grid(app, ui, content_w, &mut open_clean, &mut see_all);
+                photos_grid(app, ui, content_w, storage, &mut open_clean, &mut see_all);
                 ui.add_space(24.0);
             });
         });
@@ -223,9 +224,9 @@ struct Photo {
     modified: SystemTime,
 }
 
-fn photos_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mut Option<String>, see_all: &mut bool) {
+fn photos_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, storage: bool, open: &mut Option<String>, see_all: &mut bool) {
     let t = Tokens::get(ui.ctx());
-    let (photos, pending) = recent_photos(ui.ctx());
+    let (photos, pending) = recent_photos(ui.ctx(), storage);
     if photos.is_empty() {
         if pending {
             // Skeleton in the loaded grid's geometry: content swaps in
@@ -245,7 +246,7 @@ fn photos_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mu
             }
             return;
         }
-        if device_dirs_readable() {
+        if storage {
             ui.label(egui::RichText::new(tl!("No photos found.")).size(13.0).color(t.text_dim));
         } else {
             ui.label(egui::RichText::new(tl!("PhotoCraft needs access to this device's photos to show them here.")).size(13.0).color(t.text_dim));
@@ -289,10 +290,10 @@ fn photos_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mu
 /// skeleton, on cold start) while the rescan runs, so no frame ever blocks on
 /// the filesystem and returning to the app always presents immediately. The
 /// `bool` is true while a scan is still outstanding.
-fn recent_photos(ctx: &egui::Context) -> (Vec<Photo>, bool) {
+fn recent_photos(ctx: &egui::Context, permitted: bool) -> (Vec<Photo>, bool) {
     #[cfg(target_arch = "wasm32")]
     {
-        let _ = ctx;
+        let _ = (ctx, permitted);
         return (Vec::new(), false);
     }
     #[cfg(not(target_arch = "wasm32"))]
@@ -320,7 +321,6 @@ fn recent_photos(ctx: &egui::Context) -> (Vec<Photo>, bool) {
         let id = egui::Id::new("home-recent-photos");
         let job_id = egui::Id::new("home-recent-photos-scan");
         let perm_id = egui::Id::new("home-recent-photos-perm");
-        let permitted = device_dirs_readable();
         let was_permitted = ctx.data(|d| d.get_temp::<bool>(perm_id));
         if was_permitted != Some(permitted) {
             ctx.data_mut(|d| {
@@ -339,6 +339,7 @@ fn recent_photos(ctx: &egui::Context) -> (Vec<Photo>, bool) {
         if let Some(slot) = ctx.data(|d| d.get_temp::<ScanSlot>(job_id)) {
             if let Some(photos) = slot.take() {
                 ctx.data_mut(|d| {
+                    d.remove_temp::<ScanSlot>(job_id);
                     d.insert_temp(id, (now, store(&photos), false));
                     // Thumbs for the new list resolve over the next frames,
                     // not inside the harvest frame.
@@ -424,8 +425,19 @@ fn frame_budget(ctx: &egui::Context) -> usize {
     }
 }
 
-/// Whether any photo folder lists at all (permission/presence probe for the
-/// empty state; never writes, never asks).
+/// Whether the shell's live permission verdict says shared storage is readable;
+/// the filesystem probe is only the off-device fallback. Listing is no proof on
+/// Android: a denied app still enumerates folders on scoped storage and gets an
+/// empty view, so the probe can stay `true` across the grant.
+fn storage_access(app: &mut PhotocraftApp) -> bool {
+    match app.services.storage_has_access.as_mut() {
+        Some(has) => has(),
+        None => device_dirs_readable(),
+    }
+}
+
+/// Whether any photo folder lists at all. Off-device fallback for
+/// [`storage_access`]; never writes, never asks.
 fn device_dirs_readable() -> bool {
     #[cfg(target_arch = "wasm32")]
     {
@@ -934,17 +946,18 @@ mod tests {
         let ctx = egui::Context::default();
         let id = egui::Id::new("home-recent-photos");
         let perm_id = egui::Id::new("home-recent-photos-perm");
-        let opposing_perm = !device_dirs_readable();
+        let current_perm = device_dirs_readable();
+        let opposing_perm = !current_perm;
 
         ctx.data_mut(|d| {
             d.insert_temp(perm_id, opposing_perm);
             d.insert_temp(id, (0.0f64, vec![("fake.png".to_string(), 0u64, 0u32, 0u64)], false));
         });
 
-        let (photos, pending) = recent_photos(&ctx);
+        let (photos, pending) = recent_photos(&ctx, current_perm);
         assert!(pending);
         assert!(photos.is_empty());
-        assert_eq!(ctx.data(|d| d.get_temp::<bool>(perm_id)), Some(device_dirs_readable()));
+        assert_eq!(ctx.data(|d| d.get_temp::<bool>(perm_id)), Some(current_perm));
     }
 
     #[test]
@@ -959,9 +972,57 @@ mod tests {
             d.insert_temp(id, (0.0f64, vec![("fake.png".to_string(), 0u64, 0u32, 0u64)], false));
         });
 
-        let (photos, pending) = recent_photos(&ctx);
+        let (photos, pending) = recent_photos(&ctx, current_perm);
         assert!(!pending);
         assert_eq!(photos.len(), 1);
         assert_eq!(photos[0].path, "fake.png");
+    }
+
+    #[test]
+    fn a_harvested_scan_does_not_read_as_in_flight() {
+        let ctx = egui::Context::default();
+        let id = egui::Id::new("home-recent-photos");
+        let job_id = egui::Id::new("home-recent-photos-scan");
+        let perm = device_dirs_readable();
+        let slot = ScanSlot::default();
+        *slot.done.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some(vec![Photo { path: "fresh.png".to_string(), modified: SystemTime::UNIX_EPOCH }]);
+        ctx.data_mut(|d| {
+            d.insert_temp(egui::Id::new("home-recent-photos-perm"), perm);
+            // Expired cache: the frame takes the harvest path.
+            d.insert_temp(id, (-1.0e9f64, Vec::<(String, u64, u32, u64)>::new(), false));
+            d.insert_temp(job_id, slot);
+        });
+
+        let (photos, pending) = recent_photos(&ctx, perm);
+        assert_eq!(photos.len(), 1);
+        assert!(!pending);
+        assert!(ctx.data(|d| d.get_temp::<ScanSlot>(job_id)).is_none(), "a finished slot must be dropped, or expiry never rescans");
+    }
+
+    #[test]
+    fn home_uses_the_shell_permission_verdict() {
+        use egui_kittest::Harness;
+        use egui_kittest::kittest::Queryable;
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.services.storage_has_access = Some(Box::new(|| true));
+        let mut h = Harness::builder().with_size(vec2(390.0, 844.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                home_screen(app, ui);
+            },
+            app,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        // The host probe says no, the shell hook says yes: the hook owns the
+        // verdict, so the cached list survives instead of being rescanned away.
+        h.ctx.data_mut(|d| {
+            d.insert_temp(egui::Id::new("home-recent-photos-perm"), true);
+            d.insert_temp(egui::Id::new("home-recent-photos"), (0.0f64, vec![("hooked.png".to_string(), 0u64, 0u32, 0u64)], false));
+        });
+        h.run_steps(3);
+        assert!(h.query_all_by_label_contains("hooked.png").next().is_some(), "the hook's verdict keeps the cached photos");
     }
 }
