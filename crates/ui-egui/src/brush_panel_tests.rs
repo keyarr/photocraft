@@ -689,3 +689,98 @@ fn hand_tool_offers_scale_buttons_and_requests_the_right_view() {
     assert!(h.state().ui.views[0].fill_pending);
     assert!(!h.state().ui.views[0].fit_pending);
 }
+
+/// A phone (360 pt) gets a touch sheet instead of the desktop's floating 540 pt window: the
+/// section list, the controls and the strip stay inside the screen, and the panel still drives
+/// the brush through `tools.setBrush`.
+#[test]
+fn narrow_screen_uses_the_touch_sheet() {
+    use egui_kittest::kittest::Queryable;
+    let size = vec2(360.0, 800.0);
+    let mut a = app();
+    a.run("file.new", json!({"width": 200, "height": 200})).unwrap();
+    a.ui.tool = crate::state::Tool::Brush;
+    let mut h = Harness::builder().with_size(size).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
+            let ctx = ui.ctx().clone();
+            crate::shortcuts::handle(app, &ctx);
+            window(app, &ctx);
+        },
+        a,
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    h.run_steps(2);
+    h.key_press(egui::Key::F5);
+    h.run_steps(3);
+    assert!(h.state().ui.panels.brush_settings);
+    assert!(crate::mobile_ui::is_mobile(&h.ctx));
+    // The section list the desktop keeps in a 150 pt column beside the controls now takes the
+    // sheet's whole width: every row is on screen, none spills out of the phone.
+    for (name, _) in SECTIONS {
+        // The selected section's name is also the heading, so there can be two of them.
+        let rects: Vec<_> = h.query_all_by_label(name).map(|n| n.rect()).collect();
+        assert!(!rects.is_empty(), "{name} listed");
+        for r in rects {
+            assert!(r.left() >= 0.0 && r.right() <= size.x && r.top() >= 0.0 && r.bottom() <= size.y, "{name} at {r:?} outside {size:?}");
+        }
+    }
+    // Clicking a section still shows and enables it through the engine (Rule 1).
+    let n = h.state().session.journal.len();
+    h.get_by_label("Scattering").click();
+    h.run_steps(3);
+    assert_eq!(h.state().ui.brush_section, 2);
+    assert!(h.state().session.tools.brush.scattering.enabled);
+    assert_eq!(h.state().session.journal.len(), n + 1);
+    // The close button dismisses the panel.
+    h.get_by_label("Close").click();
+    h.run_steps(3);
+    assert!(!h.state().ui.panels.brush_settings);
+}
+
+/// A short window (360x300) overflows the sheet, so the body scrolls: the last section, stuck
+/// below the sheet's cap, is reachable with the wheel instead of being cut off.
+#[test]
+fn a_short_window_scrolls_the_sheet_to_the_last_section() {
+    use egui_kittest::kittest::Queryable;
+    let size = vec2(360.0, 300.0);
+    let mut a = app();
+    a.run("file.new", json!({"width": 200, "height": 200})).unwrap();
+    a.ui.tool = crate::state::Tool::Brush;
+    let mut h = Harness::builder().with_size(size).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
+            let ctx = ui.ctx().clone();
+            crate::shortcuts::handle(app, &ctx);
+            window(app, &ctx);
+        },
+        a,
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    h.run_steps(2);
+    h.key_press(egui::Key::F5);
+    h.run_steps(3);
+    let top = |h: &Harness<'static, PhotocraftApp>| h.query_by_label("Protect Texture").expect("the last section is listed").rect().top();
+    assert!(top(&h) > size.y, "the last section starts below a 300 pt window: {}", top(&h));
+    // Hovering the sheet's own content (not the header) is what makes the wheel reach it.
+    let at = h.query_all_by_label("Brush Tip Shape").next().expect("the first section is on screen").rect().center();
+    for _ in 0..60 {
+        if top(&h) <= size.y {
+            break;
+        }
+        h.hover_at(at);
+        h.event(egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(0.0, -60.0),
+            modifiers: egui::Modifiers::NONE,
+            phase: egui::TouchPhase::Move,
+        });
+        h.run_steps(2);
+    }
+    assert!(top(&h) <= size.y, "the wheel scrolls the sheet to the last section: {}", top(&h));
+    assert!(h.state().ui.panels.brush_settings, "scrolling keeps the panel open");
+}

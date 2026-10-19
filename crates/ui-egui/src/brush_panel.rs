@@ -45,7 +45,7 @@ pub const SECTIONS: [(&str, bool); 13] = [
     ("Protect Texture", true),
 ];
 
-/// Panel width and the stroke strip's size.
+/// Panel width and the stroke strip's size (its width is capped by the panel).
 pub(crate) const WIDTH: f32 = 540.0;
 const STRIP: (u32, u32) = (488, 76);
 
@@ -224,12 +224,14 @@ pub(crate) fn full_uv() -> egui::Rect {
 /// section when another preset is picked.
 fn section_list(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSettings) {
     let t = Tokens::get(ui.ctx());
+    // On a phone the column sits above the controls, so it takes the panel's whole width.
+    let w = if crate::mobile_ui::is_mobile(ui.ctx()) { ui.available_width() } else { 150.0 };
     ui.vertical(|ui| {
-        ui.set_width(150.0);
+        ui.set_width(w);
         ui.spacing_mut().item_spacing.y = 1.0;
         for (i, (name, has_box)) in SECTIONS.iter().enumerate() {
             let sel = app.ui.brush_section == i;
-            let (r, resp) = ui.allocate_exact_size(vec2(150.0, 23.0), Sense::click());
+            let (r, resp) = ui.allocate_exact_size(vec2(w, 23.0), Sense::click());
             // Named for accessibility and for tests and agents that look sections up by name.
             resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, sel, tl!(*name)));
             if sel {
@@ -302,6 +304,24 @@ fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let before = app.session.tools.brush.clone();
     let mut b = before.clone();
     let section = app.ui.brush_section.min(SECTIONS.len() - 1);
+    // A phone has no room for the desktop's section column beside the controls, so the list
+    // goes above them and everything takes the panel's width (see `window`).
+    if crate::mobile_ui::is_mobile(ui.ctx()) {
+        section_list(app, ui, &mut b);
+        widgets::hairline(ui);
+        ui.add_space(6.0);
+        let name = SECTIONS.get(section).map_or("Brush Tip Shape", |entry| entry.0);
+        ui.label(RichText::new(tl!(name)).font(theme::semibold(12.5)).color(t.text));
+        let on = section_flag(&mut b, section).is_none_or(|f| *f);
+        // A section that's off shows its options greyed out (Photoshop).
+        ui.add_enabled_ui(on, |ui| section_body(ui, &mut b, section, &app.session.tools.presets));
+        ui.add_space(6.0);
+        widgets::hairline(ui);
+        ui.add_space(6.0);
+        stroke_strip(app, ui, &mut b);
+        commit_gesture(app, ui.ctx(), &before, &b);
+        return;
+    }
     ui.horizontal_top(|ui| {
         section_list(app, ui, &mut b);
         widgets::vline(ui, 482.0);
@@ -321,22 +341,32 @@ fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     ui.add_space(6.0);
     widgets::hairline(ui);
     ui.add_space(6.0);
+    stroke_strip(app, ui, &mut b);
+    commit_gesture(app, ui.ctx(), &before, &b);
+}
+
+/// The live stroke preview of `b` beside the create and reset buttons, taking the width
+/// it is given (a fixed strip on desktop, the sheet's width on a phone).
+fn stroke_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSettings) {
+    let t = Tokens::get(ui.ctx());
+    let w = ui.available_width().min(STRIP.0 as f32);
+    let h = STRIP.1 as f32;
     ui.horizontal(|ui| {
-        let (r, _) = ui.allocate_exact_size(vec2(STRIP.0 as f32, STRIP.1 as f32), Sense::hover());
+        let (r, _) = ui.allocate_exact_size(vec2(w, h), Sense::hover());
         ui.painter().rect_filled(r, t.radius_sm, t.field);
-        let tex = brush_preview::stroke_texture(ui.ctx(), "settings-strip", &b, STRIP.0, STRIP.1, t.text);
+        let tex = brush_preview::stroke_texture(ui.ctx(), "settings-strip", b, w as u32, h as u32, t.text);
         ui.painter().image(tex.id(), r, full_uv(), Color32::WHITE);
         ui.vertical(|ui| {
             if icons::button(ui, "square-plus", 24.0, false, tl!("Create new brush from these settings")).clicked() {
                 let name = new_preset_name(&app.session.tools.presets);
-                run_or_status(app, "brush.presets.save", json!({ "name": name, "brush": serde_json::to_value(&b).unwrap_or(Value::Null) }));
+                let value = serde_json::to_value(&*b).unwrap_or(Value::Null);
+                run_or_status(app, "brush.presets.save", json!({ "name": name, "brush": value }));
             }
             if icons::button(ui, "undo-2", 24.0, false, tl!("Reset the brush to the defaults")).clicked() {
-                b = BrushSettings { color: b.color, background: b.background, smoothing: b.smoothing.clone(), locks: b.locks.clone(), ..Default::default() };
+                *b = BrushSettings { color: b.color, background: b.background, smoothing: b.smoothing.clone(), locks: b.locks.clone(), ..Default::default() };
             }
         });
     });
-    commit_gesture(app, ui.ctx(), &before, &b);
 }
 
 pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
@@ -350,8 +380,43 @@ pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
         .corner_radius(CornerRadius::same(t.radius_lg as u8))
         .shadow(egui::Shadow { offset: [0, 10], blur: 30, spread: 0, color: t.shadow })
         .inner_margin(egui::Margin::same(10));
-    let canvas = app.last_canvas_rect;
     let mut open = true;
+    if crate::mobile_ui::is_mobile(ctx) {
+        // Phones have no canvas corner to float the 540 pt desktop panel in: it becomes a
+        // sheet, same bodies and commands, capped like the mobile bottom sheet so it stops
+        // covering the whole screen (the body scrolls inside the cap).
+        let w = (ctx.content_rect().width() - 32.0).clamp(280.0, WIDTH);
+        let h = (ctx.content_rect().height() * 0.55).clamp(280.0, 460.0);
+        egui::Modal::new(egui::Id::new("brush-settings"))
+            .backdrop_color(t.scrim)
+            .show(ctx, |ui| {
+                frame.show(ui, |ui| {
+                    ui.set_min_width(w);
+                    ui.set_max_width(w);
+                    ui.set_min_height(h);
+                    ui.set_max_height(h);
+                    let close = sheet_header(app, ui) || ui.input(|i| i.key_pressed(egui::Key::Escape));
+                    if close {
+                        open = false;
+                        return;
+                    }
+                    // The body scrolls against the sheet's cap, so the header stays put.
+                    let room = (ui.available_height() - 4.0).max(80.0);
+                    egui::ScrollArea::vertical().id_salt("brush-settings-sheet").max_height(room).auto_shrink([false, false]).show(ui, |ui| {
+                        if app.ui.brush_tab == 1 {
+                            crate::brushes_tab::show(app, ui);
+                        } else {
+                            settings_tab(app, ui);
+                        }
+                    });
+                });
+            });
+        if !open {
+            app.ui.panels.brush_settings = false;
+        }
+        return;
+    }
+    let canvas = app.last_canvas_rect;
     egui::Window::new(tl!("Brush Settings"))
         .id(egui::Id::new("brush-settings"))
         .title_bar(false)
@@ -386,6 +451,31 @@ pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if !open {
         app.ui.panels.brush_settings = false;
     }
+}
+
+/// The sheet's header: the two tabs as pill tabs and a close button. Returns true when it
+/// asked to close.
+fn sheet_header(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> bool {
+    let mut close = false;
+    ui.horizontal(|ui| {
+        let mut tab = app.ui.brush_tab;
+        for (i, name) in [tl!("Brush Settings"), tl!("Brushes")].iter().enumerate() {
+            if widgets::pill_tab(ui, name, tab == i).clicked() {
+                tab = i;
+            }
+        }
+        app.ui.brush_tab = tab;
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let x = icons::button(ui, "x", 44.0, false, tl!("Close"));
+            x.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Close"));
+            if x.clicked() {
+                close = true;
+            }
+        });
+    });
+    ui.add_space(4.0);
+    widgets::hairline(ui);
+    close
 }
 
 #[cfg(test)]

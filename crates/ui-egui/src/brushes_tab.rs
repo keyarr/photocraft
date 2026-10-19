@@ -14,7 +14,7 @@ use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE};
 use serde_json::json;
 
 use crate::brush_panel::{
-    BrushesPanelState, BrushesView, Renaming, UNGROUPED, WIDTH, commit_gesture, full_uv, grouped_presets, is_current, new_preset_name, run_or_status,
+    BrushesPanelState, BrushesView, Renaming, UNGROUPED, commit_gesture, full_uv, grouped_presets, is_current, new_preset_name, run_or_status,
 };
 use crate::brush_preview;
 use crate::theme::{self, Tokens};
@@ -446,13 +446,15 @@ pub fn preset_list(
 /// The Brushes tab.
 pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
-    // Size of the current brush (Photoshop's Brushes panel slider).
+    // Size of the current brush (Photoshop's Brushes panel slider). The slider takes the width
+    // the panel gives it, so a phone sheet and the desktop window lay out the same way.
     let before = app.session.tools.brush.clone();
     let mut b = before.clone();
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!("Size")).color(t.text_dim));
+        let room = (ui.available_width() - 84.0).max(60.0);
         let mut lv = b.size.max(1.0).ln();
-        ui.add_sized(vec2(WIDTH - 140.0, 18.0), |ui: &mut egui::Ui| {
+        ui.add_sized(vec2(room, 18.0), |ui: &mut egui::Ui| {
             let r = widgets::slider(ui, &mut lv, 0.0..=MAX_BRUSH_SIZE.ln(), None);
             if r.changed() {
                 b.size = lv.exp().round().clamp(1.0, MAX_BRUSH_SIZE);
@@ -469,7 +471,8 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         icons::paint(ui, egui::Rect::from_min_size(ui.cursor().min + vec2(0.0, 3.0), vec2(16.0, 16.0)), "search", 14.0, t.text_faint);
         ui.add_space(20.0);
-        ui.add(egui::TextEdit::singleline(&mut app.ui.brushes_panel.filter).hint_text(tl!("Search Brushes")).desired_width(WIDTH - 120.0));
+        let w = (ui.available_width() - 60.0).max(60.0);
+        ui.add(egui::TextEdit::singleline(&mut app.ui.brushes_panel.filter).hint_text(tl!("Search Brushes")).desired_width(w));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let view = &mut app.ui.brushes_panel.view;
             if icons::button(ui, "grid-2x2", 24.0, *view == BrushesView::Grid, "Grid view").clicked() {
