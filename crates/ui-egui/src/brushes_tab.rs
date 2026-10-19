@@ -452,7 +452,9 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut b = before.clone();
     ui.horizontal(|ui| {
         ui.label(RichText::new(tl!("Size")).color(t.text_dim));
-        let room = (ui.available_width() - 84.0).max(60.0);
+        // The label is in the row already: a fixed reserve overflows the sheet by the label's
+        // width (`Size` vs localized ones), widening the whole modal on every switch.
+        let room = (ui.available_width() - 74.0 - ui.spacing().item_spacing.x).max(60.0);
         let mut lv = b.size.max(1.0).ln();
         ui.add_sized(vec2(room, 18.0), |ui: &mut egui::Ui| {
             let r = widgets::slider(ui, &mut lv, 0.0..=MAX_BRUSH_SIZE.ln(), None);

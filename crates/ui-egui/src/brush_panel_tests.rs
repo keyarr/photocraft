@@ -407,6 +407,43 @@ fn drop_targets_and_actions_reorder_presets() {
     }
 }
 
+/// The phone sheet must measure the same on every tab: a tab body wider than the sheet makes
+/// egui measure the modal wider and repin it (the settings tab sat flush at the screen edge and
+/// the sheet jumped when switching to Brushes).
+#[test]
+fn tab_switch_does_not_move_the_phone_sheet() {
+    use egui_kittest::kittest::Queryable;
+    let size = vec2(360.0, 800.0);
+    let mut a = app();
+    a.run("file.new", json!({"width": 200, "height": 200})).unwrap();
+    a.ui.tool = crate::state::Tool::Brush;
+    let mut h = Harness::builder().with_size(size).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
+            let ctx = ui.ctx().clone();
+            crate::shortcuts::handle(app, &ctx);
+            window(app, &ctx);
+        },
+        a,
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    h.run_steps(2);
+    h.key_press(egui::Key::F5);
+    h.run_steps(3);
+    assert!(h.state().ui.panels.brush_settings);
+    assert!(crate::mobile_ui::is_mobile(&h.ctx));
+    let close0 = h.query_by_label("Close").expect("close on settings tab").rect();
+    for tab in [1usize, 0] {
+        h.state_mut().ui.brush_tab = tab;
+        h.run_steps(3);
+        let close = h.query_by_label("Close").expect("close on every tab").rect();
+        assert_eq!(close.min, close0.min, "tab {tab}: the sheet moved when switching tabs");
+        assert_eq!(close.max, close0.max, "tab {tab}: the sheet resized when switching tabs");
+    }
+}
+
 fn harness(tab: usize, section: usize) -> Harness<'static, PhotocraftApp> {
     let mut app = app();
     app.ui.panels.brush_settings = true;

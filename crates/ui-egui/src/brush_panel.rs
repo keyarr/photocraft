@@ -349,7 +349,9 @@ fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// it is given (a fixed strip on desktop, the sheet's width on a phone).
 fn stroke_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSettings) {
     let t = Tokens::get(ui.ctx());
-    let w = ui.available_width().min(STRIP.0 as f32);
+    // Leave the buttons their room: taking the full available width overflows the sheet by the
+    // button column, and egui then measures the sheet wider and pins it out of centre.
+    let w = (ui.available_width() - 24.0 - ui.spacing().item_spacing.x).max(24.0).min(STRIP.0 as f32);
     let h = STRIP.1 as f32;
     ui.horizontal(|ui| {
         let (r, _) = ui.allocate_exact_size(vec2(w, h), Sense::hover());
@@ -391,8 +393,12 @@ pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
             .backdrop_color(t.scrim)
             .show(ctx, |ui| {
                 frame.show(ui, |ui| {
-                    ui.set_min_width(w);
-                    ui.set_max_width(w);
+                    // The frame's margins add to what egui measures: request the body width, not
+                    // the sheet's, or the outer sheet ends up 20 pt wider than the `- 32` gutters
+                    // intended above.
+                    let body_w = w - frame.inner_margin.sum().x;
+                    ui.set_min_width(body_w);
+                    ui.set_max_width(body_w);
                     ui.set_min_height(h);
                     ui.set_max_height(h);
                     let close = sheet_header(app, ui) || ui.input(|i| i.key_pressed(egui::Key::Escape));
