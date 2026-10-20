@@ -26,11 +26,13 @@ sed 's/viewBox="0 0 512 512"/viewBox="22 22 468 468"/' "$SVG" >"$TIGHT"
 render() { resvg -w "$2" -h "$2" "$1" "$3" </dev/null; }
 
 render "$MAC" 1024 "$DIR/photocraft-1024.png"
+cp "$DIR/photocraft-1024.png" "$DIR/niveta-1024.png"
 
 # Linux hicolor theme.
 for s in 16 24 32 48 64 128 256 512; do
   mkdir -p "$DIR/hicolor/${s}x${s}/apps"
   render "$TIGHT" "$s" "$DIR/hicolor/${s}x${s}/apps/ai.storyteller.photocraft.png"
+  cp "$DIR/hicolor/${s}x${s}/apps/ai.storyteller.photocraft.png" "$DIR/hicolor/${s}x${s}/apps/app.niveta.png"
 done
 mkdir -p "$DIR/hicolor/scalable/apps"
 # The lighter trace (photocraft-small.svg) keeps the scalable theme icon cheap to render.

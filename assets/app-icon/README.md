@@ -1,35 +1,34 @@
 # Niveta app icon
 
-A **nine-tailed kitsune with a brow diamond**: an engraving portrait, seated, looking back at the
-viewer, in the Crafting Apps' owl-template framing (full-bleed field, head and body filling the
-tile, tails running off the edges).
+An **N laid over stacked sheets**: a bold angular N whose right leg runs into layered bands, the
+mark for an editor that stacks layers. Ready-made from the owner's `newlogo.jpg` drop-in (2048 px);
+the committed SVG is a trace of that artwork.
 
 ## Palette
 
-Exactly three colours:
+Two colours:
 
 | Colour | Hex | Used for |
 |---|---|---|
-| Ink | `#0b0b0c` | line work and contours |
-| Paper | `#efe9dc` | the figure |
-| Niveta blue (app colour) | `#2f7bf5` | the full-bleed field |
+| Ink | `#14151b` | the full-bleed field |
+| Niveta blue | `#378df0` | the mark |
 
 ## Geometry
 
-A 512-unit tile (`viewBox="0 0 512 512"`), rounded square with `rx=112`, no border. The macOS
-renders pad it onto Apple's 824/1024 icon grid; the Windows and Linux renders crop 22 units off
-each side so the figure reads at 16–48 px.
+A 512-unit tile (`viewBox="0 0 512 512"`), rounded square with `rx=112`, no border. The mark keeps
+the source's margins (roughly 85 units on each side). The macOS renders pad it onto Apple's
+824/1024 icon grid; the Windows and Linux renders crop 22 units off each side so the mark reads at
+16–48 px.
 
 ## Provenance
 
-The owner's original drawing, made in ArtCraft (2880 px, engraving style, keyed to the palette),
-vectorised with craftrules `assets/logo-options/_tools/vectorize_tile.py`. The source PNG stays in
-craftrules at `assets/app-icons/photocraft/source.png`. License: see `LICENSE.txt`.
+The owner's `newlogo.jpg` artwork, traced to `photocraft.svg` with potrace (flat fills, polygons
+smoothed to beziers) and coloured to the palette above. License: see `LICENSE.txt`.
 
 ## Files
 
-- `photocraft.svg`: canonical master (traced at 2048 px).
-- `photocraft-small.svg`: lighter trace (traced at 1024 px); also the hicolor scalable icon.
+- `photocraft.svg`: canonical master.
+- `photocraft-small.svg`: lighter trace (from a 512 px mask); also the hicolor scalable icon.
 - `photocraft-1024.png`: 1024 px render on the macOS grid.
 - `photocraft.icns`: macOS bundle icon (`CFBundleIconFile`).
 - `photocraft.ico`: Windows icon, 16–256 px, embedded in the `.exe` by `apps/photocraft/build.rs`.
