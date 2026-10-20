@@ -241,6 +241,28 @@ fn curves_fast_release_commits_one_edit_and_undo_restores_the_curve() {
     assert_eq!(layer(&h).1, before);
 }
 
+/// The Properties panel is about as wide as the graph, but the phone sheet and a modal dialog
+/// are not: the graph sits in the middle of its host, not against the left margin.
+#[test]
+fn curves_graph_is_centred_in_a_wide_host() {
+    let mem = egui::Id::new("curves-centred");
+    let mut h = Harness::builder().with_size(vec2(480.0, 700.0)).build_ui_state(
+        move |ui, v: &mut serde_json::Value| {
+            let slot = ui.available_rect_before_wrap();
+            ui.data_mut(|d| d.insert_temp(mem.with("slot"), slot));
+            let cx = crate::adjust_editors::EditorCx { mem, hist: None, gray: false, swatches: [[0.0; 3]; 2], gradients: Vec::new(), dialog: false };
+            crate::adjust_editors::editor(ui, "curves", v, &cx);
+        },
+        json!({"points": [[0.0, 0.0], [255.0, 255.0]]}),
+    );
+    h.run_steps(4);
+    let graph = h.ctx.data(|d| d.get_temp::<Rect>(mem.with("curves-graph"))).expect("curves graph drawn");
+    let slot = h.ctx.data(|d| d.get_temp::<Rect>(mem.with("slot"))).expect("slot recorded");
+    // The 14 pt strip on the left holds the vertical input gradient bar.
+    let (left, right) = (graph.left() - slot.left() - 14.0, slot.right() - graph.right());
+    assert!((left - right).abs() <= 1.0, "the graph is centred: {left} pt left, {right} pt right");
+}
+
 /// Real pointer input: `n` clicks at `at` with `mods` held (2 = a double-click).
 fn clicks_with(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, n: usize, mods: egui::Modifiers) {
     // Well past the double-click time since the last gesture.

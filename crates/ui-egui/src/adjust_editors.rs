@@ -353,7 +353,10 @@ fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
     let mut pts = read_curve(v, key);
     let side = ui.available_width().clamp(120.0, 300.0);
     ui.add_space(4.0);
-    let (full, resp) = ui.allocate_exact_size(vec2(side, side + 14.0), Sense::click_and_drag());
+    // Centre the graph in whatever hosts it: the sheet on a phone is wider than the graph.
+    let slot = ui.available_rect_before_wrap();
+    let full = Rect::from_min_size(pos2(slot.center().x - side / 2.0, slot.top()), vec2(side, side + 14.0));
+    let resp = ui.allocate_rect(full, Sense::click_and_drag());
     let graph = curve_graph(full, side);
     ui.data_mut(|d| d.insert_temp(cx.mem.with("curves-graph"), graph));
     let to_scr = |q: [f32; 2]| pos2(graph.left() + q[0] / 255.0 * graph.width(), graph.bottom() - q[1] / 255.0 * graph.height());
