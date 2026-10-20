@@ -228,6 +228,10 @@ fn android_services_in(dir: Option<PathBuf>) -> (Services, Inbox) {
         services.storage_has_access = Some(Box::new(crate::android::storage_has_access));
         services.storage_request = Some(Box::new(crate::android::storage_request));
         services.storage_settings = Some(Box::new(crate::android::storage_settings));
+        // Exports go through MediaStore: no all-files grant, and the gallery
+        // indexes them at once. `export_base_dir` is only the sheet's label.
+        services.save_to_gallery = Some(Box::new(crate::android::save_to_gallery));
+        services.export_base_dir = Some("DCIM/Niveta".into());
     }
     if let Some(d) = dir {
         install_recovery(&mut services, &d);
@@ -281,12 +285,17 @@ fn install_recovery(services: &mut Services, dir: &std::path::Path) {
             store.lock().unwrap_or_else(|e| e.into_inner()).save_blocking(doc, rev, path.map(str::to_string))
         }));
     }
-    services.export_base_dir = Some(export_base_dir(dir));
+    // The shell may have already named a MediaStore folder (`save_to_gallery`);
+    // only a build without that hook probes a filesystem path.
+    if services.export_base_dir.is_none() {
+        services.export_base_dir = Some(export_base_dir(dir));
+    }
 }
 
-/// Where picker-free exports land: shared DCIM/Niveta when it takes a
+/// Host fallback for picker-free exports: shared DCIM/Niveta when it takes a
 /// file (needs the storage grant), else the private exports dir (always
-/// writable). The path is shown on the sheet, so nothing is a surprise.
+/// writable). On-device the gallery hook owns the location. The path is shown
+/// on the sheet, so nothing is a surprise.
 fn export_base_dir(dir: &std::path::Path) -> String {
     for root in ["/sdcard/DCIM/Niveta", "/storage/emulated/0/DCIM/Niveta"] {
         let probe = std::path::Path::new(root).join(".niveta-write-probe");

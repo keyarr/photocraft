@@ -186,6 +186,117 @@ pub fn storage_settings() {
     }
 }
 
+/// Save one exported image through MediaStore (`DCIM/Niveta`), so the gallery
+/// indexes it at once and no all-files grant is needed. `name` includes the
+/// extension; returns the visible path. Android 10+ only: the columns used
+/// here (`relative_path`, `is_pending`) arrived with scoped storage.
+pub fn save_to_gallery(name: &str, bytes: &[u8]) -> Result<String, String> {
+    let sdk = jni_call(|env, _| {
+        env.get_static_field(jni::jni_str!("android/os/Build$VERSION"), jni::jni_str!("SDK_INT"), jni::jni_sig!("I"))?.i()
+    });
+    if !sdk.is_some_and(|v| v >= 29) {
+        return Err("Gallery export needs Android 10 or newer".into());
+    }
+    match jni_call(|env, activity| media_store_save(env, activity, name, bytes)) {
+        Some(path) => Ok(path),
+        None => Err("Couldn't save to the gallery".into()),
+    }
+}
+
+/// Insert the row pending, stream the bytes, then flip `is_pending` off. A
+/// failed write deletes the row, so a broken export never leaves a hidden
+/// half-file in the gallery.
+fn media_store_save(env: &mut jni::Env, activity: &jni::objects::JObject, name: &str, bytes: &[u8]) -> jni::errors::Result<String> {
+    let resolver = env.call_method(activity, jni::jni_str!("getContentResolver"), jni::jni_sig!("()Landroid/content/ContentResolver;"), &[])?.l()?;
+    let text = jni::objects::JString::from_str(env, "content://media/external/images/media")?;
+    let collection = env.call_static_method(jni::jni_str!("android/net/Uri"), jni::jni_str!("parse"), jni::jni_sig!("(Ljava/lang/String;)Landroid/net/Uri;"), &[(&text).into()])?.l()?;
+    let values = media_values(env, &[("_display_name", name), ("mime_type", mime_for(name)), ("relative_path", "DCIM/Niveta")])?;
+    put_integer(env, &values, "is_pending", 1)?;
+    let row = env.call_method(&resolver, jni::jni_str!("insert"), jni::jni_sig!("(Landroid/net/Uri;Landroid/content/ContentValues;)Landroid/net/Uri;"), &[(&collection).into(), (&values).into()])?.l()?;
+    if row.is_null() {
+        return Err(jni::errors::Error::NullPtr("MediaStore insert returned null"));
+    }
+
+    let stream = env.call_method(&resolver, jni::jni_str!("openOutputStream"), jni::jni_sig!("(Landroid/net/Uri;)Ljava/io/OutputStream;"), &[(&row).into()])?.l()?;
+    if stream.is_null() {
+        delete_row(env, &resolver, &row);
+        return Err(jni::errors::Error::NullPtr("MediaStore openOutputStream returned null"));
+    }
+    let written = write_stream(env, &stream, bytes).and_then(|()| env.call_method(&stream, jni::jni_str!("close"), jni::jni_sig!("()V"), &[]).map(|_| ()));
+    if let Err(e) = written {
+        // The failed call may have left an exception pending: clear it before
+        // the close and delete, then leave it clear for the next JNI user.
+        env.exception_clear();
+        let _ = env.call_method(&stream, jni::jni_str!("close"), jni::jni_sig!("()V"), &[]);
+        env.exception_clear();
+        delete_row(env, &resolver, &row);
+        return Err(e);
+    }
+
+    let done = media_values(env, &[])?;
+    put_integer(env, &done, "is_pending", 0)?;
+    let null = jni::objects::JObject::null();
+    let updated = env.call_method(
+        &resolver,
+        jni::jni_str!("update"),
+        jni::jni_sig!("(Landroid/net/Uri;Landroid/content/ContentValues;Ljava/lang/String;[Ljava/lang/String;)I"),
+        &[(&row).into(), (&done).into(), (&null).into(), (&null).into()],
+    )?;
+    if updated.i().unwrap_or(0) <= 0 {
+        delete_row(env, &resolver, &row);
+        return Err(jni::errors::Error::NullPtr("MediaStore did not publish the image"));
+    }
+    Ok(format!("DCIM/Niveta/{name}"))
+}
+
+/// A fresh `ContentValues` with the string fields already put.
+fn media_values<'local>(env: &mut jni::Env<'local>, fields: &[(&str, &str)]) -> jni::errors::Result<jni::objects::JObject<'local>> {
+    let values = env.new_object(jni::jni_str!("android/content/ContentValues"), jni::jni_sig!("()V"), &[])?;
+    for &(key, value) in fields {
+        let key = jni::objects::JString::from_str(env, key)?;
+        let value = jni::objects::JString::from_str(env, value)?;
+        env.call_method(&values, jni::jni_str!("put"), jni::jni_sig!("(Ljava/lang/String;Ljava/lang/String;)V"), &[(&key).into(), (&value).into()])?;
+    }
+    Ok(values)
+}
+
+fn put_integer(env: &mut jni::Env, values: &jni::objects::JObject, key: &str, value: i32) -> jni::errors::Result<()> {
+    let key = jni::objects::JString::from_str(env, key)?;
+    let boxed = env.call_static_method(jni::jni_str!("java/lang/Integer"), jni::jni_str!("valueOf"), jni::jni_sig!("(I)Ljava/lang/Integer;"), &[value.into()])?.l()?;
+    env.call_method(values, jni::jni_str!("put"), jni::jni_sig!("(Ljava/lang/String;Ljava/lang/Integer;)V"), &[(&key).into(), (&boxed).into()])?;
+    Ok(())
+}
+
+/// Write in 1 MiB chunks: a single array for a 24 MP PNG would double the
+/// export's memory in the Java heap for no reason. The local ref is dropped
+/// per chunk, or a large export overflows the JNI local reference table.
+fn write_stream(env: &mut jni::Env, stream: &jni::objects::JObject, bytes: &[u8]) -> jni::errors::Result<()> {
+    for chunk in bytes.chunks(1 << 20) {
+        let array = env.byte_array_from_slice(chunk)?;
+        env.call_method(stream, jni::jni_str!("write"), jni::jni_sig!("([B)V"), &[(&array).into()])?;
+        env.delete_local_ref(array);
+    }
+    Ok(())
+}
+
+/// Best effort: the caller already has the real error, and the pending row is
+/// invisible either way.
+fn delete_row(env: &mut jni::Env, resolver: &jni::objects::JObject, row: &jni::objects::JObject) {
+    let null = jni::objects::JObject::null();
+    let _ = env.call_method(resolver, jni::jni_str!("delete"), jni::jni_sig!("(Landroid/net/Uri;Ljava/lang/String;[Ljava/lang/String;)I"), &[row.into(), (&null).into(), (&null).into()]);
+}
+
+fn mime_for(name: &str) -> &'static str {
+    match name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).as_deref() {
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        Some("tif" | "tiff") => "image/tiff",
+        Some("tga") => "image/x-tga",
+        _ => "application/octet-stream",
+    }
+}
+
 // SAFETY: `#[unsafe(no_mangle)]` only fixes the symbol name so the
 // android-activity glue (C, in that crate) resolves `android_main`; it does
 // not make the body unsafe. The body calls safe Rust only (logger init,

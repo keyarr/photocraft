@@ -201,6 +201,9 @@ impl Default for ExportSettings {
 /// Encode a document: (file bytes, warnings about anything approximated or dropped).
 pub type ExportFn = Box<dyn Fn(&Document, &str, &ExportSettings) -> Result<(Vec<u8>, Vec<String>), String>>;
 pub type WriteFn = Box<dyn FnMut(&str, &[u8]) -> Result<(), String>>;
+/// Save an exported image into shared storage through the platform gallery
+/// (Android MediaStore): file name with extension, bytes, and the visible path.
+pub type GallerySaveFn = Box<dyn Fn(&str, &[u8]) -> Result<String, String>>;
 /// Read bytes through the desktop control session's authorized read root.
 pub type AutomationReadFn = Box<dyn FnMut(&str) -> Result<(String, Vec<u8>), String>>;
 /// Write bytes through the desktop control session's authorized write root.
@@ -270,6 +273,9 @@ pub struct Services {
     pub file_dialog: Option<FileDialogFn>,
     /// Write bytes to a path (native) or trigger a download (web).
     pub write: Option<WriteFn>,
+    /// Publish an exported image through the system gallery. When set, the
+    /// mobile export sheet uses it instead of writing a path.
+    pub save_to_gallery: Option<GallerySaveFn>,
     /// File access used only by control/MCP requests. Interactive dialogs keep
     /// using `file_dialog` and `write` with the user's authority.
     pub automation_read: Option<AutomationReadFn>,
@@ -308,8 +314,9 @@ pub struct Services {
     /// queued worker may not finish before the process dies, so leaving calls
     /// this for every dirty document. `None` where there is no recovery dir.
     pub autosave_blocking: Option<AutosaveFn>,
-    /// Base directory the mobile export sheet writes into (on-device builds have
-    /// no save picker). `None` off-device, where exports keep asking for a path.
+    /// Where the mobile export sheet writes (on-device builds have no save
+    /// picker), or the visible folder when [`Self::save_to_gallery`] handles
+    /// the write. `None` off-device, where exports keep asking for a path.
     pub export_base_dir: Option<String>,
     /// History Log text file output.
     pub append_text: Option<AppendTextFn>,

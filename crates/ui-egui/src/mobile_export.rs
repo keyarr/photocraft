@@ -1,8 +1,9 @@
 //! Touch export sheet: format, quality, scale, transparency, metadata and file
 //! name for phones, which have no save picker. Same encode path as Export As
-//! ([`crate::export_dialog`]), just packed for touch and written straight into
-//! the shell's export dir. On builds with a picker (a narrow desktop window)
-//! confirming delegates to Export As, so the name field there only seeds it.
+//! ([`crate::export_dialog`]), just packed for touch and written through the
+//! shell's gallery hook when it has one, else into its export dir. On builds
+//! with a picker (a narrow desktop window) confirming delegates to Export As,
+//! so the name field there only seeds it.
 
 use egui::vec2;
 use serde::{Deserialize, Serialize};
@@ -117,12 +118,19 @@ pub fn confirm(app: &mut PhotocraftApp) {
     if name.is_empty() {
         name = "export".into();
     }
-    let Some(base) = base_dir(app) else {
-        // Temporary build-gap notice, English-only like the engine's errors.
-        fail(app, "Export needs storage access: grant it and try again".into());
-        return;
+    let file_name = format!("{name}.{ext}");
+    // A gallery save owns the location; the path is only the encoder's
+    // extension hint there.
+    let target = if app.services.save_to_gallery.is_some() {
+        file_name.clone()
+    } else {
+        let Some(base) = base_dir(app) else {
+            // Temporary build-gap notice, English-only like the engine's errors.
+            fail(app, "Export needs storage access: grant it and try again".into());
+            return;
+        };
+        if base.ends_with('/') { format!("{base}{file_name}") } else { format!("{base}/{file_name}") }
     };
-    let path = if base.ends_with('/') { format!("{base}{name}.{ext}") } else { format!("{base}/{name}.{ext}") };
     let out = match crate::export_dialog::export_document(&st.doc, &f, None) {
         Ok(d) => d,
         Err(e) => {
@@ -138,31 +146,42 @@ pub fn confirm(app: &mut PhotocraftApp) {
             return;
         }
     };
-    let (bytes, warnings) = match export(&out, &path, &settings) {
+    let (bytes, warnings) = match export(&out, &target, &settings) {
         Ok(r) => r,
         Err(e) => {
             fail(app, e);
             return;
         }
     };
-    if let Some(parent) = std::path::Path::new(&path).parent()
-        && std::fs::create_dir_all(parent).is_err()
-    {
-        fail(app, format!("Couldn't export {path}"));
-        return;
-    }
-    match app.services.write.as_mut() {
-        Some(write) => {
-            if let Err(e) = write(&path, &bytes) {
-                fail(app, format!("Couldn't export {path}: {e}"));
-                return;
-            }
-        }
-        None => {
-            fail(app, "no writer configured".into());
+    let saved = app.services.save_to_gallery.as_mut().map(|save| save(&file_name, &bytes));
+    let path = match saved {
+        Some(Ok(path)) => path,
+        Some(Err(e)) => {
+            fail(app, e);
             return;
         }
-    }
+        None => {
+            if let Some(parent) = std::path::Path::new(&target).parent()
+                && std::fs::create_dir_all(parent).is_err()
+            {
+                fail(app, format!("Couldn't export {target}"));
+                return;
+            }
+            match app.services.write.as_mut() {
+                Some(write) => {
+                    if let Err(e) = write(&target, &bytes) {
+                        fail(app, format!("Couldn't export {target}: {e}"));
+                        return;
+                    }
+                }
+                None => {
+                    fail(app, "no writer configured".into());
+                    return;
+                }
+            }
+            target
+        }
+    };
     app.ui.status = format!("Exported {path} ({})", crate::sizing::human_bytes(bytes.len() as f64));
     log::info!("mobile export: {}", app.ui.status);
     app.ui.status_error = false;
@@ -317,6 +336,30 @@ mod tests {
         assert!(!a.ui.status_error, "{}", a.ui.status);
         assert_eq!(std::fs::read(dir.join("shot.jpg")).unwrap(), b"fake-png");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn confirm_prefers_the_gallery_hook_over_a_path() {
+        let saved = std::sync::Arc::new(std::sync::Mutex::new(Vec::<(String, Vec<u8>)>::new()));
+        let sink = saved.clone();
+        let mut a = app();
+        a.run("file.new", json!({"width": 16, "height": 16})).unwrap();
+        a.services.export = Some(Box::new(|_: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"fake-jpeg".to_vec(), Vec::new()))));
+        a.services.export_base_dir = Some("DCIM/Niveta".into());
+        a.services.save_to_gallery = Some(Box::new(move |name: &str, bytes: &[u8]| {
+            sink.lock().unwrap_or_else(|e| e.into_inner()).push((name.to_string(), bytes.to_vec()));
+            Ok(format!("DCIM/Niveta/{name}"))
+        }));
+        a.services.write = Some(Box::new(|_: &str, _: &[u8]| Err("the path writer should not run".into())));
+        open(&mut a);
+        a.ui.mobile_export.filename = "shot".into();
+        confirm(&mut a);
+        assert!(!a.ui.status_error, "{}", a.ui.status);
+        assert!(a.ui.status.contains("DCIM/Niveta/shot.png"), "{}", a.ui.status);
+        let saved = saved.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].0, "shot.png");
+        assert_eq!(saved[0].1, b"fake-jpeg");
     }
 
     #[test]
