@@ -823,7 +823,7 @@
 	Embed Color Profile	Вбудувати колірний профіль
 	Assign Profile…	Призначити профіль…
 	Convert to Profile…	Перетворити на профіль…
-	PhotoCraft Manages Colors	PhotoCraft керує кольорами
+	Niveta Manages Colors	Niveta керує кольорами
 	Printer Manages Colors	Принтер керує кольорами
 	(print to the printer)	(друк на принтері)
 	Absolute Colorimetric	Абсолютний колориметричний
@@ -1389,8 +1389,8 @@
 	Use File › Open, or paste a copied image with {paste}.	Скористайтеся меню Файл › Відкрити або вставте скопійоване зображення за допомогою {paste}.
 	Native file drag-and-drop is unavailable	Нативне перетягування файлів недоступне
 	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or copy the image in your file manager and paste it with {paste}.	Нативне перетягування файлів у Wayland ще не підтримується. Скористайтеся меню Файл › Відкрити або скопіюйте зображення у файловому менеджері та вставте його за допомогою {paste}.
-	To drop files, start PhotoCraft under XWayland: `{command}`	Щоб перетягувати файли, запустіть PhotoCraft під XWayland: `{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	Або виберіть X11 у Налаштування › Продуктивність › Сервер відображення Linux: PhotoCraft завжди запускатиметься під XWayland.
+	To drop files, start Niveta under XWayland: `{command}`	Щоб перетягувати файли, запустіть Niveta під XWayland: `{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	Або виберіть X11 у Налаштування › Продуктивність › Сервер відображення Linux: Niveta завжди запускатиметься під XWayland.
 	Edit › Paste	Редагування › Вставити
 	Photo	Фото
 	Print	Друк
@@ -1562,7 +1562,7 @@
 	Don't Save	Не зберігати
 	No	Ні
 	Yes	Так
-	These settings aren't available in PhotoCraft yet.	Ці параметри ще недоступні у PhotoCraft.
+	These settings aren't available in Niveta yet.	Ці параметри ще недоступні у Niveta.
 	Shortcut removed.	Клавіатурне скорочення вилучено.
 	All shortcuts reset to Photoshop defaults.	Усі клавіатурні скорочення скинуто до типових значень Photoshop.
 	Delete Shortcut	Видалити клавіатурне скорочення
@@ -2022,7 +2022,7 @@
 	Output:	Вихід:
 	Paint Overlay	Малювати накладання
 	Pattern Size	Розмір візерунка
-	PhotoCraft	PhotoCraft
+	Niveta	Niveta
 	Niveta — an open-source, native image editor written in Rust.	Niveta — нативний редактор зображень із відкритим кодом, написаний на Rust.
 	Position and Size	Положення та розмір
 	Preserve Details	Зберігати деталі
@@ -2320,7 +2320,7 @@
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	Автоматичний режим використовує прискорення GPU, коли воно доступне, та переходить на рендеринг CPU в разі помилок.
 	Switched to CPU rendering	Перехід на рендеринг CPU
 	GPU acceleration could not continue. Your documents are unchanged.	Прискорення GPU не може продовжувати роботу. Ваші документи не змінено.
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	PhotoCraft використовує компонувальник зображень CPU. Вікно може й далі використовувати ваш графічний адаптер.
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	Niveta використовує компонувальник зображень CPU. Вікно може й далі використовувати ваш графічний адаптер.
 	Retry GPU requires a restart. Save your work first.	Повторна спроба використати GPU потребує перезапуску. Спочатку збережіть роботу.
 	Keep Using CPU	Продовжити з CPU
 	Retry GPU	Повторити спробу з GPU
@@ -3391,9 +3391,9 @@ cameraRaw	Masking	Маскування
 	Up	Вгору
 	Empty folder	Порожня папка
 	First {n} entries shown	Показано перші {n} записів
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft потрібен доступ до файлів на цьому пристрої, щоб відкривати їх. Дозвольте тут доступ до фото або відкрийте Налаштування для решти файлів (PSD, .pcraft).
-	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft потрібен дозвіл «Доступ до всіх файлів», щоб відкривати файли на цьому пристрої.
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Відкрий Налаштування > Застосунки > PhotoCraft і ввімкни «Доступ до всіх файлів», потім повернись сюди.
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Niveta потрібен доступ до файлів на цьому пристрої, щоб відкривати їх. Дозвольте тут доступ до фото або відкрийте Налаштування для решти файлів (PSD, .pcraft).
+	Niveta needs the "All files access" permission to open files from this device.	Niveta потрібен дозвіл «Доступ до всіх файлів», щоб відкривати файли на цьому пристрої.
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	Відкрий Налаштування > Застосунки > Niveta і ввімкни «Доступ до всіх файлів», потім повернись сюди.
 	Allow access	Дозволити доступ
 	Open Settings	Відкрити налаштування
 	Check again	Перевірити
@@ -3406,7 +3406,7 @@ cameraRaw	Masking	Маскування
 	No edits yet.	Поки немає правок.
 	Start now	Почати
 	No photos found.	Фото не знайдено.
-	PhotoCraft needs access to this device's photos to show them here.	Щоб показати фотографії тут, PhotoCraft потрібен доступ до фото на цьому пристрої.
+	Niveta needs access to this device's photos to show them here.	Щоб показати фотографії тут, Niveta потрібен доступ до фото на цьому пристрої.
 	Choose image	Вибрати зображення
 	just now	щойно
 	{n} min ago	{n} хв тому

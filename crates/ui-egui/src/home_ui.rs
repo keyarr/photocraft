@@ -1,6 +1,6 @@
 //! Home screen for phones: a modern start page with recent edits and device photos.
 //!
-//! - Top bar: only `PhotoCraft` (semibold) on the left and the settings button
+//! - Top bar: only `Niveta` (semibold) on the left and the settings button
 //!   on the right. No logo image, no subtitle, no search, no overflow menu.
 //! - `Suas criações` + one-line hint + a blue `+ Nova edição` button that
 //!   reuses [`NivetaApp::open_interactive`] (the on-device browser on
@@ -48,7 +48,7 @@ const MAX_THUMB_BYTES: u64 = 32 * 1024 * 1024;
 /// frame: the stale list keeps showing while the rescan runs on a later one.
 const PHOTOS_TTL: f64 = 15.0;
 
-/// Home top bar: `PhotoCraft` left, settings right. Used on narrow screens
+/// Home top bar: `Niveta` left, settings right. Used on narrow screens
 /// instead of [`crate::mobile_ui::header`] when there is nothing to edit.
 pub fn header(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
@@ -58,7 +58,7 @@ pub fn header(app: &mut NivetaApp, ui: &mut egui::Ui) {
         .show(ui, |ui| {
             ui.horizontal_centered(|ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
-                ui.label(egui::RichText::new(tl!("PhotoCraft")).font(crate::theme::semibold(18.0)).color(t.text));
+                ui.label(egui::RichText::new(tl!("Niveta")).font(crate::theme::semibold(18.0)).color(t.text));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if crate::icons::button(ui, "settings", 44.0, false, tl!("Preferences")).clicked() {
                         crate::prefs_ui::open_preferences(app, "general");
@@ -263,7 +263,7 @@ fn photos_grid(
         if storage {
             ui.label(egui::RichText::new(tl!("No photos found.")).size(13.0).color(t.text_dim));
         } else {
-            ui.label(egui::RichText::new(tl!("PhotoCraft needs access to this device's photos to show them here.")).size(13.0).color(t.text_dim));
+            ui.label(egui::RichText::new(tl!("Niveta needs access to this device's photos to show them here.")).size(13.0).color(t.text_dim));
         }
         ui.add_space(8.0);
         if crate::widgets::secondary_button(ui, tl!("Choose image"), 170.0).clicked() {
@@ -864,7 +864,7 @@ mod tests {
         );
         NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
-        for probe in ["PhotoCraft", "Your creations", "+ New edit", "Recently edited", "Recent photos"] {
+        for probe in ["Niveta", "Your creations", "+ New edit", "Recently edited", "Recent photos"] {
             assert!(h.query_all_by_label_contains(probe).next().is_some(), "home shows {probe}");
         }
         assert!(h.query_all_by_label_contains("See all").next().is_none(), "no photo grid, no See all");

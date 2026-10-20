@@ -16,7 +16,7 @@
 # particular not the Czech localisation of Adobe Photoshop. Add entries the same way.
 # Conventions: menus are nouns (Soubor, Úpravy, Obraz ...), commands are infinitives (Otevřít…,
 # Uložit jako…), sentence case as in the English source. Product and technology names
-# (PhotoCraft, ArtCraft, OpenType, CMYK, Lab ...) stay in Latin letters; the trailing "…" of
+# (Niveta, ArtCraft, OpenType, CMYK, Lab ...) stay in Latin letters; the trailing "…" of
 # dialog commands is kept.
 
 	File	Soubor
@@ -998,8 +998,8 @@
 	Drop an image or PSD anywhere to open it.	Přetáhněte sem obrázek nebo PSD a otevře se.
 	Native file drag-and-drop is unavailable	Nativní přetahování souborů ve Waylandu není dostupné
 	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or copy the image in your file manager and paste it with {paste}.	Nativní přetahování souborů ve Waylandu zatím není podporováno. Použijte Soubor › Otevřít, nebo obrázek zkopírujte ve správci souborů a vložte ho pomocí {paste}.
-	To drop files, start PhotoCraft under XWayland: `{command}`	Chcete-li soubory přetahovat, spusťte PhotoCraft v XWayland: `{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	Nebo nastavte Předvolby › Výkon › Zobrazovací server Linuxu na X11: PhotoCraft se pak vždy spustí v XWayland.
+	To drop files, start Niveta under XWayland: `{command}`	Chcete-li soubory přetahovat, spusťte Niveta v XWayland: `{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	Nebo nastavte Předvolby › Výkon › Zobrazovací server Linuxu na X11: Niveta se pak vždy spustí v XWayland.
 	Edit › Paste	Úpravy › Vložit
 	Duplicate Layers…	Duplikovat vrstvy…
 	Duplicate style	Duplikovat styl
@@ -1246,8 +1246,8 @@
 	Perspective Warp is not active	Perspektivní deformace není aktivní
 	Perspective Warp: draw planes along the image's perspective, then switch to Warp	Perspektivní deformace: nakreslete roviny podle perspektivy obrazu a pak přepněte na deformaci
 	Photo Filter	Fotografický filtr
-	PhotoCraft	PhotoCraft
-	PhotoCraft Manages Colors	Barvy spravuje PhotoCraft
+	Niveta	Niveta
+	Niveta Manages Colors	Barvy spravuje Niveta
 	Niveta — an open-source, native image editor written in Rust.	Niveta — nativní editor obrázků s otevřeným zdrojovým kódem napsaný v jazyce Rust.
 	Pin Depth:	Hloubka špendlíku:
 	Pixel Length:	Délka v pixelech:
@@ -1964,7 +1964,7 @@
 	System Info	Informace o systému
 	More panels	Další panely
 	More documents	Další dokumenty
-	These settings aren't available in PhotoCraft yet.	Tato nastavení zatím v aplikaci PhotoCraft nejsou k dispozici.
+	These settings aren't available in Niveta yet.	Tato nastavení zatím v aplikaci Niveta nejsou k dispozici.
 	Graphics	Grafika
 	Reset GPU Backend	Obnovit grafický backend
 	Applies at next launch.	Projeví se při příštím spuštění.
@@ -2064,7 +2064,7 @@
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	Automatický režim používá dostupnou GPU a při chybě přejde na CPU.
 	Switched to CPU rendering	Přepnuto na vykreslování CPU
 	GPU acceleration could not continue. Your documents are unchanged.	Akcelerace GPU nemohla pokračovat. Dokumenty zůstaly nezměněny.
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	PhotoCraft skládá obraz pomocí CPU. Okno může nadále používat grafický adaptér.
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	Niveta skládá obraz pomocí CPU. Okno může nadále používat grafický adaptér.
 	Retry GPU requires a restart. Save your work first.	Opakování GPU vyžaduje restart. Nejprve uložte práci.
 	Keep Using CPU	Pokračovat s CPU
 	Retry GPU	Zkusit GPU znovu
@@ -2283,9 +2283,9 @@ fontWeight	Italic	Kurzíva
 	Up	Nahoru
 	Empty folder	Prázdná složka
 	First {n} entries shown	Zobrazeno prvních {n} položek
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft potřebuje přístup k souborům v tomto zařízení, aby je mohl otevírat. Povolte tu přístup k fotkám, nebo otevřete Nastavení pro ostatní soubory (PSD, .pcraft).
-	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft potřebuje oprávnění „Přístup ke všem souborům“, aby mohl otevírat soubory v tomto zařízení.
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Otevři Nastavení > Aplikace > PhotoCraft a zapni „Přístup ke všem souborům“, pak se vrať sem.
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Niveta potřebuje přístup k souborům v tomto zařízení, aby je mohl otevírat. Povolte tu přístup k fotkám, nebo otevřete Nastavení pro ostatní soubory (PSD, .pcraft).
+	Niveta needs the "All files access" permission to open files from this device.	Niveta potřebuje oprávnění „Přístup ke všem souborům“, aby mohl otevírat soubory v tomto zařízení.
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	Otevři Nastavení > Aplikace > Niveta a zapni „Přístup ke všem souborům“, pak se vrať sem.
 	Allow access	Povolit přístup
 	Open Settings	Otevřít nastavení
 	Check again	Zkontrolovat
@@ -2298,7 +2298,7 @@ fontWeight	Italic	Kurzíva
 	No edits yet.	Zatím žádné úpravy.
 	Start now	Začít
 	No photos found.	Nebyly nalezeny žádné fotky.
-	PhotoCraft needs access to this device's photos to show them here.	Aby je zde mohl zobrazit, potřebuje PhotoCraft přístup k fotkám v tomto zařízení.
+	Niveta needs access to this device's photos to show them here.	Aby je zde mohl zobrazit, potřebuje Niveta přístup k fotkám v tomto zařízení.
 	Choose image	Vybrat obrázek
 	just now	právě teď
 	{n} min ago	před {n} min

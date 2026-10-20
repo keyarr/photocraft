@@ -39,7 +39,7 @@ pub fn discord_button(app: &mut NivetaApp, ui: &mut egui::Ui, min_width: f32) ->
     r
 }
 
-/// "PhotoCraft website · GitHub · ArtCraft" as links, centred. Clicks route through [`open`] (the
+/// "Niveta website · GitHub · ArtCraft" as links, centred. Clicks route through [`open`] (the
 /// platform browser service) rather than `ui.hyperlink_to`, which uses the unreliable `ctx.open_url`.
 pub fn link_row(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let t = crate::theme::Tokens::get(ui.ctx());

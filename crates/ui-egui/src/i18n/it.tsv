@@ -9,7 +9,7 @@
 # Clean-room: every entry was written from the plain meaning of the English label using ordinary
 # Italian computing vocabulary (livello, pennello, selezione, tela ...). No proprietary localisation
 # resource, string table or product UI was consulted or copied; add entries the same way.
-# Product and technology names (PhotoCraft, ArtCraft, OpenType, CMYK, Lab ...) stay in Latin
+# Product and technology names (Niveta, ArtCraft, OpenType, CMYK, Lab ...) stay in Latin
 # letters; the trailing … of dialog commands is kept.
 	File	File
 	Edit	Modifica
@@ -982,8 +982,8 @@
 	Drop an image or PSD anywhere to open it.	Trascina un'immagine o PSD ovunque per aprirlo.
 	Native file drag-and-drop is unavailable	Il drag-and-drop nativo file non è disponibile su Wayland
 	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or copy the image in your file manager and paste it with {paste}.	Il drag-and-drop nativo non è ancora supportato su Wayland. Usa File › Apri, oppure copia l'immagine nel file manager e incollala con {paste}.
-	To drop files, start PhotoCraft under XWayland: `{command}`	Per trascinare file, avvia PhotoCraft sotto XWayland: `{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	Oppure imposta Preferenze › Prestazioni › Server grafico Linux su X11: PhotoCraft partirà sempre sotto XWayland.
+	To drop files, start Niveta under XWayland: `{command}`	Per trascinare file, avvia Niveta sotto XWayland: `{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	Oppure imposta Preferenze › Prestazioni › Server grafico Linux su X11: Niveta partirà sempre sotto XWayland.
 	Edit › Paste	Modifica › Incolla
 	Duplicate Layers…	Duplica livelli…
 	Duplicate style	Duplica stile
@@ -1230,8 +1230,8 @@
 	Perspective Warp is not active	Altera prospettiva non attiva
 	Perspective Warp: draw planes along the image's perspective, then switch to Warp	Altera prospettiva: disegna piani lungo la prospettiva immagine, poi passa ad Altera
 	Photo Filter	Filtro fotografico
-	PhotoCraft	PhotoCraft
-	PhotoCraft Manages Colors	PhotoCraft gestisce i colori
+	Niveta	Niveta
+	Niveta Manages Colors	Niveta gestisce i colori
 	Niveta — an open-source, native image editor written in Rust.	Niveta — editor immagini nativo open-source scritto in Rust.
 	Pin Depth:	Profondità pin:
 	Pixel Length:	Lunghezza pixel:
@@ -1946,7 +1946,7 @@
 	System Info	Info sistema
 	More panels	Altri pannelli
 	More documents	Altri documenti
-	These settings aren't available in PhotoCraft yet.	Queste impostazioni non sono ancora disponibili in PhotoCraft.
+	These settings aren't available in Niveta yet.	Queste impostazioni non sono ancora disponibili in Niveta.
 	Graphics	Grafica
 	Reset GPU Backend	Reimposta backend GPU
 	Applies at next launch.	Si applica al prossimo avvio.
@@ -2135,7 +2135,7 @@
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	Automatico usa accelerazione GPU quando disponibile e ripiega su CPU in caso di errori.
 	Switched to CPU rendering	Passato a rendering CPU
 	GPU acceleration could not continue. Your documents are unchanged.	Accelerazione GPU non ha potuto continuare. I documenti sono invariati.
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	PhotoCraft sta componendo immagini su CPU. La finestra può ancora usare adattatore grafico.
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	Niveta sta componendo immagini su CPU. La finestra può ancora usare adattatore grafico.
 	Retry GPU requires a restart. Save your work first.	Riprovare GPU richiede riavvio. Salva prima il lavoro.
 	Keep Using CPU	Continua su CPU
 	Retry GPU	Riprova GPU
@@ -2352,9 +2352,9 @@ fontWeight	Italic	Corsivo
 	Up	Su
 	Empty folder	Cartella vuota
 	First {n} entries shown	Prime {n} voci mostrate
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft ha bisogno di accedere ai file di questo dispositivo per aprirli. Consenti qui l’accesso alle foto, oppure apri le Impostazioni per ogni tipo di file (PSD, .pcraft).
-	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft ha bisogno dell’autorizzazione "Accesso a tutti i file" per aprire i file di questo dispositivo.
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Apri Impostazioni > App > PhotoCraft e attiva "Accesso a tutti i file", poi torna qui.
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Niveta ha bisogno di accedere ai file di questo dispositivo per aprirli. Consenti qui l’accesso alle foto, oppure apri le Impostazioni per ogni tipo di file (PSD, .pcraft).
+	Niveta needs the "All files access" permission to open files from this device.	Niveta ha bisogno dell’autorizzazione "Accesso a tutti i file" per aprire i file di questo dispositivo.
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	Apri Impostazioni > App > Niveta e attiva "Accesso a tutti i file", poi torna qui.
 	Allow access	Consenti accesso
 	Open Settings	Apri impostazioni
 	Check again	Verifica
@@ -2367,7 +2367,7 @@ fontWeight	Italic	Corsivo
 	No edits yet.	Nessuna modifica ancora.
 	Start now	Inizia ora
 	No photos found.	Nessuna foto trovata.
-	PhotoCraft needs access to this device's photos to show them here.	PhotoCraft ha bisogno di accedere alle foto di questo dispositivo per mostrarle qui.
+	Niveta needs access to this device's photos to show them here.	Niveta ha bisogno di accedere alle foto di questo dispositivo per mostrarle qui.
 	Choose image	Scegli immagine
 	just now	adesso
 	{n} min ago	{n} min fa

@@ -1,4 +1,4 @@
-//! PhotoCraft for Android: eframe shell, touch-first, CPU canvas first.
+//! Niveta for Android: eframe shell, touch-first, CPU canvas first.
 //!
 //! Same `NivetaApp` + engine as desktop/web, only the `Services` differ:
 //! files arrive as bytes through the inbox (Storage Access Framework hands the

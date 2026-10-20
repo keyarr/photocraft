@@ -12,7 +12,7 @@
 # Clean-room: every entry was written from the plain meaning of the English label using ordinary
 # German image-editing vocabulary (Ebene, Maske, Auswahl, Weichzeichnen ...). No proprietary
 # localisation resource, string table or product UI was consulted or copied; add entries the same
-# way. Product and technology names (PhotoCraft, ArtCraft, OpenType, CMYK, Lab ...) stay in Latin
+# way. Product and technology names (Niveta, ArtCraft, OpenType, CMYK, Lab ...) stay in Latin
 # letters; the trailing "…" of dialog commands is kept. Plural rule: one|other (n != 1 -> other).
 
 	File	Datei
@@ -982,8 +982,8 @@
 	Drop an image or PSD anywhere to open it.	Ziehe ein Bild oder PSD an eine beliebige Stelle, um es zu öffnen.
 	Native file drag-and-drop is unavailable	Natives Ziehen und Ablegen von Dateien ist nicht verfügbar
 	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or copy the image in your file manager and paste it with {paste}.	Natives Ziehen und Ablegen von Dateien wird unter Wayland noch nicht unterstützt. Nutze Datei › Öffnen oder kopiere das Bild im Dateimanager und füge es mit {paste} ein.
-	To drop files, start PhotoCraft under XWayland: `{command}`	Um Dateien abzulegen, starte PhotoCraft unter XWayland: `{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	Oder stelle Voreinstellungen › Leistung › Linux-Anzeigeserver auf X11: PhotoCraft startet dann immer unter XWayland.
+	To drop files, start Niveta under XWayland: `{command}`	Um Dateien abzulegen, starte Niveta unter XWayland: `{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	Oder stelle Voreinstellungen › Leistung › Linux-Anzeigeserver auf X11: Niveta startet dann immer unter XWayland.
 	Edit › Paste	Bearbeiten › Einfügen
 	Duplicate Layers…	Ebenen duplizieren…
 	Duplicate style	Stil duplizieren
@@ -1230,8 +1230,8 @@
 	Perspective Warp is not active	Perspektivische Verkrümmung ist nicht aktiv
 	Perspective Warp: draw planes along the image's perspective, then switch to Warp	Perspektivische Verkrümmung: zeichne Flächen entlang der Bildperspektive, wechsle dann zu Verkrümmen
 	Photo Filter	Foto-Filter
-	PhotoCraft	PhotoCraft
-	PhotoCraft Manages Colors	PhotoCraft verwaltet die Farben
+	Niveta	Niveta
+	Niveta Manages Colors	Niveta verwaltet die Farben
 	Niveta — an open-source, native image editor written in Rust.	Niveta — ein nativer Open-Source-Bildeditor, geschrieben in Rust.
 	Pin Depth:	Pin-Tiefe:
 	Pixel Length:	Pixel-Länge:
@@ -1936,7 +1936,7 @@
 	System Info	Systeminformationen
 	More panels	Weitere Bedienfelder
 	More documents	Weitere Dokumente
-	These settings aren't available in PhotoCraft yet.	Diese Einstellungen gibt es in PhotoCraft noch nicht.
+	These settings aren't available in Niveta yet.	Diese Einstellungen gibt es in Niveta noch nicht.
 	Graphics	Grafik
 	Reset GPU Backend	GPU-Backend zurücksetzen
 	Applies at next launch.	Wird beim nächsten Start angewendet.
@@ -2115,7 +2115,7 @@
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	Automatisch nutzt GPU-Beschleunigung, wenn verfügbar, und fällt bei Fehlern auf CPU-Rendering zurück.
 	Switched to CPU rendering	Auf CPU-Rendering umgeschaltet
 	GPU acceleration could not continue. Your documents are unchanged.	GPU-Beschleunigung konnte nicht fortgesetzt werden. Deine Dokumente sind unverändert.
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	PhotoCraft nutzt den CPU-Bildkompositor. Das Fenster kann weiterhin deinen Grafikadapter verwenden.
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	Niveta nutzt den CPU-Bildkompositor. Das Fenster kann weiterhin deinen Grafikadapter verwenden.
 	Retry GPU requires a restart. Save your work first.	GPU erneut versuchen erfordert einen Neustart. Speichere zuerst deine Arbeit.
 	Keep Using CPU	CPU weiter verwenden
 	Retry GPU	GPU erneut versuchen
@@ -2321,9 +2321,9 @@ fontWeight	Italic	Kursiv
 	Up	Nach oben
 	Empty folder	Leerer Ordner
 	First {n} entries shown	Erste {n} Einträge angezeigt
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft braucht Zugriff auf die Dateien auf diesem Gerät, um sie zu öffnen. Erlaube hier den Fotozugriff oder öffne die Einstellungen für alle Dateiformate (PSD, .pcraft).
-	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft benötigt die Berechtigung „Zugriff auf alle Dateien“, um Dateien auf diesem Gerät zu öffnen.
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Öffne Einstellungen > Apps > PhotoCraft und aktiviere „Zugriff auf alle Dateien“, dann komm hierher zurück.
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Niveta braucht Zugriff auf die Dateien auf diesem Gerät, um sie zu öffnen. Erlaube hier den Fotozugriff oder öffne die Einstellungen für alle Dateiformate (PSD, .pcraft).
+	Niveta needs the "All files access" permission to open files from this device.	Niveta benötigt die Berechtigung „Zugriff auf alle Dateien“, um Dateien auf diesem Gerät zu öffnen.
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	Öffne Einstellungen > Apps > Niveta und aktiviere „Zugriff auf alle Dateien“, dann komm hierher zurück.
 	Allow access	Zugriff erlauben
 	Open Settings	Einstellungen öffnen
 	Check again	Prüfen
@@ -2336,7 +2336,7 @@ fontWeight	Italic	Kursiv
 	No edits yet.	Noch keine Bearbeitungen.
 	Start now	Jetzt starten
 	No photos found.	Keine Fotos gefunden.
-	PhotoCraft needs access to this device's photos to show them here.	PhotoCraft benötigt Zugriff auf die Fotos dieses Geräts, um sie hier anzuzeigen.
+	Niveta needs access to this device's photos to show them here.	Niveta benötigt Zugriff auf die Fotos dieses Geräts, um sie hier anzuzeigen.
 	Choose image	Bild wählen
 	just now	gerade eben
 	{n} min ago	vor {n} Min.

@@ -142,7 +142,7 @@ pub fn header(app: &mut NivetaApp, ui: &mut egui::Ui) {
                     }
                 }
                 let title =
-                    app.session.active().map(|st| format!("{}{}", st.doc.name, if st.is_dirty() { " *" } else { "" })).unwrap_or_else(|| "PhotoCraft".into());
+                    app.session.active().map(|st| format!("{}{}", st.doc.name, if st.is_dirty() { " *" } else { "" })).unwrap_or_else(|| "Niveta".into());
                 // Whatever the right-hand buttons take, the title gets the rest, truncated.
                 let right_reserve = if has_doc { 72.0 } else { 0.0 } + 48.0 + 12.0;
                 let avail = (ui.available_width() - right_reserve).max(48.0);

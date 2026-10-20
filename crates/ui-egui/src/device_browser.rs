@@ -755,10 +755,10 @@ fn gate(ctx: &egui::Context, services: &mut crate::Services) -> Gate {
             });
         });
         if assisted {
-            ui.label(tl!("PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft)."));
+            ui.label(tl!("Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft)."));
         } else {
-            ui.label(tl!("PhotoCraft needs the \"All files access\" permission to open files from this device."));
-            ui.label(tl!("Open Settings > Apps > PhotoCraft and turn on \"All files access\", then come back here."));
+            ui.label(tl!("Niveta needs the \"All files access\" permission to open files from this device."));
+            ui.label(tl!("Open Settings > Apps > Niveta and turn on \"All files access\", then come back here."));
         }
         ui.add_space(8.0);
         if assisted {

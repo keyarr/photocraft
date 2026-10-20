@@ -92,7 +92,7 @@ pub struct ImportResult {
     pub document: Document,
     /// Human-readable notes about anything approximated or dropped.
     pub warnings: Vec<String>,
-    /// Save must not write back to the source (an Affinity document: PhotoCraft can't write it).
+    /// Save must not write back to the source (an Affinity document: Niveta can't write it).
     pub source_read_only: bool,
     /// Only a stand-in picture of the file (an Affinity document whose native data couldn't be
     /// read): Open shows it with its warning; Place and other auxiliary imports refuse it.

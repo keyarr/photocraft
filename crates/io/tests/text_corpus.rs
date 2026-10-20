@@ -144,7 +144,7 @@ fn corpus_tysh_lossless() {
     assert_eq!(find(&bytes), find(&out));
 }
 
-/// A text layer created in Photocraft (no PSD data) exports as an editable type layer and
+/// A text layer created in Niveta (no PSD data) exports as an editable type layer and
 /// imports back with the same model.
 #[test]
 fn created_text_layer_roundtrips_through_psd() {

@@ -4,7 +4,7 @@
 # Clean-room: every entry was written from the plain meaning of the English label using ordinary
 # Dutch computing vocabulary (laag, selectie, masker, aanpassingslaag, penseel, verloop ...). No
 # proprietary localisation resource, string table or product UI was consulted or copied; add
-# entries the same way. Product and technology names (PhotoCraft, ArtCraft, OpenType, CMYK, Lab ...)
+# entries the same way. Product and technology names (Niveta, ArtCraft, OpenType, CMYK, Lab ...)
 # stay as they are; the trailing "…" of dialog commands is kept. UI text addresses the user
 # informally ("je") and uses sentence case.
 
@@ -974,8 +974,8 @@
 	Drop an image or PSD anywhere to open it.	Sleep een afbeelding of PSD ergens naartoe om deze te openen.
 	Native file drag-and-drop is unavailable	Bestanden slepen en neerzetten is niet beschikbaar
 	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or copy the image in your file manager and paste it with {paste}.	Bestanden slepen en neerzetten wordt nog niet ondersteund onder Wayland. Gebruik Bestand › Openen, of kopieer de afbeelding in je bestandsbeheerder en plak deze met {paste}.
-	To drop files, start PhotoCraft under XWayland: `{command}`	Start PhotoCraft onder XWayland om bestanden neer te zetten: `{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	Of zet Voorkeuren › Prestaties › Linux-weergaveserver op X11: PhotoCraft start dan altijd onder XWayland.
+	To drop files, start Niveta under XWayland: `{command}`	Start Niveta onder XWayland om bestanden neer te zetten: `{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	Of zet Voorkeuren › Prestaties › Linux-weergaveserver op X11: Niveta start dan altijd onder XWayland.
 	Edit › Paste	Bewerken › Plakken
 	Duplicate Layers…	Lagen dupliceren…
 	Duplicate style	Stijl dupliceren
@@ -1222,8 +1222,8 @@
 	Perspective Warp is not active	Perspectiefvervorming is niet actief
 	Perspective Warp: draw planes along the image's perspective, then switch to Warp	Perspectiefvervorming: teken vlakken langs het perspectief van de afbeelding en schakel daarna naar Verbuigen
 	Photo Filter	Fotofilter
-	PhotoCraft	PhotoCraft
-	PhotoCraft Manages Colors	PhotoCraft beheert kleuren
+	Niveta	Niveta
+	Niveta Manages Colors	Niveta beheert kleuren
 	Niveta — an open-source, native image editor written in Rust.	Niveta — een opensource, native afbeeldingseditor geschreven in Rust.
 	Pin Depth:	Speldiepte:
 	Pixel Length:	Pixellengte:
@@ -1926,7 +1926,7 @@
 	System Info	Systeeminformatie
 	More panels	Meer panelen
 	More documents	Meer documenten
-	These settings aren't available in PhotoCraft yet.	Deze instellingen zijn nog niet beschikbaar in PhotoCraft.
+	These settings aren't available in Niveta yet.	Deze instellingen zijn nog niet beschikbaar in Niveta.
 	Graphics	Grafisch
 	Reset GPU Backend	GPU-backend herstellen
 	Applies at next launch.	Wordt toegepast bij de volgende start.
@@ -2105,7 +2105,7 @@
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	Automatisch gebruikt GPU-versnelling indien beschikbaar en valt bij fouten terug op CPU-rendering.
 	Switched to CPU rendering	Overgeschakeld naar CPU-rendering
 	GPU acceleration could not continue. Your documents are unchanged.	GPU-versnelling kon niet doorgaan. Je documenten zijn ongewijzigd.
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	PhotoCraft gebruikt de CPU-beeldcompositor. Het venster kan nog steeds je grafische adapter gebruiken.
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	Niveta gebruikt de CPU-beeldcompositor. Het venster kan nog steeds je grafische adapter gebruiken.
 	Retry GPU requires a restart. Save your work first.	GPU opnieuw proberen vereist een herstart. Sla eerst je werk op.
 	Keep Using CPU	CPU blijven gebruiken
 	Retry GPU	GPU opnieuw proberen
@@ -2460,7 +2460,7 @@ cameraRaw	Color	Kleur
 	Restart Required	Herstart vereist
 	Restart	Opnieuw starten
 	Quit	Afsluiten
-	Quit PhotoCraft	PhotoCraft afsluiten
+	Quit Niveta	Niveta afsluiten
 	Close Window	Venster sluiten
 	New Window	Nieuw venster
 	Open Image	Afbeelding openen
@@ -3229,7 +3229,7 @@ cameraRaw	Color	Kleur
 	Modify Date	Wijzigingsdatum
 	Mosaic	Mozaïek
 	Motion Blur	Bewegingsonscherpte
-	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or run PhotoCraft under XWayland with `WAYLAND_DISPLAY= photocraft`.	Bestanden slepen en neerzetten wordt nog niet ondersteund onder Wayland. Gebruik Bestand › Openen, of start PhotoCraft onder XWayland met `WAYLAND_DISPLAY= photocraft`.
+	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or run Niveta under XWayland with `WAYLAND_DISPLAY= photocraft`.	Bestanden slepen en neerzetten wordt nog niet ondersteund onder Wayland. Gebruik Bestand › Openen, of start Niveta onder XWayland met `WAYLAND_DISPLAY= photocraft`.
 	Neon Glow	Neongloed
 	New Guide Layout	Nieuwe hulplijnindeling
 	New Path	Nieuw pad
@@ -3468,9 +3468,9 @@ cameraRaw	Whites	Witten
 	Up	Omhoog
 	Empty folder	Lege map
 	First {n} entries shown	Eerste {n} items weergegeven
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft heeft toegang tot de bestanden op dit apparaat nodig om ze te openen. Sta hier fototoegang toe, of open Instellingen voor alle bestandstypen (PSD, .pcraft).
-	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft heeft de toestemming "Toegang tot alle bestanden" nodig om bestanden op dit apparaat te openen.
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Open Instellingen > Apps > PhotoCraft en schakel "Toegang tot alle bestanden" in, en kom hier terug.
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Niveta heeft toegang tot de bestanden op dit apparaat nodig om ze te openen. Sta hier fototoegang toe, of open Instellingen voor alle bestandstypen (PSD, .pcraft).
+	Niveta needs the "All files access" permission to open files from this device.	Niveta heeft de toestemming "Toegang tot alle bestanden" nodig om bestanden op dit apparaat te openen.
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	Open Instellingen > Apps > Niveta en schakel "Toegang tot alle bestanden" in, en kom hier terug.
 	Allow access	Toegang toestaan
 	Open Settings	Instellingen openen
 	Check again	Controleren
@@ -3483,7 +3483,7 @@ cameraRaw	Whites	Witten
 	No edits yet.	Nog geen bewerkingen.
 	Start now	Nu starten
 	No photos found.	Geen foto's gevonden.
-	PhotoCraft needs access to this device's photos to show them here.	PhotoCraft heeft toegang tot de foto's op dit apparaat nodig om ze hier te tonen.
+	Niveta needs access to this device's photos to show them here.	Niveta heeft toegang tot de foto's op dit apparaat nodig om ze hier te tonen.
 	Choose image	Afbeelding kiezen
 	just now	zojuist
 	{n} min ago	{n} min geleden

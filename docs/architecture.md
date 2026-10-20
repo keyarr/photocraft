@@ -1,4 +1,4 @@
-# Photocraft Architecture
+# Niveta Architecture
 
 Status: draft v1 (2026-09-30). This plan does not assume a final UI toolkit. The candidates are discussed in [`rust-framework-options.md`](rust-framework-options.md).
 

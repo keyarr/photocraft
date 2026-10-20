@@ -559,7 +559,7 @@ fn download_for_web(app: &mut NivetaApp, mut p: Value) -> Result<Value, String> 
 pub fn open_print(app: &mut NivetaApp) -> u64 {
     let mut f = Map::new();
     f.insert("__print".into(), json!(true));
-    f.insert("__label".into(), json!("PhotoCraft Print Settings"));
+    f.insert("__label".into(), json!("Niveta Print Settings"));
     if let Some(Value::Object(m)) = app.session.file_menu.last_print.clone() {
         f.extend(m);
     }
@@ -682,7 +682,7 @@ fn print_body(app: &mut NivetaApp, ui: &mut egui::Ui, f: &mut Map<String, Value>
                 "colorHandling",
                 &[
                     ("printerManages", tl!("Printer Manages Colors")),
-                    ("photocraftManages", tl!("PhotoCraft Manages Colors")),
+                    ("photocraftManages", tl!("Niveta Manages Colors")),
                     ("noColorManagement", tl!("No Color Management")),
                 ],
                 240.0,

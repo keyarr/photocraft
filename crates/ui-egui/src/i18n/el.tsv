@@ -1,4 +1,4 @@
-# Greek (el) PhotoCraft interface catalog.
+# Greek (el) Niveta interface catalog.
 # Columns separated by TAB: context, English source, Greek translation.
 # Original translations based on general Greek graphics/computing terminology.
 # Covers every source label the i18n coverage check lists.
@@ -645,7 +645,7 @@
 	Restart Required	Απαιτείται επανεκκίνηση
 	Restart	Επανεκκίνηση
 	Quit	Έξοδος
-	Quit PhotoCraft	Έξοδος από το PhotoCraft
+	Quit Niveta	Έξοδος από το Niveta
 	Close Window	Κλείσιμο παραθύρου
 	New Window	Νέο παράθυρο
 	Open Image	Άνοιγμα εικόνας
@@ -735,7 +735,7 @@
 	Pattern Size	Μέγεθος μοτίβου
 	Perspective Warp is not active	Ο μετασχηματισμός προοπτικής δεν είναι ενεργός
 	Perspective Warp: draw planes along the image's perspective, then switch to Warp	Μετασχηματισμός προοπτικής: σχεδιάστε επίπεδα σύμφωνα με την προοπτική της εικόνας και έπειτα επιλέξτε Παραμόρφωση
-	PhotoCraft Manages Colors	Διαχείριση χρωμάτων από το PhotoCraft
+	Niveta Manages Colors	Διαχείριση χρωμάτων από το Niveta
 	Niveta — an open-source, native image editor written in Rust.	Niveta — εγγενής εφαρμογή επεξεργασίας εικόνας ανοικτού κώδικα, γραμμένη σε Rust.
 	Pixels/Centimeter	Εικονοστοιχεία/εκατοστό
 	Pixels/Inch	Εικονοστοιχεία/ίντσα
@@ -1038,7 +1038,7 @@
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	Η αυτόματη λειτουργία χρησιμοποιεί επιτάχυνση GPU όταν είναι διαθέσιμη και επιστρέφει στην CPU σε περίπτωση σφάλματος.
 	Switched to CPU rendering	Έγινε μετάβαση σε απόδοση μέσω CPU
 	GPU acceleration could not continue. Your documents are unchanged.	Η επιτάχυνση GPU δεν μπόρεσε να συνεχιστεί. Τα έγγραφά σας δεν έχουν αλλάξει.
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	Το PhotoCraft χρησιμοποιεί σύνθεση εικόνας μέσω CPU. Το παράθυρο μπορεί να εξακολουθεί να χρησιμοποιεί την κάρτα γραφικών.
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	Το Niveta χρησιμοποιεί σύνθεση εικόνας μέσω CPU. Το παράθυρο μπορεί να εξακολουθεί να χρησιμοποιεί την κάρτα γραφικών.
 	Retry GPU requires a restart. Save your work first.	Η νέα προσπάθεια χρήσης GPU απαιτεί επανεκκίνηση. Αποθηκεύστε πρώτα την εργασία σας.
 	Keep Using CPU	Συνέχεια με CPU
 	Retry GPU	Νέα προσπάθεια χρήσης GPU
@@ -2591,7 +2591,7 @@
 	Move to	Μετακίνηση σε
 	NTSC Colors	Χρώματα NTSC
 	Name:	Όνομα:
-	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or run PhotoCraft under XWayland with `WAYLAND_DISPLAY= photocraft`.	Η μεταφορά και απόθεση αρχείων δεν υποστηρίζεται ακόμη στο Wayland. Χρησιμοποιήστε Αρχείο › Άνοιγμα ή εκτελέστε το PhotoCraft μέσω XWayland με `WAYLAND_DISPLAY= photocraft`.
+	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or run Niveta under XWayland with `WAYLAND_DISPLAY= photocraft`.	Η μεταφορά και απόθεση αρχείων δεν υποστηρίζεται ακόμη στο Wayland. Χρησιμοποιήστε Αρχείο › Άνοιγμα ή εκτελέστε το Niveta μέσω XWayland με `WAYLAND_DISPLAY= photocraft`.
 	Nearest Neighbor	Πλησιέστερος γείτονας
 	Nearest Neighbor (hard edges)	Πλησιέστερος γείτονας (σκληρές ακμές)
 	Nearest neighbor	Πλησιέστερος γείτονας
@@ -3001,7 +3001,7 @@
 	Text Position:	Θέση κειμένου:
 	Texture Each Tip	Υφή σε κάθε αποτύπωμα πινέλου
 	Texturizer	Εφαρμογή υφής
-	These settings aren't available in PhotoCraft yet.	Αυτές οι ρυθμίσεις δεν είναι ακόμη διαθέσιμες στο PhotoCraft.
+	These settings aren't available in Niveta yet.	Αυτές οι ρυθμίσεις δεν είναι ακόμη διαθέσιμες στο Niveta.
 	Thin	Λεπτό
 	Threshold Level	Στάθμη κατωφλίου
 	Thumbnail size (smallest: list)	Μέγεθος μικρογραφίας (μικρότερο: λίστα)
@@ -3271,7 +3271,7 @@ cameraRaw	Yellow	Κίτρινο
 	New Swatch Group…	Νέα ομάδα δειγμάτων χρωμάτων…
 	New Swatch…	Νέο δείγμα χρώματος…
 	OpenType	OpenType
-	PhotoCraft	PhotoCraft
+	Niveta	Niveta
 	Pupil Size	Μέγεθος κόρης
 	Replace Swatches…	Αντικατάσταση δειγμάτων χρωμάτων…
 	Reset Swatches	Επαναφορά δειγμάτων χρωμάτων
@@ -3337,8 +3337,8 @@ cameraRaw	Yellow	Κίτρινο
 	Red Eye Tool	Κόκκινα μάτια (Red Eye Tool)
 	Seafoam	Θαλασσί
 	Srgb	sRGB
-	To drop files, start PhotoCraft under XWayland: `{command}`	Για να αποθέσετε αρχεία, εκκινήστε το PhotoCraft μέσω XWayland: `{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	Ή ορίστε Προτιμήσεις › Επιδόσεις › Διακομιστής οθόνης Linux σε X11: το PhotoCraft θα εκκινεί τότε πάντα μέσω XWayland.
+	To drop files, start Niveta under XWayland: `{command}`	Για να αποθέσετε αρχεία, εκκινήστε το Niveta μέσω XWayland: `{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	Ή ορίστε Προτιμήσεις › Επιδόσεις › Διακομιστής οθόνης Linux σε X11: το Niveta θα εκκινεί τότε πάντα μέσω XWayland.
 	Vulkan	Vulkan
 	WebP (lossless)	WebP (χωρίς απώλειες)
 	Webp	WebP
@@ -3393,9 +3393,9 @@ fontWeight	Thin	Πολύ λεπτά
 	Up	Πάνω
 	Empty folder	Άδειος φάκελος
 	First {n} entries shown	Εμφανίζονται οι πρώτες {n} καταχωρίσεις
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Το PhotoCraft χρειάζεται πρόσβαση στα αρχεία αυτής της συσκευής για να τα ανοίγει. Επιτρέψτε εδώ την πρόσβαση στις φωτογραφίες ή ανοίξτε τις Ρυθμίσεις για κάθε είδος αρχείου (PSD, .pcraft).
-	PhotoCraft needs the "All files access" permission to open files from this device.	Το PhotoCraft χρειάζεται το δικαίωμα «Πρόσβαση σε όλα τα αρχεία» για να ανοίγει αρχεία από αυτήν τη συσκευή.
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Άνοιξε Ρυθμίσεις > Εφαρμογές > PhotoCraft και ενεργοποίησε το «Πρόσβαση σε όλα τα αρχεία», μετά γύρνα εδώ.
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Το Niveta χρειάζεται πρόσβαση στα αρχεία αυτής της συσκευής για να τα ανοίγει. Επιτρέψτε εδώ την πρόσβαση στις φωτογραφίες ή ανοίξτε τις Ρυθμίσεις για κάθε είδος αρχείου (PSD, .pcraft).
+	Niveta needs the "All files access" permission to open files from this device.	Το Niveta χρειάζεται το δικαίωμα «Πρόσβαση σε όλα τα αρχεία» για να ανοίγει αρχεία από αυτήν τη συσκευή.
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	Άνοιξε Ρυθμίσεις > Εφαρμογές > Niveta και ενεργοποίησε το «Πρόσβαση σε όλα τα αρχεία», μετά γύρνα εδώ.
 	Allow access	Επιτρέψτε την πρόσβαση
 	Open Settings	Ανοίξτε τις Ρυθμίσεις
 	Check again	Έλεγξε
@@ -3408,7 +3408,7 @@ fontWeight	Thin	Πολύ λεπτά
 	No edits yet.	Δεν υπάρχουν ακόμη επεξεργασίες.
 	Start now	Έναρξη τώρα
 	No photos found.	Δεν βρέθηκαν φωτογραφίες.
-	PhotoCraft needs access to this device's photos to show them here.	Το PhotoCraft χρειάζεται πρόσβαση στις φωτογραφίες αυτής της συσκευής για να τις εμφανίσει εδώ.
+	Niveta needs access to this device's photos to show them here.	Το Niveta χρειάζεται πρόσβαση στις φωτογραφίες αυτής της συσκευής για να τις εμφανίσει εδώ.
 	Choose image	Επιλογή εικόνας
 	just now	μόλις τώρα
 	{n} min ago	πριν από {n} λεπτά

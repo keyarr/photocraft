@@ -15,7 +15,7 @@
 # particular not the French localisation of Adobe Photoshop. Add entries the same way.
 # Conventions: menus are nouns (Fichier, Édition, Image ...), commands are infinitives (Ouvrir…,
 # Enregistrer sous…), sentence case. French typography: a no-break space (U+00A0) before
-# « : ; ? ! » and "%", and inside guillemets « … ». Product and technology names (PhotoCraft,
+# « : ; ? ! » and "%", and inside guillemets « … ». Product and technology names (Niveta,
 # ArtCraft, OpenType, Lab ...) stay as they are; RGB/CMYK read RVB/CMJN; the trailing "…" of
 # dialog commands is kept.
 	File	Fichier
@@ -1215,8 +1215,8 @@
 	Perspective Warp is not active	La déformation de la perspective n'est pas active
 	Perspective Warp: draw planes along the image's perspective, then switch to Warp	Déformation de la perspective : tracez des plans selon la perspective de l'image, puis passez à Déformer
 	Photo Filter	Filtre photo
-	PhotoCraft	PhotoCraft
-	PhotoCraft Manages Colors	PhotoCraft gère les couleurs
+	Niveta	Niveta
+	Niveta Manages Colors	Niveta gère les couleurs
 	Niveta — an open-source, native image editor written in Rust.	Niveta — un éditeur d'images natif et libre, écrit en Rust.
 	Pin Depth:	Profondeur de l'épingle :
 	Pixel Length:	Longueur en pixels :
@@ -1915,7 +1915,7 @@
 	System Info	Informations système
 	More panels	Autres panneaux
 	More documents	Autres documents
-	These settings aren't available in PhotoCraft yet.	Ces paramètres ne sont pas encore disponibles dans PhotoCraft.
+	These settings aren't available in Niveta yet.	Ces paramètres ne sont pas encore disponibles dans Niveta.
 	Graphics	Graphismes
 	Reset GPU Backend	Réinitialiser le moteur GPU
 	Applies at next launch.	Prend effet au prochain démarrage.
@@ -2476,8 +2476,8 @@
 	Use Global Light	Utiliser la lumière globale
 	Native file drag-and-drop is unavailable	Le glisser-déposer natif de fichiers n'est pas disponible
 	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or copy the image in your file manager and paste it with {paste}.	Le glisser-déposer natif de fichiers n'est pas encore pris en charge sous Wayland. Utilisez Fichier › Ouvrir, ou copiez l'image dans votre gestionnaire de fichiers et collez-la avec {paste}.
-	To drop files, start PhotoCraft under XWayland: `{command}`	Pour déposer des fichiers, lancez PhotoCraft sous XWayland : `{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	Ou réglez Préférences › Performances › Serveur d'affichage Linux sur X11 : PhotoCraft démarre alors toujours sous XWayland.
+	To drop files, start Niveta under XWayland: `{command}`	Pour déposer des fichiers, lancez Niveta sous XWayland : `{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	Ou réglez Préférences › Performances › Serveur d'affichage Linux sur X11 : Niveta démarre alors toujours sous XWayland.
 	Edit › Paste	Édition › Coller
 	Use File › Open, or paste a copied image with {paste}.	Utilisez Fichier › Ouvrir, ou collez une image copiée avec {paste}.
 	Mixer Brush Tool	Outil Pinceau mélangeur
@@ -2492,7 +2492,7 @@
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	Le mode automatique utilise l'accélération GPU lorsqu'elle est disponible et repasse au rendu CPU en cas d'erreur.
 	Switched to CPU rendering	Passage au rendu CPU
 	GPU acceleration could not continue. Your documents are unchanged.	L'accélération GPU n'a pas pu continuer. Vos documents sont intacts.
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	PhotoCraft utilise le compositeur d'images CPU. La fenêtre peut encore utiliser votre carte graphique.
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	Niveta utilise le compositeur d'images CPU. La fenêtre peut encore utiliser votre carte graphique.
 	Retry GPU requires a restart. Save your work first.	Réessayer le GPU nécessite un redémarrage. Enregistrez votre travail au préalable.
 	Keep Using CPU	Continuer avec le CPU
 	Retry GPU	Réessayer le GPU
@@ -2704,9 +2704,9 @@ fontWeight	Italic	Italique
 	Up	Haut
 	Empty folder	Dossier vide
 	First {n} entries shown	{n} premiers éléments affichés
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft a besoin d’accéder aux fichiers de cet appareil pour les ouvrir. Autorise ici l’accès aux photos, ou ouvre les réglages pour tous les formats (PSD, .pcraft).
-	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft a besoin de l’autorisation « Accès à tous les fichiers » pour ouvrir les fichiers de cet appareil.
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Ouvrez Réglages > Applications > PhotoCraft et activez « Accès à tous les fichiers », puis revenez ici.
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Niveta a besoin d’accéder aux fichiers de cet appareil pour les ouvrir. Autorise ici l’accès aux photos, ou ouvre les réglages pour tous les formats (PSD, .pcraft).
+	Niveta needs the "All files access" permission to open files from this device.	Niveta a besoin de l’autorisation « Accès à tous les fichiers » pour ouvrir les fichiers de cet appareil.
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	Ouvrez Réglages > Applications > Niveta et activez « Accès à tous les fichiers », puis revenez ici.
 	Allow access	Autoriser l’accès
 	Open Settings	Ouvrir les réglages
 	Check again	Vérifier
@@ -2719,7 +2719,7 @@ fontWeight	Italic	Italique
 	No edits yet.	Aucune retouche pour l'instant.
 	Start now	Commencer
 	No photos found.	Aucune photo trouvée.
-	PhotoCraft needs access to this device's photos to show them here.	PhotoCraft a besoin d'accéder aux photos de cet appareil pour les afficher ici.
+	Niveta needs access to this device's photos to show them here.	Niveta a besoin d'accéder aux photos de cet appareil pour les afficher ici.
 	Choose image	Choisir une image
 	just now	à l'instant
 	{n} min ago	il y a {n} min

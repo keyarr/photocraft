@@ -108,7 +108,7 @@ pub fn map_file_with(f: &AbrFile, group: &str, ctl: &niveta_raster::Interrupt) -
     }
     out.warnings.extend(m.warnings);
     if !m.unknown.is_empty() {
-        out.warnings.push(format!("settings without a PhotoCraft equivalent were ignored: {}", m.unknown.into_iter().collect::<Vec<_>>().join(", ")));
+        out.warnings.push(format!("settings without a Niveta equivalent were ignored: {}", m.unknown.into_iter().collect::<Vec<_>>().join(", ")));
     }
     ctl.progress(1.0);
     Ok(out)

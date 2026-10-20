@@ -259,7 +259,7 @@ mod tests {
         let mut gray = doc();
         gray.mode = niveta_doc::ColorMode::Grayscale;
         gray.icc_profile = Some(niveta_engine::color_cmds::working_profile(gray.mode).to_bytes());
-        assert_eq!(profile_name(&gray), "sGray (sRGB tone curve, Photocraft)");
+        assert_eq!(profile_name(&gray), "sGray (sRGB tone curve, Niveta)");
 
         let mut custom = (*niveta_engine::color_cmds::working_profile(niveta_doc::ColorMode::Cmyk)).clone();
         custom.description = "PhotoCraft Studio CMYK".into();

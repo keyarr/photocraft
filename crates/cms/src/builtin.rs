@@ -73,13 +73,13 @@ impl Builtin {
         match self {
             Builtin::Srgb => "sRGB IEC61966-2.1",
             Builtin::DisplayP3 => "Display P3",
-            Builtin::AdobeRgbCompat => "Adobe RGB (1998)-compatible (Photocraft)",
-            Builtin::ProPhotoCompat => "ProPhoto RGB-compatible (ROMM primaries, Photocraft)",
-            Builtin::LinearSrgb => "Linear sRGB (Photocraft)",
-            Builtin::Rec2020 => "Rec. ITU-R BT.2020 (Photocraft)",
-            Builtin::GrayGamma22 => "Gray Gamma 2.2 (Photocraft)",
-            Builtin::SGray => "sGray (sRGB tone curve, Photocraft)",
-            Builtin::LabD50 => "Lab D50 identity (Photocraft)",
+            Builtin::AdobeRgbCompat => "Adobe RGB (1998)-compatible (Niveta)",
+            Builtin::ProPhotoCompat => "ProPhoto RGB-compatible (ROMM primaries, Niveta)",
+            Builtin::LinearSrgb => "Linear sRGB (Niveta)",
+            Builtin::Rec2020 => "Rec. ITU-R BT.2020 (Niveta)",
+            Builtin::GrayGamma22 => "Gray Gamma 2.2 (Niveta)",
+            Builtin::SGray => "sGray (sRGB tone curve, Niveta)",
+            Builtin::LabD50 => "Lab D50 identity (Niveta)",
             Builtin::CoatedCmyk => crate::synth::DESCRIPTION,
         }
     }

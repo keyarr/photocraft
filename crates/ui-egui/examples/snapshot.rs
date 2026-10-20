@@ -1,4 +1,4 @@
-//! Render the full Photocraft UI offscreen (no window, no focus stealing) and save a PNG.
+//! Render the full Niveta UI offscreen (no window, no focus stealing) and save a PNG.
 //!
 //! ```sh
 //! cargo run --release -p niveta-ui-egui --example snapshot -- \

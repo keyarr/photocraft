@@ -1,4 +1,4 @@
-//! Photocraft's type engine.
+//! Niveta's type engine.
 //!
 //! * [`fonts::FontDb`]: bundled fonts (Inter, JetBrains Mono; always available, including on the
 //!   web), optional system fonts from a directory scan (no fontconfig), user font data, TrueType

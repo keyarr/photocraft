@@ -24,7 +24,7 @@ pub static INTER_MEDIUM: &[u8] = include_bytes!("../../../assets/fonts/Inter-Med
 pub static INTER_SEMIBOLD: &[u8] = include_bytes!("../../../assets/fonts/Inter-SemiBold.ttf");
 pub static JETBRAINS_MONO_REGULAR: &[u8] = include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf");
 
-/// Fonts shipped with Photocraft (OFL; licences in `assets/fonts`).
+/// Fonts shipped with Niveta (OFL; licences in `assets/fonts`).
 pub static BUNDLED: &[(&str, &[u8])] = &[
     ("Inter-Regular.ttf", INTER_REGULAR),
     ("Inter-Medium.ttf", INTER_MEDIUM),

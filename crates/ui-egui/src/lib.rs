@@ -1,4 +1,4 @@
-//! Photocraft's first UI shell, built on egui/eframe.
+//! Niveta's first UI shell, built on egui/eframe.
 //!
 //! This crate is deliberately thin. Every action goes through
 //! [`niveta_engine::Session::execute`], and all UI state lives in [`state::UiState`] (plain
@@ -1549,7 +1549,7 @@ impl NivetaApp {
         theme::install_fonts(ctx);
         egui_extras::install_image_loaders(ctx);
         theme::apply(ctx, kind);
-        // egui's own ⌘+ / ⌘- / ⌘0 scale the whole interface; PhotoCraft zooms the canvas instead
+        // egui's own ⌘+ / ⌘- / ⌘0 scale the whole interface; Niveta zooms the canvas instead
         // (shortcuts.rs), like Photoshop.
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
         // ⌘/Ctrl + wheel scrolls sideways, as in Photoshop; only a pinch zooms (wheel_nav.rs).

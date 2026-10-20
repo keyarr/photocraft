@@ -12,7 +12,7 @@
 # Clean-room: every entry was written from the plain meaning of the English label using ordinary
 # Japanese computing vocabulary (レイヤー, ぼかし, 選択範囲 ...). No proprietary localisation
 # resource, string table or product UI was consulted or copied; add entries the same way.
-# Product and technology names (PhotoCraft, ArtCraft, OpenType, CMYK, Lab ...) stay in Latin
+# Product and technology names (Niveta, ArtCraft, OpenType, CMYK, Lab ...) stay in Latin
 # letters; the trailing "…" of dialog commands is kept.
 
 	File	ファイル
@@ -988,8 +988,8 @@
 	Drop an image or PSD anywhere to open it.	画像や PSD をここにドロップすると開きます。
 	Native file drag-and-drop is unavailable	Wayland ではネイティブのファイルドラッグ＆ドロップを利用できません
 	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or copy the image in your file manager and paste it with {paste}.	Wayland ではネイティブのファイルドラッグ＆ドロップはまだ利用できません。[ファイル › 開く] を使うか、ファイルマネージャーで画像をコピーして {paste} で貼り付けてください。
-	To drop files, start PhotoCraft under XWayland: `{command}`	ファイルをドロップするには、XWayland 上で PhotoCraft を起動してください: `{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	または 環境設定 › パフォーマンス › Linux ディスプレイサーバー を X11 にすると、PhotoCraft は常に XWayland 上で起動します。
+	To drop files, start Niveta under XWayland: `{command}`	ファイルをドロップするには、XWayland 上で Niveta を起動してください: `{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	または 環境設定 › パフォーマンス › Linux ディスプレイサーバー を X11 にすると、Niveta は常に XWayland 上で起動します。
 	Edit › Paste	[編集 › 貼り付け]
 	Duplicate Layers…	レイヤーを複製…
 	Duplicate style	スタイルを複製
@@ -1236,8 +1236,8 @@
 	Perspective Warp is not active	遠近法ワープは有効ではありません
 	Perspective Warp: draw planes along the image's perspective, then switch to Warp	遠近法ワープ: 画像の遠近に沿って面を描き、ワープに切り替えます
 	Photo Filter	写真フィルター
-	PhotoCraft	PhotoCraft
-	PhotoCraft Manages Colors	PhotoCraft でカラーを管理
+	Niveta	Niveta
+	Niveta Manages Colors	Niveta でカラーを管理
 	Niveta — an open-source, native image editor written in Rust.	Niveta — Rust で書かれた、オープンソースのネイティブ画像エディター。
 	Pin Depth:	ピンの深さ:
 	Pixel Length:	ピクセル長:
@@ -1953,7 +1953,7 @@
 	System Info	システム情報
 	More panels	その他のパネル
 	More documents	その他のドキュメント
-	These settings aren't available in PhotoCraft yet.	これらの設定は PhotoCraft ではまだ使用できません。
+	These settings aren't available in Niveta yet.	これらの設定は Niveta ではまだ使用できません。
 	Graphics	グラフィックス
 	Reset GPU Backend	GPU バックエンドをリセット
 	Applies at next launch.	次回の起動時に適用されます。
@@ -2052,7 +2052,7 @@
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	自動モードは利用可能な場合にGPUを使用し、エラー時はCPU描画に切り替えます。
 	Switched to CPU rendering	CPU描画に切り替えました
 	GPU acceleration could not continue. Your documents are unchanged.	GPUアクセラレーションを継続できませんでした。ドキュメントは変更されていません。
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	PhotoCraftはCPUで画像を合成しています。ウィンドウは引き続きグラフィックスアダプターを使用する場合があります。
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	NivetaはCPUで画像を合成しています。ウィンドウは引き続きグラフィックスアダプターを使用する場合があります。
 	Retry GPU requires a restart. Save your work first.	GPUの再試行には再起動が必要です。先に作業を保存してください。
 	Keep Using CPU	CPUを使い続ける
 	Retry GPU	GPUを再試行
@@ -3183,7 +3183,7 @@ fontWeight	Italic	斜体
 	Mouse Controls	マウス操作
 	Mouse Coordinates	マウス座標
 	NTSC (1953)	NTSC (1953)
-	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or run PhotoCraft under XWayland with `WAYLAND_DISPLAY= photocraft`.	Wayland ではネイティブのファイルのドラッグ&ドロップにまだ対応していません。ファイル › 開く を使うか、XWayland 上で `WAYLAND_DISPLAY= photocraft` として PhotoCraft を実行してください。
+	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or run Niveta under XWayland with `WAYLAND_DISPLAY= photocraft`.	Wayland ではネイティブのファイルのドラッグ&ドロップにまだ対応していません。ファイル › 開く を使うか、XWayland 上で `WAYLAND_DISPLAY= photocraft` として Niveta を実行してください。
 	New Brush	新規ブラシ
 	New Channel	新規チャンネル
 	New Layer from Brush	ブラシから新規レイヤー
@@ -3308,9 +3308,9 @@ fontWeight	Italic	斜体
 	Up	上へ
 	Empty folder	空のフォルダ
 	First {n} entries shown	最初の{n}件を表示
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	ファイルを開くには、PhotoCraftにこのデバイスのファイルへのアクセスが必要です。 ここで写真へのアクセスを許可するか、すべての形式 (PSD、.pcraft) 用に設定を開いてください。
-	PhotoCraft needs the "All files access" permission to open files from this device.	このデバイスのファイルを開くには、PhotoCraftに「すべてのファイルへのアクセス」権限が必要です。
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	設定 > アプリ > PhotoCraft を開いて「すべてのファイルへのアクセス」をオンにし、ここに戻ってください。
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	ファイルを開くには、Nivetaにこのデバイスのファイルへのアクセスが必要です。 ここで写真へのアクセスを許可するか、すべての形式 (PSD、.pcraft) 用に設定を開いてください。
+	Niveta needs the "All files access" permission to open files from this device.	このデバイスのファイルを開くには、Nivetaに「すべてのファイルへのアクセス」権限が必要です。
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	設定 > アプリ > Niveta を開いて「すべてのファイルへのアクセス」をオンにし、ここに戻ってください。
 	Allow access	アクセスを許可
 	Open Settings	設定を開く
 	Check again	再確認
@@ -3323,7 +3323,7 @@ fontWeight	Italic	斜体
 	No edits yet.	まだ編集がありません。
 	Start now	今すぐ始める
 	No photos found.	写真が見つかりませんでした。
-	PhotoCraft needs access to this device's photos to show them here.	ここに表示するには、PhotoCraftにこのデバイスの写真へのアクセスが必要です。
+	Niveta needs access to this device's photos to show them here.	ここに表示するには、Nivetaにこのデバイスの写真へのアクセスが必要です。
 	Choose image	画像を選択
 	just now	たった今
 	{n} min ago	{n}分前

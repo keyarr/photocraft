@@ -1,6 +1,6 @@
 [package]
 name = "niveta-android"
-description = "PhotoCraft for Android: touch-first eframe shell, CPU canvas first"
+description = "Niveta for Android: touch-first eframe shell, CPU canvas first"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -14,7 +14,7 @@
 # Clean-room: every entry was written from the plain meaning of the English label using the
 # image-editing vocabulary in everyday use in Taiwan (圖層, 遮色片, 選取範圍, 濾鏡, 色階 ...). No
 # proprietary localisation resource, string table or product UI was consulted or copied; add
-# entries the same way. Product and technology names (PhotoCraft, ArtCraft, OpenType, CMYK, Lab ...)
+# entries the same way. Product and technology names (Niveta, ArtCraft, OpenType, CMYK, Lab ...)
 # and paper sizes (Legal, Tabloid) stay in Latin letters; the trailing "…" of dialog commands is
 # kept. Full-width punctuation (，。：) inside sentences; half-width parentheses and the " · "
 # separators as in the English.
@@ -989,8 +989,8 @@
 	Drop an image or PSD anywhere to open it.	將影像或 PSD 拖放到任何位置即可開啟。
 	Native file drag-and-drop is unavailable	Wayland 不支援原生檔案拖放
 	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or copy the image in your file manager and paste it with {paste}.	Wayland 尚未支援原生檔案拖放。請使用「檔案 › 開啟」，或在檔案管理員中複製影像後使用 {paste} 貼上。
-	To drop files, start PhotoCraft under XWayland: `{command}`	若要拖放檔案，請在 XWayland 下啟動 PhotoCraft：`{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	或將 偏好設定 › 效能 › Linux 顯示伺服器 設為 X11：PhotoCraft 之後一律在 XWayland 下啟動。
+	To drop files, start Niveta under XWayland: `{command}`	若要拖放檔案，請在 XWayland 下啟動 Niveta：`{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	或將 偏好設定 › 效能 › Linux 顯示伺服器 設為 X11：Niveta 之後一律在 XWayland 下啟動。
 	Edit › Paste	「編輯 › 貼上」
 	Duplicate Layers…	複製圖層…
 	Duplicate style	複製樣式
@@ -1237,8 +1237,8 @@
 	Perspective Warp is not active	透視彎曲未啟用
 	Perspective Warp: draw planes along the image's perspective, then switch to Warp	透視彎曲：沿影像透視繪製平面，然後切換到彎曲
 	Photo Filter	相片濾鏡
-	PhotoCraft	PhotoCraft
-	PhotoCraft Manages Colors	PhotoCraft 管理色彩
+	Niveta	Niveta
+	Niveta Manages Colors	Niveta 管理色彩
 	Niveta — an open-source, native image editor written in Rust.	Niveta — 以 Rust 撰寫的開放原始碼原生影像編輯器。
 	Pin Depth:	圖釘深度：
 	Pixel Length:	像素長度：
@@ -1946,7 +1946,7 @@
 	System Info	系統資訊
 	More panels	更多面板
 	More documents	更多文件
-	These settings aren't available in PhotoCraft yet.	這些設定在 PhotoCraft 中尚未提供。
+	These settings aren't available in Niveta yet.	這些設定在 Niveta 中尚未提供。
 	Graphics	圖形
 	Reset GPU Backend	重設 GPU 後端
 	Applies at next launch.	下次啟動時套用。
@@ -2046,7 +2046,7 @@
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	自動模式會在可用時使用 GPU 加速，發生錯誤時改用 CPU 渲染。
 	Switched to CPU rendering	已改用 CPU 渲染
 	GPU acceleration could not continue. Your documents are unchanged.	GPU 加速無法繼續。您的文件未變更。
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	PhotoCraft 正使用 CPU 合成影像。視窗仍可能使用您的顯示卡。
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	Niveta 正使用 CPU 合成影像。視窗仍可能使用您的顯示卡。
 	Retry GPU requires a restart. Save your work first.	重試 GPU 需要重新啟動。請先儲存您的工作。
 	Keep Using CPU	繼續使用 CPU
 	Retry GPU	重試 GPU
@@ -2260,9 +2260,9 @@ fontWeight	Italic	斜體
 	Up	向上
 	Empty folder	空資料夾
 	First {n} entries shown	顯示前 {n} 個項目
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft 需要存取此裝置上的檔案才能將其開啟。 在此允許相片存取，或為所有檔案類型 (PSD、.pcraft) 開啟設定。
-	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft 需要「所有檔案存取」權限才能開啟此裝置上的檔案。
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	開啟「設定」>「應用程式」> PhotoCraft 並開啟「所有檔案存取」，然後回到這裡。
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Niveta 需要存取此裝置上的檔案才能將其開啟。 在此允許相片存取，或為所有檔案類型 (PSD、.pcraft) 開啟設定。
+	Niveta needs the "All files access" permission to open files from this device.	Niveta 需要「所有檔案存取」權限才能開啟此裝置上的檔案。
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	開啟「設定」>「應用程式」> Niveta 並開啟「所有檔案存取」，然後回到這裡。
 	Allow access	允許存取
 	Open Settings	開啟設定
 	Check again	重新檢查
@@ -2275,7 +2275,7 @@ fontWeight	Italic	斜體
 	No edits yet.	尚無編輯。
 	Start now	立即開始
 	No photos found.	找不到相片。
-	PhotoCraft needs access to this device's photos to show them here.	PhotoCraft 需要存取此裝置的相片才能在此顯示。
+	Niveta needs access to this device's photos to show them here.	Niveta 需要存取此裝置的相片才能在此顯示。
 	Choose image	選擇圖片
 	just now	剛剛
 	{n} min ago	{n}分鐘前

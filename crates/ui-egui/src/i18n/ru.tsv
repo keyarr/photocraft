@@ -13,7 +13,7 @@
 # graphics-editor vocabulary (Слой, Каналы, Маска, Выделение, Кривые ...), matching Photoshop's
 # Russian menu tradition where it is unambiguous. No proprietary localisation resource was
 # consulted or copied; entries are added the same way.
-# Product and technology names (PhotoCraft, ArtCraft, OpenType, CMYK, Lab ...) stay in Latin
+# Product and technology names (Niveta, ArtCraft, OpenType, CMYK, Lab ...) stay in Latin
 # letters; the trailing "…" of dialog commands is kept; the colon of a label ("Width:") becomes
 # the Russian typographic equivalent, with the space the source carries.
 
@@ -832,7 +832,7 @@
 	Embed Color Profile	Встроить цветовой профиль
 	Assign Profile…	Назначить профиль…
 	Convert to Profile…	Преобразовать в профиль…
-	PhotoCraft Manages Colors	PhotoCraft управляет цветами
+	Niveta Manages Colors	Niveta управляет цветами
 	Printer Manages Colors	Принтер управляет цветами
 	(print to the printer)	(печать на принтере)
 	Absolute Colorimetric	Абсолютный колориметрический
@@ -1397,8 +1397,8 @@
 	Use File › Open, or paste a copied image with {paste}.	Выберите Файл › Открыть или вставьте скопированное изображение с помощью {paste}.
 	Native file drag-and-drop is unavailable	Нативное перетаскивание файлов в Wayland недоступно
 	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or copy the image in your file manager and paste it with {paste}.	Нативное перетаскивание файлов в Wayland пока не поддерживается. Откройте файл через Файл › Открыть или скопируйте изображение в файловом менеджере и вставьте его с помощью {paste}.
-	To drop files, start PhotoCraft under XWayland: `{command}`	Чтобы перетаскивать файлы, запустите PhotoCraft в XWayland: `{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	Или выберите в Настройки › Производительность › Дисплейный сервер Linux значение X11: PhotoCraft будет всегда запускаться в XWayland.
+	To drop files, start Niveta under XWayland: `{command}`	Чтобы перетаскивать файлы, запустите Niveta в XWayland: `{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	Или выберите в Настройки › Производительность › Дисплейный сервер Linux значение X11: Niveta будет всегда запускаться в XWayland.
 	Edit › Paste	Редактирование › Вставить
 	Photo	Фото
 	Print	Печать
@@ -1570,7 +1570,7 @@
 	Don't Save	Не сохранять
 	No	Нет
 	Yes	Да
-	These settings aren't available in PhotoCraft yet.	Эти параметры пока недоступны в PhotoCraft.
+	These settings aren't available in Niveta yet.	Эти параметры пока недоступны в Niveta.
 	Shortcut removed.	Комбинация клавиш удалена.
 	All shortcuts reset to Photoshop defaults.	Все комбинации клавиш сброшены к стандартным Photoshop.
 	Delete Shortcut	Удалить комбинацию
@@ -2030,7 +2030,7 @@
 	Output:	Выход:
 	Paint Overlay	Перекрытие краской
 	Pattern Size	Размер паттерна
-	PhotoCraft	PhotoCraft
+	Niveta	Niveta
 	Niveta — an open-source, native image editor written in Rust.	Niveta — открытый нативный графический редактор на Rust.
 	Position and Size	Положение и размер
 	Preserve Details	Сохранять детали
@@ -2331,7 +2331,7 @@
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	Автоматический режим использует GPU, когда он доступен, и переходит на CPU при ошибках.
 	Switched to CPU rendering	Включена отрисовка на CPU
 	GPU acceleration could not continue. Your documents are unchanged.	Ускорение GPU остановлено. Документы не изменены.
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	PhotoCraft обрабатывает изображения на CPU. Окно может продолжать использовать графический адаптер.
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	Niveta обрабатывает изображения на CPU. Окно может продолжать использовать графический адаптер.
 	Retry GPU requires a restart. Save your work first.	Для повтора GPU нужен перезапуск. Сначала сохраните работу.
 	Keep Using CPU	Продолжить с CPU
 	Retry GPU	Повторить GPU
@@ -2556,9 +2556,9 @@ fontWeight	Italic	Курсив
 	Up	Вверх
 	Empty folder	Пустая папка
 	First {n} entries shown	Показаны первые {n} записей
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft нужен доступ к файлам на этом устройстве, чтобы открывать их. Разрешите здесь доступ к фото или откройте Настройки для остальных файлов (PSD, .pcraft).
-	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft нужно разрешение «Доступ ко всем файлам», чтобы открывать файлы на этом устройстве.
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	Открой Настройки > Приложения > PhotoCraft и включи «Доступ ко всем файлам», затем вернись сюда.
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Niveta нужен доступ к файлам на этом устройстве, чтобы открывать их. Разрешите здесь доступ к фото или откройте Настройки для остальных файлов (PSD, .pcraft).
+	Niveta needs the "All files access" permission to open files from this device.	Niveta нужно разрешение «Доступ ко всем файлам», чтобы открывать файлы на этом устройстве.
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	Открой Настройки > Приложения > Niveta и включи «Доступ ко всем файлам», затем вернись сюда.
 	Allow access	Разрешить доступ
 	Open Settings	Открыть настройки
 	Check again	Проверить
@@ -2571,7 +2571,7 @@ fontWeight	Italic	Курсив
 	No edits yet.	Пока нет правок.
 	Start now	Начать
 	No photos found.	Фото не найдены.
-	PhotoCraft needs access to this device's photos to show them here.	Чтобы показать фотографии здесь, PhotoCraft нужен доступ к фото на этом устройстве.
+	Niveta needs access to this device's photos to show them here.	Чтобы показать фотографии здесь, Niveta нужен доступ к фото на этом устройстве.
 	Choose image	Выбрать изображение
 	just now	только что
 	{n} min ago	{n} мин назад

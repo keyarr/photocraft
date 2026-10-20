@@ -988,8 +988,8 @@
 	Drop an image or PSD anywhere to open it.	将图像或 PSD 拖放到任意位置即可打开。
 	Native file drag-and-drop is unavailable	Wayland 上不支持原生文件拖放
 	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or copy the image in your file manager and paste it with {paste}.	Wayland 尚不支持原生文件拖放。请使用“文件 › 打开”，或在文件管理器中复制图像后使用 {paste} 粘贴。
-	To drop files, start PhotoCraft under XWayland: `{command}`	要拖放文件，请在 XWayland 下启动 PhotoCraft：`{command}`
-	Or set Preferences › Performance › Linux display server to X11: PhotoCraft then always starts under XWayland.	或将 首选项 › 性能 › Linux 显示服务器 设为 X11：PhotoCraft 将始终在 XWayland 下启动。
+	To drop files, start Niveta under XWayland: `{command}`	要拖放文件，请在 XWayland 下启动 Niveta：`{command}`
+	Or set Preferences › Performance › Linux display server to X11: Niveta then always starts under XWayland.	或将 首选项 › 性能 › Linux 显示服务器 设为 X11：Niveta 将始终在 XWayland 下启动。
 	Edit › Paste	“编辑 › 粘贴”
 	Duplicate Layers…	复制图层…
 	Duplicate style	复制样式
@@ -1240,8 +1240,8 @@
 	Perspective Warp is not active	透视变形尚未启用
 	Perspective Warp: draw planes along the image's perspective, then switch to Warp	透视变形：沿图像透视绘制平面，然后切换到变形
 	Photo Filter	照片滤镜
-	PhotoCraft	PhotoCraft
-	PhotoCraft Manages Colors	由 PhotoCraft 管理颜色
+	Niveta	Niveta
+	Niveta Manages Colors	由 Niveta 管理颜色
 	Niveta — an open-source, native image editor written in Rust.	Niveta — 用 Rust 编写的开源原生图像编辑器。
 	Pin Depth:	控制点深度：
 	Pixel Length:	像素长度：
@@ -2007,7 +2007,7 @@ cameraRaw	Blending	混合
 	System Info	系统信息
 	More panels	更多面板
 	More documents	更多文档
-	These settings aren't available in PhotoCraft yet.	PhotoCraft 暂不支持这些设置。
+	These settings aren't available in Niveta yet.	Niveta 暂不支持这些设置。
 	Graphics	图形
 	Reset GPU Backend	重置 GPU 后端
 	Applies at next launch.	下次启动时生效。
@@ -2102,7 +2102,7 @@ cameraRaw	Blending	混合
 	Automatic uses GPU acceleration when available and falls back to CPU rendering on errors.	自动模式会在可用时使用 GPU 加速，出错时改用 CPU 渲染。
 	Switched to CPU rendering	已切换到 CPU 渲染
 	GPU acceleration could not continue. Your documents are unchanged.	GPU 加速无法继续。您的文档未更改。
-	PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.	PhotoCraft 正在使用 CPU 合成图像。窗口仍可能使用您的显卡。
+	Niveta is using the CPU image compositor. The window may still use your graphics adapter.	Niveta 正在使用 CPU 合成图像。窗口仍可能使用您的显卡。
 	Retry GPU requires a restart. Save your work first.	重试 GPU 需要重新启动。请先保存您的工作。
 	Keep Using CPU	继续使用 CPU
 	Retry GPU	重试 GPU
@@ -2291,9 +2291,9 @@ fontWeight	Italic	斜体
 	Up	向上
 	Empty folder	空文件夹
 	First {n} entries shown	显示前 {n} 个条目
-	PhotoCraft needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	PhotoCraft 需要访问此设备上的文件才能将其打开。 在此允许照片访问，或为所有文件类型 (PSD、.pcraft) 打开设置。
-	PhotoCraft needs the "All files access" permission to open files from this device.	PhotoCraft 需要“所有文件访问”权限才能打开此设备上的文件。
-	Open Settings > Apps > PhotoCraft and turn on "All files access", then come back here.	打开“设置”>“应用”> PhotoCraft 并开启“所有文件访问”，然后回到这里。
+	Niveta needs access to the files on this device to open them. Allow photo access here, or open Settings for every file kind (PSD, .pcraft).	Niveta 需要访问此设备上的文件才能将其打开。 在此允许照片访问，或为所有文件类型 (PSD、.pcraft) 打开设置。
+	Niveta needs the "All files access" permission to open files from this device.	Niveta 需要“所有文件访问”权限才能打开此设备上的文件。
+	Open Settings > Apps > Niveta and turn on "All files access", then come back here.	打开“设置”>“应用”> Niveta 并开启“所有文件访问”，然后回到这里。
 	Allow access	允许访问
 	Open Settings	打开设置
 	Check again	重新检查
@@ -2306,7 +2306,7 @@ fontWeight	Italic	斜体
 	No edits yet.	暂无编辑。
 	Start now	立即开始
 	No photos found.	未找到照片。
-	PhotoCraft needs access to this device's photos to show them here.	PhotoCraft 需要访问此设备的照片才能在此显示。
+	Niveta needs access to this device's photos to show them here.	Niveta 需要访问此设备的照片才能在此显示。
 	Choose image	选择图片
 	just now	刚刚
 	{n} min ago	{n}分钟前
