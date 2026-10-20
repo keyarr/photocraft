@@ -693,7 +693,12 @@ pub fn sheet(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             if has_subtabs {
                 let mut sel = tab_index(&app.ui.dock_tabs, group).min(tabs.len().saturating_sub(1));
                 let opts: Vec<(usize, &str)> = tabs.iter().enumerate().map(|(i, &tab_name)| (i, tl!(tab_name))).collect();
-                if widgets::dropdown(ui, "mobile-sheet-subtab", &mut sel, &opts, 92.0) {
+                // Long tab names (Layer Comps in most languages) must not widen the row past Close.
+                let picked = ui.scope(|ui| {
+                    ui.set_max_width(92.0);
+                    widgets::dropdown(ui, "mobile-sheet-subtab", &mut sel, &opts, 92.0)
+                });
+                if picked.inner {
                     *tab_index_mut(&mut app.ui.dock_tabs, group) = sel;
                 }
             }
@@ -1182,6 +1187,36 @@ mod tests {
             let n = h.query_all_by_label_contains(probe).next().unwrap_or_else(|| panic!("the adjustments body renders {probe}"));
             assert!(n.rect().min.y >= 0.0 && n.rect().max.y <= 800.0, "{probe} is inside the window: {:?}", n.rect());
         }
+    }
+
+    /// The layer comps tab keeps the sheet header on screen: its long name once widened the
+    /// subtab dropdown past the close button and off the phone.
+    #[test]
+    fn sheet_layer_comps_subtab_stays_inside_the_window() {
+        use egui_kittest::kittest::Queryable;
+        let mut a = app();
+        a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        a.ui.mobile.panel = Some(crate::dock::Group::History);
+        a.ui.dock_tabs.history = 2;
+        let mut h = Harness::builder().with_size(vec2(320.0, 700.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                header(app, ui);
+                tool_bar(app, ui);
+                sheet(app, ui);
+                crate::canvas::document_area(app, ui);
+            },
+            a,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.run_steps(8);
+        // "Composição de camadas" is long enough to widen the row; the harness does not sync prefs itself.
+        crate::i18n::set_current(crate::i18n::Lang::from_code("pt-br").expect("pt-br"));
+        h.run_steps(2);
+        let combo = h.query_all_by_role(egui::accesskit::Role::ComboBox).next().expect("the subtab dropdown renders").rect();
+        assert!(combo.min.x >= 0.0 && combo.max.x <= 320.0 - 32.0 - 4.0, "the subtab keeps room for Close: {combo:?}");
     }
 
     /// The Layers footer stays inside the sheet: the 56pt touch cells once overflowed
