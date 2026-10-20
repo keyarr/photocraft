@@ -13,9 +13,10 @@
 //!   newest arrival first (`max(created, modified)`). The time is only a
 //!   sort key here, never shown as an "added" date. Thumbnails use the EXIF preview when
 //!   there is one and never decode full-resolution images for the grid.
-//!   `Ver todas` reopens the same browser the Open button uses.
-//! - No permission is requested from here: unreadable storage shows a message
-//!   with a button that opens the browser, whose gate owns the request flow.
+//!   `Ver todas` sits centered under the grid and reopens the same browser the
+//!   Open button uses.
+//! - Without photo access the section says so and its button fires the OS
+//!   permission prompt directly, instead of opening the browser's gate.
 
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -75,6 +76,7 @@ pub fn home_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut open_clean: Option<String> = None;
     let mut new_edit = false;
     let mut see_all = false;
+    let mut request_storage = false;
     let storage = storage_access(app);
     egui::ScrollArea::vertical().id_salt("home-scroll").auto_shrink([false, false]).show(ui, |ui| {
         let avail = ui.available_width();
@@ -103,22 +105,30 @@ pub fn home_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 ui.add_space(20.0);
                 ui.label(egui::RichText::new(tl!("Recently edited")).font(crate::theme::semibold(15.0)).color(t.text));
                 ui.add_space(10.0);
-                recent_grid(app, ui, content_w, &mut open, &mut new_edit);
+                recent_grid(app, ui, content_w, &mut open);
                 ui.add_space(20.0);
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(tl!("Recent photos")).font(crate::theme::semibold(15.0)).color(t.text));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if crate::widgets::secondary_button(ui, tl!("See all"), 96.0).clicked() {
-                            see_all = true;
+                ui.label(egui::RichText::new(tl!("Recent photos")).font(crate::theme::semibold(15.0)).color(t.text));
+                ui.add_space(10.0);
+                let grid_shown = photos_grid(app, ui, content_w, storage, &mut open_clean, &mut see_all, &mut request_storage);
+                if grid_shown {
+                    ui.add_space(12.0);
+                    ui.vertical_centered(|ui| {
+                        if crate::widgets::secondary_button(ui, tl!("See all"), 160.0).clicked() {
+                            if !storage && app.services.storage_request.is_some() {
+                                request_storage = true;
+                            } else {
+                                see_all = true;
+                            }
                         }
                     });
-                });
-                ui.add_space(10.0);
-                photos_grid(app, ui, content_w, storage, &mut open_clean, &mut see_all);
+                }
                 ui.add_space(24.0);
             });
         });
     });
+    if request_storage && let Some(request) = app.services.storage_request.as_mut() {
+        request();
+    }
     if new_edit || see_all {
         app.open_interactive();
     }
@@ -165,15 +175,11 @@ fn recents(app: &PhotocraftApp) -> Vec<Recent> {
     }
 }
 
-fn recent_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mut Option<String>, new_edit: &mut bool) {
+fn recent_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mut Option<String>) {
     let t = Tokens::get(ui.ctx());
     let items = recents(app);
     if items.is_empty() {
         ui.label(egui::RichText::new(tl!("No edits yet.")).size(13.0).color(t.text_dim));
-        ui.add_space(8.0);
-        if crate::widgets::secondary_button(ui, tl!("Start now"), 160.0).clicked() {
-            *new_edit = true;
-        }
         return;
     }
     let gap = 12.0;
@@ -224,7 +230,15 @@ struct Photo {
     modified: SystemTime,
 }
 
-fn photos_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, storage: bool, open: &mut Option<String>, see_all: &mut bool) {
+fn photos_grid(
+    app: &PhotocraftApp,
+    ui: &mut egui::Ui,
+    content_w: f32,
+    storage: bool,
+    open: &mut Option<String>,
+    see_all: &mut bool,
+    request_storage: &mut bool,
+) -> bool {
     let t = Tokens::get(ui.ctx());
     let (photos, pending) = recent_photos(ui.ctx(), storage);
     if photos.is_empty() {
@@ -244,7 +258,7 @@ fn photos_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, storage: 
                 });
                 ui.add_space(gap);
             }
-            return;
+            return false;
         }
         if storage {
             ui.label(egui::RichText::new(tl!("No photos found.")).size(13.0).color(t.text_dim));
@@ -253,9 +267,13 @@ fn photos_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, storage: 
         }
         ui.add_space(8.0);
         if crate::widgets::secondary_button(ui, tl!("Choose image"), 170.0).clicked() {
-            *see_all = true;
+            if !storage && app.services.storage_request.is_some() {
+                *request_storage = true;
+            } else {
+                *see_all = true;
+            }
         }
-        return;
+        return false;
     }
     let gap = 8.0;
     let cell = ((content_w - 2.0 * gap) / 3.0).clamp(80.0, 240.0);
@@ -280,6 +298,7 @@ fn photos_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, storage: 
         });
         ui.add_space(gap);
     }
+    true
 }
 
 /// Cached device photo scan (arrival-descending, `PHOTOS_MAX` kept). The cache
@@ -845,9 +864,10 @@ mod tests {
         );
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
-        for probe in ["PhotoCraft", "Your creations", "+ New edit", "Recently edited", "Recent photos", "See all"] {
+        for probe in ["PhotoCraft", "Your creations", "+ New edit", "Recently edited", "Recent photos"] {
             assert!(h.query_all_by_label_contains(probe).next().is_some(), "home shows {probe}");
         }
+        assert!(h.query_all_by_label_contains("See all").next().is_none(), "no photo grid, no See all");
         assert!(h.query_all_by_label_contains("open source").next().is_none(), "no subtitle under the name");
         assert!(h.query_all_by_label_contains("Discord").next().is_none(), "no promo on the home screen");
     }
@@ -998,6 +1018,67 @@ mod tests {
         assert_eq!(photos.len(), 1);
         assert!(!pending);
         assert!(ctx.data(|d| d.get_temp::<ScanSlot>(job_id)).is_none(), "a finished slot must be dropped, or expiry never rescans");
+    }
+
+    #[test]
+    fn choose_image_asks_the_os_instead_of_the_browser_gate() {
+        use egui_kittest::Harness;
+        use egui_kittest::kittest::Queryable;
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let asked = Arc::new(AtomicBool::new(false));
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.services.storage_has_access = Some(Box::new(|| false));
+        let flag = asked.clone();
+        app.services.storage_request = Some(Box::new(move || flag.store(true, Ordering::Relaxed)));
+        let mut h = Harness::builder().with_size(vec2(390.0, 844.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                home_screen(app, ui);
+            },
+            app,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        // Cache an empty, finished scan so the empty state renders on the first frame.
+        h.ctx.data_mut(|d| {
+            d.insert_temp(egui::Id::new("home-recent-photos-perm"), false);
+            d.insert_temp(egui::Id::new("home-recent-photos"), (0.0f64, Vec::<(String, u64, u32, u64)>::new(), false));
+        });
+        h.run_steps(3);
+        h.get_by_label("Choose image").click();
+        h.run_steps(2);
+        assert!(asked.load(Ordering::Relaxed), "the button asks the OS directly");
+        assert!(h.query_all_by_label_contains("Allow access").next().is_none(), "no egui permission gate");
+        assert!(h.query_all_by_label_contains("See all").next().is_none(), "no grid without permission, no See all");
+    }
+
+    #[test]
+    fn see_all_appears_below_the_photo_grid_only() {
+        use egui_kittest::Harness;
+        use egui_kittest::kittest::Queryable;
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.services.storage_has_access = Some(Box::new(|| true));
+        let mut h = Harness::builder().with_size(vec2(390.0, 844.0)).build_ui_state(
+            |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                home_screen(app, ui);
+            },
+            app,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        h.ctx.data_mut(|d| {
+            d.insert_temp(egui::Id::new("home-recent-photos-perm"), true);
+            d.insert_temp(
+                egui::Id::new("home-recent-photos"),
+                (0.0f64, vec![("/no/such/photo.png".to_string(), 0u64, 0u32, 0u64)], false),
+            );
+        });
+        h.run_steps(3);
+        assert!(h.query_all_by_label_contains("See all").next().is_some(), "the grid has its See all");
     }
 
     #[test]
