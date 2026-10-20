@@ -317,12 +317,12 @@ pub fn new_app() -> (PhotocraftApp, Inbox) {
     (app, inbox)
 }
 
-/// Whether the Android shell should use the wgpu canvas: an explicit GPU rendering
-/// mode in Preferences › Performance (applies at next launch), or the host
-/// dev-loop override. `auto` stays on the CPU compositor on phones.
+/// Whether the Android shell should use the wgpu canvas: `auto` tries the GPU first (the canvas
+/// falls back to the CPU renderer on init failure or a device fault), `gpu` forces it, `cpu` opts
+/// out. The host dev-loop override wins.
 fn android_wants_gpu(app: &PhotocraftApp) -> bool {
     std::env::var_os("PHOTOCRAFT_ANDROID_GPU").is_some()
-        || app.session.prefs().performance.effective_rendering_mode() == photocraft_engine::prefs::RenderingMode::Gpu
+        || app.session.prefs().performance.effective_rendering_mode() != photocraft_engine::prefs::RenderingMode::Cpu
 }
 
 fn maybe_enable_gpu(app: &mut PhotocraftApp, cc: &eframe::CreationContext) {
@@ -467,7 +467,7 @@ mod tests {
     }
 
     #[test]
-    fn gpu_canvas_is_opt_in_through_the_rendering_mode() {
+    fn auto_tries_gpu_and_cpu_is_opt_out() {
         if std::env::var_os("PHOTOCRAFT_ANDROID_GPU").is_some() {
             return; // host override on: prefs can't keep the canvas off.
         }
@@ -476,7 +476,7 @@ mod tests {
             p.performance.rendering_mode = None;
             p.performance.use_gpu = true;
         });
-        assert!(!android_wants_gpu(&app), "auto stays on the CPU compositor on phones");
+        assert!(android_wants_gpu(&app), "auto tries the GPU first");
         app.session.edit_prefs(|p| p.performance.rendering_mode = Some(photocraft_engine::prefs::RenderingMode::Gpu));
         assert!(android_wants_gpu(&app));
         app.session.edit_prefs(|p| p.performance.rendering_mode = Some(photocraft_engine::prefs::RenderingMode::Cpu));

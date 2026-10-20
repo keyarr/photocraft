@@ -727,7 +727,7 @@ pub(crate) fn options_content(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 crate::paint_mouse::sync_tool_brush(app);
                 // Brush edits here go through `tools.setBrush`, one journal entry per gesture (Rule 1).
                 if (tool.is_brushlike() && !matches!(tool, Tool::Brush | Tool::Pencil | Tool::MixerBrush | Tool::Eraser)) || tool == Tool::QuickSelection {
-                    brush_preset_chip(ui, &app.session.tools.brush, &mut app.ui);
+                    brush_preset_chip(ui, &app.session.tools.brush, &mut app.ui, c32(app.session.tools.foreground));
                     crate::brush_picker::settings_toggle(app, ui);
                     widgets::vline(ui, 22.0);
                 }
@@ -744,7 +744,7 @@ pub(crate) fn options_content(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let b = &mut brush;
                 match app.ui.tool {
                     Tool::Brush | Tool::Eraser if t.pro => {
-                        brush_preset_chip(ui, b, &mut app.ui);
+                        brush_preset_chip(ui, b, &mut app.ui, c32(app.session.tools.foreground));
                         crate::brush_picker::settings_toggle(app, ui);
                         widgets::vline(ui, 22.0);
                         opt_label(ui, tl!("Mode"));
@@ -773,7 +773,7 @@ pub(crate) fn options_content(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     }
                     // Pencil: Photoshop's options (no hardness or flow: the pencil is always hard).
                     Tool::Pencil => {
-                        brush_preset_chip(ui, b, &mut app.ui);
+                        brush_preset_chip(ui, b, &mut app.ui, c32(app.session.tools.foreground));
                         crate::brush_picker::settings_toggle(app, ui);
                         widgets::vline(ui, 22.0);
                         if !t.pro {
@@ -794,7 +794,7 @@ pub(crate) fn options_content(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         widgets::checkbox(ui, &mut app.ui.tool_options.pencil_auto_erase, tl!("Auto Erase"));
                     }
                     Tool::Brush | Tool::Eraser => {
-                        brush_preset_chip(ui, b, &mut app.ui);
+                        brush_preset_chip(ui, b, &mut app.ui, c32(app.session.tools.foreground));
                         crate::brush_picker::settings_toggle(app, ui);
                         widgets::vline(ui, 22.0);
                         opt_label(ui, tl!("Size"));
@@ -810,7 +810,7 @@ pub(crate) fn options_content(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         widgets::toggle(ui, &mut b.pressure_opacity, tl!("Pressure for Opacity"));
                     }
                     Tool::MixerBrush => {
-                        brush_preset_chip(ui, b, &mut app.ui);
+                        brush_preset_chip(ui, b, &mut app.ui, c32(app.session.tools.foreground));
                         crate::brush_picker::settings_toggle(app, ui);
                         widgets::vline(ui, 22.0);
                         for (label, value) in [
@@ -3029,7 +3029,7 @@ fn smoothing_options(ui: &mut egui::Ui, b: &mut photocraft_engine::BrushSettings
 
 /// Options-bar brush chip: a click shows or hides Photoshop's Brush Preset picker below it (size,
 /// hardness, the preset library), the one a right-click on the canvas opens.
-fn brush_preset_chip(ui: &mut egui::Ui, b: &photocraft_engine::BrushSettings, state: &mut crate::state::UiState) {
+fn brush_preset_chip(ui: &mut egui::Ui, b: &photocraft_engine::BrushSettings, state: &mut crate::state::UiState, color: Color32) {
     let t = Tokens::get(ui.ctx());
     let (r, _) = ui.allocate_exact_size(vec2(44.0, 30.0), Sense::hover());
     let resp = ui.interact(r, crate::brush_picker::chip_id(), Sense::click());
@@ -3037,7 +3037,9 @@ fn brush_preset_chip(ui: &mut egui::Ui, b: &photocraft_engine::BrushSettings, st
         ui.painter().rect_filled(r, t.radius_sm, t.hover);
     }
     let c = pos2(r.left() + 14.0, r.top() + 11.0);
-    brush_tip(ui.painter(), c, 7.0, b.hardness, Color32::WHITE);
+    brush_tip(ui.painter(), c, 7.0, b.hardness, color);
+    // A dark colour on the dark chrome would vanish without it.
+    ui.painter().circle_stroke(c, 7.0, egui::Stroke::new(1.0, t.text_faint));
     ui.painter().text(pos2(c.x, r.bottom() - 5.0), Align2::CENTER_CENTER, format!("{}", b.size.round() as i64), egui::FontId::proportional(9.5), t.text_dim);
     icons::paint(ui, Rect::from_center_size(pos2(r.right() - 9.0, c.y), vec2(10.0, 10.0)), "chevron-down", 9.0, t.text_faint);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Brush Preset picker")));
