@@ -1556,4 +1556,37 @@ mod tests {
         assert_eq!(corner(&h), [255, 0, 0], "the original is back");
         let _ = std::fs::remove_dir_all(&dir);
     }
+
+    /// The histogram/slider adjustment editors (Levels, Threshold, Gradient Map, Color Lookup)
+    /// used to hug the left edge of the sheet: their content caps at 300 pt. A wider sheet
+    /// (tablet, landscape phone) centres that column instead.
+    #[test]
+    fn sheet_centres_narrow_adjustment_editors() {
+        use egui_kittest::kittest::Queryable;
+        for (kind, probe) in [("levels", "Output Levels:"), ("threshold", "Threshold Level"), ("gradientMap", "Preset:"), ("colorLookup", "3D LUT File")] {
+            let mut a = app();
+            a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+            a.run(&format!("layer.newAdjustmentLayer.{kind}"), json!({})).unwrap();
+            a.ui.mobile.panel = Some(crate::dock::Group::Properties);
+            a.ui.dock_tabs.properties = 0;
+            let mut h = Harness::builder().with_size(vec2(600.0, 900.0)).build_ui_state(
+                |ui, app: &mut PhotocraftApp| {
+                    if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                        return;
+                    }
+                    header(app, ui);
+                    tool_bar(app, ui);
+                    sheet(app, ui);
+                    crate::canvas::document_area(app, ui);
+                },
+                a,
+            );
+            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+            h.run_steps(8);
+            // A 300 pt column on a 600 pt screen starts ~150 pt in (the scroll bar shaves a few
+            // points off the body's right); the probe sits at its left.
+            let content = h.query_all_by_label(probe).last().unwrap_or_else(|| panic!("{kind}: {probe}")).rect();
+            assert!((content.min.x - 150.0).abs() <= 6.0, "{kind}: {probe} at {content:?}");
+        }
+    }
 }

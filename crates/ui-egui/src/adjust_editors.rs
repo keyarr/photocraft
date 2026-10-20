@@ -99,6 +99,18 @@ pub fn space_of(v: &Value) -> ToneSpace {
     }
 }
 
+/// How wide a histogram/slider editor gets. A wider host (the touch sheet on a tablet, the
+/// dialogs) centres a column this wide instead of leaving the content hugging its left edge.
+const CONTENT_WIDTH: f32 = 300.0;
+
+/// Lay `add` out in a [`CONTENT_WIDTH`] column centred in `ui`; narrow hosts keep their width.
+fn centred<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let slot = ui.available_rect_before_wrap();
+    let w = slot.width().min(CONTENT_WIDTH);
+    let rect = Rect::from_min_size(pos2(slot.center().x - w / 2.0, slot.top()), vec2(w, slot.height()));
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::Min)), add).inner
+}
+
 /// The editor for `kind` over its parameter set `v`.
 pub fn editor(ui: &mut egui::Ui, kind: &str, v: &mut Value, cx: &EditorCx) -> Edit {
     if !v.is_object() {
@@ -106,7 +118,7 @@ pub fn editor(ui: &mut egui::Ui, kind: &str, v: &mut Value, cx: &EditorCx) -> Ed
     }
     match kind {
         "brightnessContrast" => brightness_contrast(ui, v),
-        "levels" => levels(ui, v, cx),
+        "levels" => centred(ui, |ui| levels(ui, v, cx)),
         "curves" => curves(ui, v, cx),
         "exposure" => sliders(
             ui,
@@ -124,8 +136,8 @@ pub fn editor(ui: &mut egui::Ui, kind: &str, v: &mut Value, cx: &EditorCx) -> Ed
         "photoFilter" => photo_filter(ui, v, cx),
         "channelMixer" => channel_mixer(ui, v, cx),
         "posterize" => sliders(ui, v, &[("levels", "Levels", 2.0, 255.0, 4.0, "")]),
-        "threshold" => threshold(ui, v, cx),
-        "gradientMap" => gradient_map(ui, v, cx),
+        "threshold" => centred(ui, |ui| threshold(ui, v, cx)),
+        "gradientMap" => centred(ui, |ui| gradient_map(ui, v, cx)),
         _ => Edit::default(),
     }
 }
@@ -1333,7 +1345,7 @@ pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj
     let kind = photocraft_engine::commands::adjustment_kind(adj);
     match adj {
         Adjustment::SelectiveColor { .. } => return crate::adjust_ui::selective_color_editor(app, ui, id, adj),
-        Adjustment::ColorLookup { .. } => return crate::adjust_ui::color_lookup_editor(app, ui, id, adj),
+        Adjustment::ColorLookup { .. } => return centred(ui, |ui| crate::adjust_ui::color_lookup_editor(app, ui, id, adj)),
         Adjustment::Invert => {
             ui.label(RichText::new(tl!("Invert has no settings.")).color(t.text_faint));
             return;
@@ -1412,6 +1424,23 @@ mod tests {
                 assert!(r.top() >= full.top() && r.bottom() <= full.bottom());
             }
         }
+    }
+
+    #[test]
+    fn wide_hosts_centre_the_editor_column() {
+        let mut column = None;
+        egui::__run_test_ui(|ui| {
+            ui.set_width(600.0);
+            centred(ui, |ui| {
+                let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 10.0), Sense::hover());
+                column = Some(r);
+            });
+            let (below, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
+            let r = column.expect("the column lays out");
+            assert_eq!(r.width(), CONTENT_WIDTH);
+            assert!((r.center().x - 300.0).abs() <= 0.5, "{r:?}");
+            assert!(below.top() >= r.bottom(), "{below:?} follows the column {r:?}");
+        });
     }
 
     #[test]
