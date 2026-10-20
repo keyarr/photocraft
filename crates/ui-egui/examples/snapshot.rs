@@ -66,7 +66,7 @@ fn main() {
             NivetaApp::setup_context(&cc.egui_ctx, Default::default());
             let mut services = services;
             services.is_wayland = wayland_notice;
-            services.xwayland_command = wayland_notice.then(|| "WAYLAND_DISPLAY= photocraft".into());
+            services.xwayland_command = wayland_notice.then(|| "WAYLAND_DISPLAY= niveta-android".into());
             let mut app = NivetaApp::new(niveta_engine::Session::new(), services);
             app.background_jobs = background_jobs;
             app.custom_titlebar = custom_titlebar;

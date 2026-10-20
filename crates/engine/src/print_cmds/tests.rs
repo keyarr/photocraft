@@ -69,7 +69,9 @@ fn print_dry_run_renders_a_pdf_and_reports_lp() {
     let scale = r["scale"].as_f64().unwrap();
     assert!(scale > 200.0, "fit to a landscape letter page: {scale}");
     assert!(s.execute("file.print", json!({"paper": "napkin", "dryRun": true})).is_err());
-    assert!(s.execute("file.print", json!({"colorHandling": "photocraftManages", "dryRun": true})).is_err(), "needs a printer profile");
+    assert!(s.execute("file.print", json!({"colorHandling": "nivetaManages", "dryRun": true})).is_err(), "needs a printer profile");
+    // Legacy values saved by automation keep working after the rename.
+    assert!(s.execute("file.print", json!({"dryRun": true, "colorHandling": "photocraftManages", "printerProfile": "coated-cmyk"})).is_ok());
 }
 
 #[test]
@@ -78,7 +80,7 @@ fn niveta_manages_colors_converts_to_the_printer_profile() {
     let r = s
         .execute(
             "file.print",
-            json!({"dryRun": true, "colorHandling": "photocraftManages", "printerProfile": "coated-cmyk", "intent": "perceptual", "bpc": false}),
+            json!({"dryRun": true, "colorHandling": "nivetaManages", "printerProfile": "coated-cmyk", "intent": "perceptual", "bpc": false}),
         )
         .unwrap();
     assert_eq!(r["color"]["intent"], "perceptual");

@@ -541,7 +541,7 @@ fn batch_reports_inputs_that_share_an_output_name() {
     std::fs::create_dir_all(&other).unwrap();
     png(&other, "a.png", 8, 8, "#ffffff");
     let droplet = join(&dir, "d.pcdroplet");
-    std::fs::write(&droplet, json!({"photocraftDroplet": 1, "name": "d", "action": {"steps": []}, "options": {"format": "png"}}).to_string()).unwrap();
+    std::fs::write(&droplet, json!({"nivetaDroplet": 1, "name": "d", "action": {"steps": []}, "options": {"format": "png"}}).to_string()).unwrap();
     let out = join(&dir, "droplet");
     let r = s.execute("file.automate.runDroplet", json!({"droplet": droplet, "input": [join(&input, "a.png"), other], "output": out})).unwrap();
     assert_eq!((r["files"].as_array().unwrap().len(), r["errors"].as_array().unwrap().len()), (1, 1), "{r}");

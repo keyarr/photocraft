@@ -682,12 +682,12 @@ fn print_body(app: &mut NivetaApp, ui: &mut egui::Ui, f: &mut Map<String, Value>
                 "colorHandling",
                 &[
                     ("printerManages", tl!("Printer Manages Colors")),
-                    ("photocraftManages", tl!("Niveta Manages Colors")),
+                    ("nivetaManages", tl!("Niveta Manages Colors")),
                     ("noColorManagement", tl!("No Color Management")),
                 ],
                 240.0,
             );
-            if s(f, "colorHandling", "") == "photocraftManages" {
+            if ["nivetaManages", "photocraftManages"].contains(&s(f, "colorHandling", "").as_str()) {
                 dropdown_str(
                     ui,
                     "print-profile",

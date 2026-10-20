@@ -93,7 +93,7 @@ fn synthetic(w: u32, h: u32) -> Document {
     // Text layers through the engine (real glyph rasterization).
     let mut s = niveta_engine::Session::new();
     s.add_document(d, None);
-    let lines = ["Photocraft", "Layer Effects", "on the GPU", "Drop Shadow", "Stroke", "Bevel & Emboss", "36 megapixels", "interactive"];
+    let lines = ["Niveta", "Layer Effects", "on the GPU", "Drop Shadow", "Stroke", "Bevel & Emboss", "36 megapixels", "interactive"];
     let rows = lines.len() as u32;
     for (i, t) in lines.iter().enumerate() {
         let y = (h / (rows + 1)) * (i as u32 + 1);

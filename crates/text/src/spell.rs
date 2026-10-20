@@ -285,10 +285,10 @@ mod tests {
     #[test]
     fn misspellings_and_user_words() {
         let d = Dictionary::from_list("#10\nhello\nworld\nParis\n");
-        let text = "Hello wrld, Paris paris photocraft 42x";
+        let text = "Hello wrld, Paris paris niveta 42x";
         let m: Vec<String> = d.misspellings(text, &none()).into_iter().map(|m| m.word).collect();
-        assert_eq!(m, vec!["wrld", "paris", "photocraft"]);
-        let user: HashSet<String> = ["photocraft".to_string()].into();
+        assert_eq!(m, vec!["wrld", "paris", "niveta"]);
+        let user: HashSet<String> = ["niveta".to_string()].into();
         assert_eq!(d.misspellings(text, &user).len(), 2);
         let mm = &d.misspellings(text, &none())[0];
         assert_eq!(&text[mm.start..mm.end], "wrld");

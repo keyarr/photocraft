@@ -295,7 +295,7 @@ fn create_droplet(s: &mut Session, p: &Value) -> Result<Value> {
             options.insert(k.into(), v.clone());
         }
     }
-    let droplet = json!({"photocraftDroplet": 1, "name": name, "action": {"name": name, "steps": steps_json}, "options": options});
+    let droplet = json!({"nivetaDroplet": 1, "name": name, "action": {"name": name, "steps": steps_json}, "options": options});
     let text = serde_json::to_string_pretty(&droplet).unwrap_or_default();
     write_file(&path, text.as_bytes())?;
     let shim = p.get("shim").and_then(Value::as_bool).unwrap_or(cfg!(unix));
@@ -332,7 +332,7 @@ fn run_droplet(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "file.automate.runDroplet";
     let path = p.get("droplet").or_else(|| p.get("path")).and_then(Value::as_str).ok_or_else(|| bad(cmd, "missing \"droplet\""))?;
     let v: Value = serde_json::from_slice(&read_file(path)?).map_err(|e| bad(cmd, format!("{path}: {e}")))?;
-    if v.get("photocraftDroplet").is_none() {
+    if v.get("nivetaDroplet").is_none() && v.get("photocraftDroplet").is_none() {
         return Err(bad(cmd, format!("{path} is not a Niveta droplet")));
     }
     let steps = v.get("action").and_then(|a| a.get("steps")).cloned().ok_or_else(|| bad(cmd, "droplet has no action"))?;

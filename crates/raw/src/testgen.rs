@@ -476,7 +476,7 @@ impl DngSpec {
             baseline_exposure: None,
             orientation: 1,
             opcode_list2: None,
-            make: "Photocraft".into(),
+            make: "Niveta".into(),
             model: "Synthetic".into(),
         }
     }

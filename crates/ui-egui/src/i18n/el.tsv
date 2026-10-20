@@ -2591,7 +2591,6 @@
 	Move to	Μετακίνηση σε
 	NTSC Colors	Χρώματα NTSC
 	Name:	Όνομα:
-	Native file drag-and-drop is not supported on Wayland yet. Use File › Open, or run Niveta under XWayland with `WAYLAND_DISPLAY= photocraft`.	Η μεταφορά και απόθεση αρχείων δεν υποστηρίζεται ακόμη στο Wayland. Χρησιμοποιήστε Αρχείο › Άνοιγμα ή εκτελέστε το Niveta μέσω XWayland με `WAYLAND_DISPLAY= photocraft`.
 	Nearest Neighbor	Πλησιέστερος γείτονας
 	Nearest Neighbor (hard edges)	Πλησιέστερος γείτονας (σκληρές ακμές)
 	Nearest neighbor	Πλησιέστερος γείτονας

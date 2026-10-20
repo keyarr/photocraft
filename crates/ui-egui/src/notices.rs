@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn wayland_guidance_follows_language_changes_after_startup() {
-        let command = Some("WAYLAND_DISPLAY= photocraft".to_string());
+        let command = Some("WAYLAND_DISPLAY= niveta-android".to_string());
         let app = NivetaApp::new(Session::new(), Services { is_wayland: true, xwayland_command: command, ..Default::default() });
         let notice = &app.ui.notices[0];
         assert!(notice.lines.iter().all(|line| crate::i18n::tr(crate::i18n::Lang::from_code("es").unwrap(), line) != line), "every line is a catalog template");

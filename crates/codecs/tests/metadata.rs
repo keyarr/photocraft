@@ -11,7 +11,7 @@ fn rich_image(layout: ChannelLayout) -> Image {
         exif: Some(sample_exif()),
         xmp: Some(SAMPLE_XMP.to_owned()),
         dpi: Some((300.0, 150.0)),
-        text: vec![("Description".into(), "synthetic test image".into()), ("Software".into(), "photocraft".into())],
+        text: vec![("Description".into(), "synthetic test image".into()), ("Software".into(), "niveta".into())],
         ..Default::default()
     };
     img

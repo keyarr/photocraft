@@ -33,8 +33,10 @@ fn scripts_parse_json_and_lines() {
     let b = parse_script("# make a doc\nfile.new {\"width\": 12, \"height\": 8}\n\nimage.imageRotation.90cw\n").unwrap();
     assert_eq!(b.len(), 2);
     assert_eq!(b[1].0, "image.imageRotation.90cw");
-    let c = parse_script(r#"{"photocraftDroplet":1,"action":{"steps":[["file.new",{}]]}}"#).unwrap();
+    let c = parse_script(r#"{"nivetaDroplet":1,"action":{"steps":[["file.new",{}]]}}"#).unwrap();
     assert_eq!(c.len(), 1);
+    // Droplets exported before the rename keep running (legacy marker).
+    assert_eq!(parse_script(r#"{"photocraftDroplet":1,"action":{"steps":[["file.new",{}]]}}"#).unwrap().len(), 1);
     assert!(parse_script("file.new {bad json").is_err());
 }
 
@@ -97,7 +99,7 @@ fn droplets_are_written_and_run() {
     let dp = r["path"].as_str().unwrap().to_string();
     assert!(dp.ends_with("Rotate.pcdroplet"));
     let v: Value = serde_json::from_slice(&std::fs::read(&dp).unwrap()).unwrap();
-    assert_eq!(v["photocraftDroplet"], 1);
+    assert_eq!(v["nivetaDroplet"], 1);
     #[cfg(unix)]
     {
         let shim = r["shim"].as_str().unwrap();

@@ -97,7 +97,7 @@ impl Builtin {
             "gray" | "graygamma22" | "gamma22" => Some(Builtin::GrayGamma22),
             "sgray" | "graysrgb" => Some(Builtin::SGray),
             "lab" | "labd50" | "cielab" => Some(Builtin::LabD50),
-            "cmyk" | "coatedcmyk" | "defaultcmyk" | "photocraftcoatedcmyk" => Some(Builtin::CoatedCmyk),
+            "cmyk" | "coatedcmyk" | "defaultcmyk" | "nivetacoatedcmyk" | "photocraftcoatedcmyk" => Some(Builtin::CoatedCmyk),
             _ => None,
         };
         alias.or_else(|| Builtin::ALL.into_iter().find(|b| b.description().eq_ignore_ascii_case(s)))

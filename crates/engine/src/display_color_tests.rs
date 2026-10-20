@@ -337,9 +337,9 @@ fn each_display_gets_its_own_profile() {
 fn saved_monitor_profile_that_is_gone_is_reported() {
     // Preferences load settings without validating them: a saved .icc path deleted since.
     let mut s = Session::new();
-    s.color.settings.monitor_profile = "/nonexistent/photocraft/display.icc".into();
+    s.color.settings.monitor_profile = "/nonexistent/niveta/display.icc".into();
     let st = s.color.monitor_status();
-    assert_eq!((st.requested.as_str(), st.source), ("/nonexistent/photocraft/display.icc", "fallback"));
+    assert_eq!((st.requested.as_str(), st.source), ("/nonexistent/niveta/display.icc", "fallback"));
     assert!(st.reason.as_deref().unwrap_or("").contains("cannot read profile"), "{st:?}");
     assert_eq!(s.color.monitor().content_hash(), Builtin::Srgb.profile().content_hash());
 }

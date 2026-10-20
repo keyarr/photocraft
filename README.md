@@ -256,7 +256,7 @@ CRAFT_FONTS_DIR="$PWD/../craft-fonts" cargo xtask android build --release
 
 New contributors and AI agents: start with [`AGENTS.md`](AGENTS.md), then [`docs/`](docs/).
 
-Releases ship a signed APK (`ai.storyteller.photocraft.android`); see [`docs/releasing.md`](docs/releasing.md).
+Releases ship a signed APK (`app.niveta`); see [`docs/releasing.md`](docs/releasing.md).
 
 > [!IMPORTANT]
 > **Status:** Niveta is in early alpha, and we want to be straight about where it stands: much of Photoshop's feature surface exists in some form, but **it is not yet a Photoshop replacement for daily professional work**. The biggest gaps are AI/generative features, about twenty missing tools, depth in typography and pro workflows, and plug-in compatibility. Every Photoshop menu item is wired to a command ([`docs/parity.md`](docs/parity.md)), but that measures wiring, not behaviour. The honest, dimension-by-dimension picture and where we're going next are in the [roadmap's parity assessment](docs/roadmap.md#honest-parity-assessment-2026-10-05). Expect rough edges, and please file issues (include your OS, document size, layer count and a screenshot). You can also tell us what broke on [Discord](https://discord.gg/artcraft).
