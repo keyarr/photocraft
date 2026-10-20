@@ -24,7 +24,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 
 /// Shared-storage candidates, first readable wins as the start folder.
 const ROOTS: &[&str] =
@@ -102,7 +102,7 @@ struct Listing {
 /// there is no shared storage, so the probe fails and the gate shows (which
 /// also keeps the browser host-testable through `access: Some(true)`).
 fn has_access() -> bool {
-    let probe = Path::new("/sdcard/Download").join(".photocraft-access-probe");
+    let probe = Path::new("/sdcard/Download").join(".niveta-access-probe");
     if std::fs::write(&probe, b"1").is_err() {
         return false;
     }
@@ -115,15 +115,15 @@ fn start_dir() -> PathBuf {
 }
 
 /// File › Open without a system picker: show the browser modal.
-pub fn open(app: &mut PhotocraftApp) {
+pub fn open(app: &mut NivetaApp) {
     app.ui.device_browser = Some(Browser { dir: start_dir(), error: None, access: None, cached: None });
 }
 
 /// What File › Open shows: exactly what `import` opens
-/// (`photocraft_io::is_openable_file`), so the browser never hides a format
+/// (`niveta_io::is_openable_file`), so the browser never hides a format
 /// the importer handles.
 fn is_supported(name: &str) -> bool {
-    photocraft_io::is_openable_file(name)
+    niveta_io::is_openable_file(name)
 }
 
 fn list(dir: &Path) -> Result<Listing, String> {
@@ -187,7 +187,7 @@ fn size_text(size: Option<u64>) -> String {
 }
 
 /// Draw the modal when File › Open asked for it; a no-op otherwise.
-pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut NivetaApp, ctx: &egui::Context) {
     let Some(mut b) = app.ui.device_browser.take() else { return };
     // With shell hooks the verdict is live: recheck while the gate is up so
     // granting in the dialog or Settings opens the browser with no extra tap.
@@ -335,9 +335,9 @@ enum ThumbKind {
 }
 
 fn thumb_kind(name: &str) -> ThumbKind {
-    if name.rsplit(['/', '\\']).next().and_then(|n| n.rsplit_once('.')).is_some_and(|(base, ext)| !base.is_empty() && ext.eq_ignore_ascii_case(photocraft_format::EXTENSION)) {
+    if name.rsplit(['/', '\\']).next().and_then(|n| n.rsplit_once('.')).is_some_and(|(base, ext)| !base.is_empty() && ext.eq_ignore_ascii_case(niveta_format::EXTENSION)) {
         ThumbKind::Pcraft
-    } else if photocraft_codecs::from_extension(name).is_some_and(|f| f.caps().read) {
+    } else if niveta_codecs::from_extension(name).is_some_and(|f| f.caps().read) {
         ThumbKind::Flat
     } else {
         ThumbKind::None
@@ -370,8 +370,8 @@ fn decode_thumb(path: &Path, name: &str, size: Option<u64>) -> Option<egui::Colo
     match thumb_kind(name) {
         ThumbKind::None => None,
         ThumbKind::Pcraft => {
-            let png = photocraft_format::read_thumbnail(&bytes).ok()??;
-            let img = photocraft_codecs::decode(&png).ok()?;
+            let png = niveta_format::read_thumbnail(&bytes).ok()??;
+            let img = niveta_codecs::decode(&png).ok()?;
             Some(shrink(&img.to_rgba8(), img.width(), img.height()))
         }
         ThumbKind::Flat => {
@@ -380,12 +380,12 @@ fn decode_thumb(path: &Path, name: &str, size: Option<u64>) -> Option<egui::Colo
             // the full decode when there is none. A stamp smaller than the
             // grid cell stretched up looks worse than no shortcut at all, so
             // tiny previews fall through to the full decode too.
-            if let Some(img) = photocraft_codecs::exif_thumbnail(&bytes).filter(|img| img.width().max(img.height()) >= THUMB_SIDE) {
+            if let Some(img) = niveta_codecs::exif_thumbnail(&bytes).filter(|img| img.width().max(img.height()) >= THUMB_SIDE) {
                 return Some(shrink(&img.to_rgba8(), img.width(), img.height()));
             }
             let limits =
-                photocraft_codecs::Limits { max_width: 12_000, max_height: 12_000, max_pixels: 64 * 1024 * 1024, max_alloc: 256 * 1024 * 1024 };
-            let img = photocraft_codecs::decode_with(&bytes, &photocraft_codecs::DecodeOptions { limits, keep_orientation: false }).ok()?;
+                niveta_codecs::Limits { max_width: 12_000, max_height: 12_000, max_pixels: 64 * 1024 * 1024, max_alloc: 256 * 1024 * 1024 };
+            let img = niveta_codecs::decode_with(&bytes, &niveta_codecs::DecodeOptions { limits, keep_orientation: false }).ok()?;
             Some(shrink(&img.to_rgba8(), img.width(), img.height()))
         }
     }
@@ -809,7 +809,7 @@ mod tests {
 
     impl TempDir {
         fn new() -> Self {
-            let dir = std::env::temp_dir().join(format!("photocraft-browser-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
+            let dir = std::env::temp_dir().join(format!("niveta-browser-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(dir.join("sub")).unwrap();
             std::fs::create_dir_all(dir.join(".hidden")).unwrap();
@@ -861,12 +861,12 @@ mod tests {
 
     #[test]
     fn thumbs_decode_small_photos_and_skip_the_rest() {
-        let dir = std::env::temp_dir().join(format!("photocraft-thumb-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
+        let dir = std::env::temp_dir().join(format!("niveta-thumb-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let png = |name: &str, w: u32, h: u32| {
-            let img = photocraft_codecs::Image::from_u8(w, h, photocraft_codecs::ChannelLayout::Rgba, [255u8, 0, 0, 255].repeat((w * h) as usize)).unwrap();
-            let bytes = photocraft_codecs::encode(&img, photocraft_codecs::Format::Png, &photocraft_codecs::EncodeOptions::default()).unwrap();
+            let img = niveta_codecs::Image::from_u8(w, h, niveta_codecs::ChannelLayout::Rgba, [255u8, 0, 0, 255].repeat((w * h) as usize)).unwrap();
+            let bytes = niveta_codecs::encode(&img, niveta_codecs::Format::Png, &niveta_codecs::EncodeOptions::default()).unwrap();
             std::fs::write(dir.join(name), &bytes).unwrap();
             bytes.len() as u64
         };
@@ -894,18 +894,18 @@ mod tests {
     fn photo_grid_caches_thumbs_and_dirs_keep_their_icon() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let dir = std::env::temp_dir().join(format!("photocraft-grid-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
+        let dir = std::env::temp_dir().join(format!("niveta-grid-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("sub")).unwrap();
         for (name, px) in [("red.png", [255u8, 0, 0, 255]), ("green.png", [0u8, 255, 0, 255])] {
-            let img = photocraft_codecs::Image::from_u8(8, 8, photocraft_codecs::ChannelLayout::Rgba, px.repeat(64)).unwrap();
-            let bytes = photocraft_codecs::encode(&img, photocraft_codecs::Format::Png, &photocraft_codecs::EncodeOptions::default()).unwrap();
+            let img = niveta_codecs::Image::from_u8(8, 8, niveta_codecs::ChannelLayout::Rgba, px.repeat(64)).unwrap();
+            let bytes = niveta_codecs::encode(&img, niveta_codecs::Format::Png, &niveta_codecs::EncodeOptions::default()).unwrap();
             std::fs::write(dir.join(name), bytes).unwrap();
         }
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.ui.device_browser = Some(Browser { dir: dir.clone(), error: None, access: Some(true), cached: None });
         let mut h = Harness::builder().with_size(egui::vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -913,7 +913,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(2);
         assert!(h.query_all_by_label_contains("red.png").next().is_some(), "photo cell renders");
         assert!(h.query_all_by_label_contains("green.png").next().is_some(), "photo cell renders");
@@ -943,7 +943,7 @@ mod tests {
     fn grid_only_lays_out_the_visible_rows() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let dir = std::env::temp_dir().join(format!("photocraft-grid-big-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
+        let dir = std::env::temp_dir().join(format!("niveta-grid-big-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         // 300 unsupported-but-listed files would previously build 300 cells a
@@ -952,10 +952,10 @@ mod tests {
         for i in 0..300 {
             std::fs::write(dir.join(format!("img{i:03}.psd")), b"x").unwrap();
         }
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.ui.device_browser = Some(Browser { dir: dir.clone(), error: None, access: Some(true), cached: None });
         let mut h = Harness::builder().with_size(egui::vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -963,7 +963,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
         assert!(h.query_all_by_label_contains("img000").next().is_some(), "first row renders");
         assert!(h.query_all_by_label_contains("img299").next().is_none(), "off-screen rows are virtualized away");
@@ -975,10 +975,10 @@ mod tests {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
         let t = TempDir::new();
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.ui.device_browser = Some(Browser { dir: t.dir.clone(), error: None, access: Some(true), cached: None });
         let mut h = Harness::builder().with_size(egui::vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -986,7 +986,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
         assert!(h.query_all_by_label_contains("a.png").next().is_some(), "file row renders");
         assert!(h.query_all_by_label_contains("sub/").next().is_some(), "dir row renders");
@@ -1002,9 +1002,9 @@ mod tests {
         }
     }
 
-    fn gate_harness(app: PhotocraftApp) -> egui_kittest::Harness<'static, PhotocraftApp> {
+    fn gate_harness(app: NivetaApp) -> egui_kittest::Harness<'static, NivetaApp> {
         egui_kittest::Harness::builder().with_size(egui::vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1021,10 +1021,10 @@ mod tests {
         use egui_kittest::kittest::Queryable;
         let t = TempDir::new();
         let services = crate::Services { storage_has_access: Some(Box::new(|| true)), ..Default::default() };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), services);
         app.ui.device_browser = Some(Browser { dir: t.dir.clone(), error: None, access: None, cached: None });
         let mut h = gate_harness(app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
         assert!(h.query_all_by_label_contains("a.png").next().is_some(), "hook verdict opens the browser");
     }
@@ -1034,10 +1034,10 @@ mod tests {
     fn gate_offers_request_and_settings_buttons() {
         use egui_kittest::kittest::Queryable;
         let t = TempDir::new();
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), hooked_services());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), hooked_services());
         app.ui.device_browser = Some(Browser { dir: t.dir.clone(), error: None, access: None, cached: None });
         let mut h = gate_harness(app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
         assert!(h.query_all_by_label_contains("Allow access").next().is_some(), "request button renders");
         assert!(h.query_all_by_label_contains("Open Settings").next().is_some(), "settings button renders");

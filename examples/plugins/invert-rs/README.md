@@ -19,7 +19,7 @@ a member of the Niveta workspace.
 
 ```sh
 # Into a running app (control channel) or the CLI, as a command:
-plugin.install {"path": "examples/plugins/invert-rs/target/wasm32-unknown-unknown/release/photocraft_plugin_invert.wasm"}
+plugin.install {"path": "examples/plugins/invert-rs/target/wasm32-unknown-unknown/release/niveta_plugin_invert.wasm"}
 plugin.run {"id": "org.photocraft.example.invert"}
 ```
 

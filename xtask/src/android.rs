@@ -1,6 +1,6 @@
 //! Android builds: `cargo xtask android <build|install|log|devices> [--release]`.
 //!
-//! The phone shell (`apps/photocraft-android`) packages with `x` (xbuild):
+//! The phone shell (`apps/niveta-android`) packages with `x` (xbuild):
 //! same Rust, `android_main` instead of `main`, APK out. This wraps the
 //! fiddly parts (env checks, APK discovery, `adb install`, filtered logcat)
 //! so the dev loop is one command. When `x` itself fails, its output is the
@@ -19,16 +19,16 @@ commands:
   install [--release] build, then `adb install -r` the freshest APK onto the
                       attached device (`adb devices` must list one)
   log                 `adb logcat` with the rust log of the running app
-                      (tag photocraft-android; Ctrl-C to stop)
+                      (tag niveta-android; Ctrl-C to stop)
   devices             `adb devices` plus what xbuild sees
 
 env: ANDROID_HOME (or ANDROID_SDK_ROOT) must point at the SDK;
      the NDK inside it and the aarch64-linux-android rust target must exist.
      `x` (xbuild) must be on PATH (`cargo install xbuild`).";
 
-/// `apps/photocraft-android`, from the workspace root.
+/// `apps/niveta-android`, from the workspace root.
 fn app_dir() -> PathBuf {
-    root().join("apps").join("photocraft-android")
+    root().join("apps").join("niveta-android")
 }
 
 /// ANDROID_HOME, or ANDROID_SDK_ROOT when the former is unset.
@@ -139,7 +139,7 @@ fn cmd_build(release: bool) -> Result<(), String> {
             println!("apk: {}", p.display());
             Ok(())
         }
-        None => Err("x build succeeded but no APK found under apps/photocraft-android/target".into()),
+        None => Err("x build succeeded but no APK found under apps/niveta-android/target".into()),
     }
 }
 
@@ -156,8 +156,8 @@ fn cmd_log() -> Result<(), String> {
     let sdk = need_toolchain()?;
     // The rust log of the running app; everything else is noise.
     let mut c = Command::new(sdk.join("platform-tools").join("adb"));
-    c.args(["logcat", "photocraft-android:I", "*:S"]);
-    run(c, "adb logcat photocraft-android:I *:S")
+    c.args(["logcat", "niveta-android:I", "*:S"]);
+    run(c, "adb logcat niveta-android:I *:S")
 }
 
 fn cmd_devices() -> Result<(), String> {

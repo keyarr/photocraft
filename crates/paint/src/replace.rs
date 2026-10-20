@@ -1,10 +1,10 @@
 //! Color Replacement: recolour pixels similar to a sampled colour using a non-separable blend
 //! (Hue, Saturation, Color or Luminosity) with the foreground colour.
 
-use photocraft_color::BlendMode;
-use photocraft_color::blend::blend_rgb;
-use photocraft_geom::Rect;
-use photocraft_raster::{Surface, from_rgba_into, to_rgba};
+use niveta_color::BlendMode;
+use niveta_color::blend::blend_rgb;
+use niveta_geom::Rect;
+use niveta_raster::{Surface, from_rgba_into, to_rgba};
 use serde::{Deserialize, Serialize};
 
 use crate::Stroke;
@@ -194,14 +194,14 @@ pub fn apply_color_replacement(target: &mut Surface, stroke: &Stroke, rs: &Repla
 mod tests {
     use super::*;
     use crate::{BrushSettings, StrokePoint};
-    use photocraft_color::PixelFormat;
-    use photocraft_color::blend::lum;
+    use niveta_color::PixelFormat;
+    use niveta_color::blend::lum;
 
     fn setup(fmt: PixelFormat) -> Surface {
         let mut s = Surface::new(fmt);
         // Left: mid green; right: dark blue.
-        s.fill_rect(Rect::new(0, 0, 40, 40), &photocraft_raster::from_rgba(&fmt, [0.2, 0.6, 0.2, 1.0]));
-        s.fill_rect(Rect::new(40, 0, 80, 40), &photocraft_raster::from_rgba(&fmt, [0.1, 0.1, 0.5, 1.0]));
+        s.fill_rect(Rect::new(0, 0, 40, 40), &niveta_raster::from_rgba(&fmt, [0.2, 0.6, 0.2, 1.0]));
+        s.fill_rect(Rect::new(40, 0, 80, 40), &niveta_raster::from_rgba(&fmt, [0.1, 0.1, 0.5, 1.0]));
         s
     }
 

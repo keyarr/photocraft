@@ -37,7 +37,7 @@ fn grid_columns_never_panic_or_return_no_columns() {
 
 /// Checks each of the first `groups` groups' rows against its header (which spans the list's
 /// width): the same left margin on every row, and on full rows the spare width split evenly.
-fn rows_are_centred(h: &Harness<'_, PhotocraftApp>, indent: f32, groups: usize) {
+fn rows_are_centred(h: &Harness<'_, NivetaApp>, indent: f32, groups: usize) {
     let presets = h.state().session.tools.presets.clone();
     let grouped = grouped_presets(&presets);
     let headers: Vec<Rect> = grouped
@@ -91,8 +91,8 @@ fn rows_are_centred(h: &Harness<'_, PhotocraftApp>, indent: f32, groups: usize) 
 #[test]
 fn the_brush_preset_picker_grid_is_centred() {
     let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
+        NivetaApp::setup_context(&cc.egui_ctx, Default::default());
+        NivetaApp::new(niveta_engine::Session::new(), crate::Services::default())
     });
     h.state_mut().run("file.new", serde_json::json!({"width": 400, "height": 300})).unwrap();
     h.state_mut().ui.tool = crate::state::Tool::Brush;
@@ -104,12 +104,12 @@ fn the_brush_preset_picker_grid_is_centred() {
 
 #[test]
 fn the_brushes_tab_grid_is_centred_past_its_indent() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
     app.ui.panels.brush_settings = true;
     app.ui.brush_tab = 1;
     app.ui.brushes_panel.view = BrushesView::Grid;
     let mut h = Harness::builder().with_size(vec2(1200.0, 900.0)).build_ui_state(
-        |ui, app: &mut PhotocraftApp| {
+        |ui, app: &mut NivetaApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
@@ -118,7 +118,7 @@ fn the_brushes_tab_grid_is_centred_past_its_indent() {
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
     h.run_steps(6);
     rows_are_centred(&h, PANEL_LIST.indent, 2);
 }

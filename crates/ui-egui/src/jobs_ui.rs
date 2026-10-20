@@ -1,7 +1,7 @@
 //! Background jobs in the shell (#210): long commands and file opens run on worker threads (see
-//! `photocraft_engine::jobs`) while the window keeps drawing at full frame rate.
+//! `niveta_engine::jobs`) while the window keeps drawing at full frame rate.
 //!
-//! - [`run`] starts a job-capable command in the background (when [`PhotocraftApp::background_jobs`]
+//! - [`run`] starts a job-capable command in the background (when [`NivetaApp::background_jobs`]
 //!   is on: the desktop app; tests and the web run inline as before).
 //! - [`tick`] (every frame) applies finished jobs, reports failures, answers control requests
 //!   waiting on a job, finishes background opens and keeps frames coming while anything runs.
@@ -17,11 +17,11 @@ use std::sync::Arc;
 use std::sync::mpsc::Sender;
 
 use egui::{Color32, Rect, RichText, Sense, Stroke, vec2};
-use photocraft_engine::jobs::{JobEvent, JobId, JobInfo, JobOutcome, OPEN_JOB, OpenSource, Started};
+use niveta_engine::jobs::{JobEvent, JobId, JobInfo, JobOutcome, OPEN_JOB, OpenSource, Started};
 use serde_json::{Value, json};
 
 use crate::theme::Tokens;
-use crate::{ControlResponse, PhotocraftApp, notices};
+use crate::{ControlResponse, NivetaApp, notices};
 
 /// Delay before the modal progress dialog appears (quick jobs finish without it).
 pub const DIALOG_DELAY_MS: f64 = 250.0;
@@ -53,8 +53,8 @@ pub struct JobsUi {
 
 /// Run command `id`: in the background when background jobs are on and the command is a job
 /// (the result is then `{"job": id, "pending": true}` and the edit lands when [`tick`] applies
-/// it), else synchronously like [`photocraft_engine::Session::execute`].
-pub fn run(app: &mut PhotocraftApp, id: &str, params: Value) -> Result<Value, String> {
+/// it), else synchronously like [`niveta_engine::Session::execute`].
+pub fn run(app: &mut NivetaApp, id: &str, params: Value) -> Result<Value, String> {
     if !app.background_jobs {
         return app.session.execute(id, params).map_err(|e| e.to_string());
     }
@@ -72,7 +72,7 @@ pub fn run(app: &mut PhotocraftApp, id: &str, params: Value) -> Result<Value, St
 
 /// Open a file in the background: a tab appears at once and shows the progress; the document
 /// replaces it when decoded. `path` is remembered for File › Save and Open Recent.
-pub fn start_open(app: &mut PhotocraftApp, name: &str, path: Option<String>, source: OpenSource) -> Result<(), String> {
+pub fn start_open(app: &mut NivetaApp, name: &str, path: Option<String>, source: OpenSource) -> Result<(), String> {
     let name = &app.open_name(name);
     match app.session.start_open(name, source).map_err(|e| e.to_string())? {
         // Inline (wasm): finish now, like a background open that ended at once.
@@ -90,7 +90,7 @@ pub fn start_open(app: &mut PhotocraftApp, name: &str, path: Option<String>, sou
 
 /// Per frame: apply finished jobs and react to them; keep frames coming while jobs run; Esc
 /// cancels the job in view.
-pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn tick(app: &mut NivetaApp, ctx: &egui::Context) {
     for e in app.session.poll_jobs() {
         on_event(app, e);
     }
@@ -113,7 +113,7 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 /// The job the user is looking at: the open tab in view, the active document's job, or (for
 /// the status bar) the newest running job.
-pub fn job_in_view(app: &PhotocraftApp) -> Option<JobInfo> {
+pub fn job_in_view(app: &NivetaApp) -> Option<JobInfo> {
     if let Some(j) = app.jobs.focus.and_then(|j| app.session.job(j)) {
         return Some(j);
     }
@@ -121,7 +121,7 @@ pub fn job_in_view(app: &PhotocraftApp) -> Option<JobInfo> {
 }
 
 /// Cancel job `id` (the status bar's ×, the dialog's Cancel, Esc, closing an opening tab).
-pub fn cancel(app: &mut PhotocraftApp, id: JobId) {
+pub fn cancel(app: &mut NivetaApp, id: JobId) {
     let label = app.session.job(id).map(|j| j.label);
     if app.session.cancel_job(id) {
         // The event (and its status text) arrives with the next poll; say so now as well.
@@ -132,7 +132,7 @@ pub fn cancel(app: &mut PhotocraftApp, id: JobId) {
     }
 }
 
-fn on_event(app: &mut PhotocraftApp, e: JobEvent) {
+fn on_event(app: &mut NivetaApp, e: JobEvent) {
     // Control requests waiting on this job.
     let reply = match &e.outcome {
         JobOutcome::Done(v) => json!({"ok": true, "result": v}),
@@ -193,9 +193,9 @@ fn on_event(app: &mut PhotocraftApp, e: JobEvent) {
     }
 }
 
-/// What [`crate::PhotocraftApp::open_bytes`] does after decoding, for a background open's result
+/// What [`crate::NivetaApp::open_bytes`] does after decoding, for a background open's result
 /// (`{document, warnings, color}`).
-fn finish_open(app: &mut PhotocraftApp, name: &str, path: Option<&str>, v: &Value, slot: Option<usize>) -> Result<(), String> {
+fn finish_open(app: &mut NivetaApp, name: &str, path: Option<&str>, v: &Value, slot: Option<usize>) -> Result<(), String> {
     let mut index = v.get("document").and_then(Value::as_u64).ok_or("the open job returned no document")? as usize;
     if let Some(slot) = slot
         && let Ok(moved) = app.run("document.move", json!({"document": index, "to": slot}))
@@ -219,7 +219,7 @@ fn finish_open(app: &mut PhotocraftApp, name: &str, path: Option<&str>, v: &Valu
         notices::io_warnings(app, &format!("Opened {name}"), &warnings);
     }
     // Script events bound to "Open Document".
-    photocraft_engine::automate_cmds::document_opened(&mut app.session);
+    niveta_engine::automate_cmds::document_opened(&mut app.session);
     app.sync_views();
     let color = v.get("color").cloned().unwrap_or(Value::Null);
     let ask = color.get("ask").and_then(Value::as_bool) == Some(true);
@@ -263,7 +263,7 @@ fn percent(j: &JobInfo) -> String {
 }
 
 /// The status bar's job readout: "Gaussian Blur ▬▬▬▭▭ 45 %  ×". Draws nothing when no job runs.
-pub fn status_progress(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn status_progress(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let Some(j) = job_in_view(app) else { return };
     let t = Tokens::get(ui.ctx());
     let (bar_w, bar_h) = if t.pro { (120.0, 6.0) } else { (140.0, 6.0) };
@@ -288,7 +288,7 @@ pub fn status_progress(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// The modal progress window for a job locking the active document (Photoshop shows one for
 /// long filters): title, status, bar, percentage and elapsed time, Cancel. Appears after
 /// [`DIALOG_DELAY_MS`]; Esc cancels (see [`tick`]).
-pub fn dialog(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn dialog(app: &mut NivetaApp, ctx: &egui::Context) {
     let Some(j) = app.session.active_job() else { return };
     if j.elapsed_ms < DIALOG_DELAY_MS {
         return;
@@ -334,7 +334,7 @@ fn elapsed(ms: f64) -> String {
 
 /// The canvas area of an opening tab: the file name, a bar and Cancel, centred on the
 /// workspace backdrop.
-pub fn open_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, job: JobId) {
+pub fn open_card(app: &mut NivetaApp, ui: &mut egui::Ui, job: JobId) {
     let Some(tab) = app.jobs.opens.iter().find(|o| o.job == job).cloned() else { return };
     let Some(j) = app.session.job(job) else { return };
     let t = Tokens::get(ui.ctx());
@@ -365,7 +365,7 @@ pub fn open_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, job: JobId) {
 }
 
 /// Open tabs for the tab strips: (job, title, progress).
-pub fn open_tabs(app: &PhotocraftApp) -> Vec<(JobId, String, f32)> {
+pub fn open_tabs(app: &NivetaApp) -> Vec<(JobId, String, f32)> {
     app.jobs.opens.iter().map(|o| (o.job, o.name.clone(), app.session.job(o.job).map_or(0.0, |j| j.progress))).collect()
 }
 
@@ -378,7 +378,7 @@ pub fn tab_underline(ui: &egui::Ui, r: Rect, frac: f32, t: &Tokens) {
 }
 
 /// Jobs for `ui.inspect`.
-pub fn inspect(app: &PhotocraftApp) -> Value {
+pub fn inspect(app: &NivetaApp) -> Value {
     json!({
         "running": app.session.jobs(),
         "opening": app.jobs.opens.iter().map(|o| json!({"job": o.job.0, "name": o.name, "path": o.path})).collect::<Vec<_>>(),

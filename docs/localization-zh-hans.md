@@ -60,7 +60,7 @@ complete catalog coverage does not claim those strings are translated.
 
 ## Validation and maintenance
 
-Run `cargo test -p photocraft-ui-egui`, the touched-crate all-target clippy check,
+Run `cargo test -p niveta-ui-egui`, the touched-crate all-target clippy check,
 `cargo xtask layers` and `cargo xtask wasm`. The shared catalog tests validate
 duplicate keys, placeholders, ellipses, menu coverage, `tl!` literals, brush
 sections and blend modes. Chinese-specific tests cover locale selection, fallback,

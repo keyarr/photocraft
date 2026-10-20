@@ -53,8 +53,8 @@ On main 7055f0c plus this change:
 - Offscreen French-to-Korean language switching and the Korean brush settings
   panel were rendered and visually inspected for missing glyphs/clipping.
 
-Re-run with `cargo test -p photocraft-ui-egui --locked`,
-`cargo clippy -p photocraft-ui-egui --all-targets --locked -- -D warnings`,
+Re-run with `cargo test -p niveta-ui-egui --locked`,
+`cargo clippy -p niveta-ui-egui --all-targets --locked -- -D warnings`,
 `cargo test -p xtask i18n_coverage`, `cargo xtask i18n-coverage`,
 `cargo xtask layers`, and `cargo xtask wasm`.
 

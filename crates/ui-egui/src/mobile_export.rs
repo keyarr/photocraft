@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::theme::Tokens;
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 
 /// Transient export-sheet state (never persisted).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -36,7 +36,7 @@ fn stem_of(name: &str) -> String {
 
 /// Open the sheet for the active document, seeded from its name and the
 /// export prefs. With no document there is nothing to export.
-pub fn open(app: &mut PhotocraftApp) {
+pub fn open(app: &mut NivetaApp) {
     let Some(st) = app.session.active() else {
         // Engine-style errors stay English-only (like "no document" below).
         app.ui.status = "No document to export".into();
@@ -61,7 +61,7 @@ fn fmt(e: &MobileExport) -> &str {
 
 /// Where a direct write lands: the shell's export dir, else shared storage
 /// when it takes a folder. `None` means nowhere writable was found.
-fn base_dir(app: &PhotocraftApp) -> Option<String> {
+fn base_dir(app: &NivetaApp) -> Option<String> {
     if let Some(b) = app.services.export_base_dir.clone() {
         return Some(b);
     }
@@ -84,7 +84,7 @@ fn fields(e: &MobileExport) -> Map<String, Value> {
     f
 }
 
-fn fail(app: &mut PhotocraftApp, e: String) {
+fn fail(app: &mut NivetaApp, e: String) {
     log::warn!("mobile export failed: {e}");
     app.ui.status = e;
     app.ui.status_error = true;
@@ -92,7 +92,7 @@ fn fail(app: &mut PhotocraftApp, e: String) {
 
 /// Encode with the sheet's settings and write the file. With a picker the
 /// Export As flow asks for the path; without one the file lands in `base_dir`.
-pub fn confirm(app: &mut PhotocraftApp) {
+pub fn confirm(app: &mut NivetaApp) {
     let f = fields(&app.ui.mobile_export);
     if app.services.file_dialog.is_some() {
         match crate::export_dialog::confirm(app, &f) {
@@ -191,7 +191,7 @@ pub fn confirm(app: &mut PhotocraftApp) {
 
 /// Draw the sheet when open: format pills, the settings the format needs,
 /// file name, destination and the Export button. Touch-sized throughout.
-pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut NivetaApp, ctx: &egui::Context) {
     if !app.ui.mobile_export.open {
         return;
     }
@@ -293,8 +293,8 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn app() -> PhotocraftApp {
-        PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
+    fn app() -> NivetaApp {
+        NivetaApp::new(niveta_engine::Session::new(), crate::Services::default())
     }
 
     #[test]
@@ -318,13 +318,13 @@ mod tests {
 
     #[test]
     fn confirm_writes_the_chosen_format_into_the_base_dir() {
-        let dir = std::env::temp_dir().join(format!("photocraft-mobile-export-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("niveta-mobile-export-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let mut a = app();
         a.run("file.new", json!({"width": 16, "height": 16})).unwrap();
         a.services.export =
-            Some(Box::new(|_: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"fake-png".to_vec(), Vec::new()))));
+            Some(Box::new(|_: &niveta_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"fake-png".to_vec(), Vec::new()))));
         a.services.write = Some(Box::new(|path: &str, bytes: &[u8]| std::fs::write(path, bytes).map_err(|e| e.to_string())));
         a.services.export_base_dir = Some(dir.to_string_lossy().into_owned());
         open(&mut a);
@@ -344,7 +344,7 @@ mod tests {
         let sink = saved.clone();
         let mut a = app();
         a.run("file.new", json!({"width": 16, "height": 16})).unwrap();
-        a.services.export = Some(Box::new(|_: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"fake-jpeg".to_vec(), Vec::new()))));
+        a.services.export = Some(Box::new(|_: &niveta_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"fake-jpeg".to_vec(), Vec::new()))));
         a.services.export_base_dir = Some("DCIM/Niveta".into());
         a.services.save_to_gallery = Some(Box::new(move |name: &str, bytes: &[u8]| {
             sink.lock().unwrap_or_else(|e| e.into_inner()).push((name.to_string(), bytes.to_vec()));

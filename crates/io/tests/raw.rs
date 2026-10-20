@@ -1,10 +1,10 @@
 //! Camera raw import: synthetic DNG / CR2 develop into a 16-bit ProPhoto
 //! document; unsupported raw variants fall back to the embedded preview.
 
-use photocraft_codecs::{ChannelLayout, EncodeOptions, Format, Image};
-use photocraft_color::{ColorMode, SampleType};
-use photocraft_io::{IoError, import};
-use photocraft_raw::testgen::{Cr2Spec, DngSpec, TiffBuilder, Val, mosaic, scene};
+use niveta_codecs::{ChannelLayout, EncodeOptions, Format, Image};
+use niveta_color::{ColorMode, SampleType};
+use niveta_io::{IoError, import};
+use niveta_raw::testgen::{Cr2Spec, DngSpec, TiffBuilder, Val, mosaic, scene};
 
 #[test]
 fn dng_opens_as_16_bit_prophoto() {
@@ -18,7 +18,7 @@ fn dng_opens_as_16_bit_prophoto() {
     assert_eq!(d.depth, SampleType::U16);
     assert_eq!(d.layers.len(), 1);
     let icc = d.icc_profile.as_ref().expect("profile");
-    assert_eq!(icc.as_slice(), &photocraft_cms::Builtin::ProPhotoCompat.profile().to_bytes()[..]);
+    assert_eq!(icc.as_slice(), &niveta_cms::Builtin::ProPhotoCompat.profile().to_bytes()[..]);
     assert!(r.warnings.iter().any(|w| w.contains("DNG") && w.contains("ProPhoto")), "{:?}", r.warnings);
 }
 
@@ -38,7 +38,7 @@ fn cr2_opens() {
 /// baseline JPEG preview in IFD0.
 fn nef_with_preview() -> Vec<u8> {
     let img = Image::from_u8(32, 20, ChannelLayout::Rgb, vec![180; 32 * 20 * 3]).unwrap();
-    let jpeg = photocraft_codecs::encode(&img, Format::Jpeg, &EncodeOptions::default()).unwrap();
+    let jpeg = niveta_codecs::encode(&img, Format::Jpeg, &EncodeOptions::default()).unwrap();
     let mut t = TiffBuilder::default();
     let strip = t.blob(vec![0; 64]);
     let preview = t.blob(jpeg.clone());
@@ -85,8 +85,8 @@ fn unsupported_raw_without_preview_is_a_clear_error() {
 #[test]
 fn cr3_opens_its_upright_camera_jpeg_with_explicit_preview_warning() {
     let img = Image::from_u8(32, 20, ChannelLayout::Rgb, vec![180; 32 * 20 * 3]).unwrap();
-    let jpeg = photocraft_codecs::encode(&img, Format::Jpeg, &EncodeOptions::default()).unwrap();
-    let raw = photocraft_raw::testgen::cr3_preview(&jpeg, 6);
+    let jpeg = niveta_codecs::encode(&img, Format::Jpeg, &EncodeOptions::default()).unwrap();
+    let raw = niveta_raw::testgen::cr3_preview(&jpeg, 6);
     let r = import("shot.cr3", &raw).unwrap();
     assert_eq!((r.document.size.width, r.document.size.height), (20, 32));
     assert_eq!(r.document.depth, SampleType::U8);

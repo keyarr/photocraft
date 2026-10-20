@@ -102,7 +102,7 @@ jobs:
         if: runner.os == 'Linux'
         run: cargo fmt --all -- --check
 
-      # `--features heif`: official builds open HEIC photos via the optional photocraft-heif crate.
+      # `--features heif`: official builds open HEIC photos via the optional niveta-heif crate.
       - name: Test
         run: cargo test --workspace --locked --features heif
 
@@ -110,13 +110,13 @@ jobs:
       # error for distributors who leave it out.
       - name: Test without heif
         if: runner.os == 'Linux'
-        run: cargo test -p photocraft-heif -p photocraft-codecs -p photocraft-io --locked
+        run: cargo test -p niveta-heif -p niveta-codecs -p niveta-io --locked
 
       # The same tests built with the optional craft-fonts input (crates/text/build.rs), so the
       # Japanese font tests that skip without it run here. Linux only. Keep the exact `--workspace
       # --features heif` of the Test step: any other package or feature selection resolves a
       # different feature set, recompiles the whole dependency graph into the same target dir and
-      # runs the runner out of disk (as `-p photocraft-text -p photocraft-ui-egui` did after #800).
+      # runs the runner out of disk (as `-p niveta-text -p niveta-ui-egui` did after #800).
       - name: Check out craft-fonts
         if: runner.os == 'Linux'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -153,7 +153,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
           cache-on-failure: true
       - name: Check the Android shell
-        run: cargo check -p photocraft-android --target aarch64-linux-android --locked
+        run: cargo check -p niveta-android --target aarch64-linux-android --locked
 
       # docs/scorecard.md must match its sources (checklists, budgets, baseline, corpus floors,
       # prefs audit). Static: it reads committed files only, no benchmarks run here.

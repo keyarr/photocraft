@@ -13,7 +13,7 @@ use serde_json::json;
 
 use crate::state::Tool;
 use crate::theme::Tokens;
-use crate::{PhotocraftApp, icons, widgets};
+use crate::{NivetaApp, icons, widgets};
 
 /// Content width below which the mobile chrome replaces the desktop panels. Phones
 /// (360-430 pt wide) get the compact layout; 800 pt and up keeps the desktop one (the
@@ -117,7 +117,7 @@ pub fn two_finger_tap(track: &mut Option<TapTrack>, now: f64, rect: egui::Rect, 
 /// take no header room. Everything else lives one tap away in the command palette or the
 /// overflow menu, so no menu bar has to fit in 360 pt. With no document open only the title
 /// and the overflow menu stay: Home and export need an editable document.
-pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn header(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     egui::Panel::top("mobile_header")
         .exact_size(52.0 + SAFE_TOP)
@@ -203,7 +203,7 @@ const MENU_W: f32 = 280.0;
 const MENU_ROW_H: f32 = 40.0;
 const MENU_GAP: f32 = 2.0;
 
-fn menu_item(ui: &mut egui::Ui, app: &mut PhotocraftApp, label: &str, id: &str, params: serde_json::Value) {
+fn menu_item(ui: &mut egui::Ui, app: &mut NivetaApp, label: &str, id: &str, params: serde_json::Value) {
     if ui.add_enabled(crate::menus::is_enabled(app, id), egui::Button::new(label).min_size(vec2(MENU_W, MENU_ROW_H))).clicked() {
         if let Err(e) = crate::menus::invoke(app, ui.ctx(), id, params) {
             app.ui.status = e;
@@ -215,7 +215,7 @@ fn menu_item(ui: &mut egui::Ui, app: &mut PhotocraftApp, label: &str, id: &str, 
 
 /// The active tool's options, horizontally scrollable: single-line container with smooth
 /// horizontal scrolling and hidden scrollbar so controls are never clipped abruptly.
-pub fn options_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn options_strip(app: &mut NivetaApp, ui: &mut egui::Ui) {
     if app.session.active().is_none() {
         return;
     }
@@ -248,7 +248,7 @@ pub fn options_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 }
 
 /// Floating pill centered at the bottom of the canvas for Transform confirm and cancel actions.
-pub fn transform_floating_pill(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn transform_floating_pill(app: &mut NivetaApp, ctx: &egui::Context) {
     if app.ui.transform.is_none() || !is_mobile(ctx) || app.session.active().is_none() {
         return;
     }
@@ -309,7 +309,7 @@ const HOLD_SECS: f64 = 0.35;
 /// it, and moving off the button before the hold is up cancels it (egui drops
 /// `is_pointer_button_down_on` past its click distance), so no gesture leaves a stale card.
 /// `row` keeps the two rows' cards apart.
-fn tool_press(app: &mut PhotocraftApp, ui: &mut egui::Ui, resp: &egui::Response, tool: Tool, subtools: &[Tool], row: &str) -> bool {
+fn tool_press(app: &mut NivetaApp, ui: &mut egui::Ui, resp: &egui::Response, tool: Tool, subtools: &[Tool], row: &str) -> bool {
     let held_id = egui::Id::new((row, "held"));
     let card_id = egui::Id::new((row, "card"));
     if ui.input(|i| i.pointer.any_pressed()) {
@@ -362,7 +362,7 @@ fn tool_press(app: &mut PhotocraftApp, ui: &mut egui::Ui, resp: &egui::Response,
 /// it. Both rows show this card, so a hold behaves the same in the bar and in the grid; the
 /// rows carry the short names and take their width from the widest of them, so nothing
 /// spills out of the phone.
-fn variant_card(app: &mut PhotocraftApp, ui: &egui::Ui, anchor: Rect, subtools: &[Tool], card_id: egui::Id) {
+fn variant_card(app: &mut NivetaApp, ui: &egui::Ui, anchor: Rect, subtools: &[Tool], card_id: egui::Id) {
     let t = Tokens::get(ui.ctx());
     let font = egui::FontId::proportional(12.5);
     let labels: Vec<&str> = subtools.iter().map(|&sub| Tool::short_display(tl!(sub.label()))).collect();
@@ -408,7 +408,7 @@ fn variant_card(app: &mut PhotocraftApp, ui: &egui::Ui, anchor: Rect, subtools: 
 /// The active tool is always in the row (prepended when it is not a favourite), so the
 /// selection never silently points at a tool the user cannot see. Hidden with no
 /// document open: the start screen has no editing context.
-pub fn tool_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn tool_bar(app: &mut NivetaApp, ui: &mut egui::Ui) {
     if app.session.active().is_none() {
         return;
     }
@@ -508,7 +508,7 @@ fn favourites() -> [Tool; 10] {
 
 /// The full tool list over the canvas: high-density 3-4 column grid with subtools grouped
 /// by slot, fluid vertical scrolling, and search fixed at the top.
-pub fn tool_sheet(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn tool_sheet(app: &mut NivetaApp, ctx: &egui::Context) {
     if !app.ui.mobile.tools_open || app.session.active().is_none() {
         return;
     }
@@ -607,7 +607,7 @@ fn card_label(ctx: &egui::Context, card: Rect, text: &str, color: egui::Color32)
 
 /// One compact touch card: 20px icon over the short name, which wraps onto a second row
 /// instead of ellipsing at once (the hold card lists the slot's variants).
-fn tool_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, w: f32, subtools: &[Tool]) {
+fn tool_card(app: &mut NivetaApp, ui: &mut egui::Ui, tool: Tool, w: f32, subtools: &[Tool]) {
     let t = Tokens::get(ui.ctx());
     let full = tl!(tool.label()).to_string();
     let short = Tool::short_display(tl!(tool.label())).to_string();
@@ -636,7 +636,7 @@ fn tool_card(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, w: f32, sub
 /// The bottom sheet: one dock group at a time, with its own height cap and scrolling, so
 /// the canvas takes the room back as soon as it closes. The bodies are the desktop dock's
 /// ([`crate::panels::dock_body`]), sharing its state and commands.
-pub fn sheet(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn sheet(app: &mut NivetaApp, ui: &mut egui::Ui) {
     if app.session.active().is_none() {
         return;
     }
@@ -750,14 +750,14 @@ mod tests {
     use egui_kittest::Harness;
     use serde_json::json;
 
-    fn app() -> PhotocraftApp {
-        PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
+    fn app() -> NivetaApp {
+        NivetaApp::new(niveta_engine::Session::new(), crate::Services::default())
     }
 
     /// One frame of the bottom bar driven by raw pointer events: a tap and a hold differ
     /// only in the timing between the press and the release. (The kittest drag/drop helpers
     /// drop the cursor on release, which makes egui see no click at all.)
-    fn bar_frame(app: &mut PhotocraftApp, ctx: &egui::Context, time: f64, events: Vec<egui::Event>) {
+    fn bar_frame(app: &mut NivetaApp, ctx: &egui::Context, time: f64, events: Vec<egui::Event>) {
         let mut out = ctx.run_ui(
             egui::RawInput { time: Some(time), events, screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(360.0, 800.0))), ..Default::default() },
             |ui| tool_bar(app, ui),
@@ -780,10 +780,10 @@ mod tests {
     }
 
     /// A phone with a document open and two settled frames of bottom bar behind it.
-    fn bar(app: &mut PhotocraftApp) -> egui::Context {
+    fn bar(app: &mut NivetaApp) -> egui::Context {
         app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
         bar_frame(app, &ctx, 0.0, vec![]);
         bar_frame(app, &ctx, 0.1, vec![]);
         ctx
@@ -884,7 +884,7 @@ mod tests {
         a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         a.ui.mobile.tools_open = true;
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -893,7 +893,7 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(8);
         let tool = h.state().ui.tool;
         let brush = h.query_all_by_label("Brush Tool").next().expect("the grid shows the brush").rect().center();
@@ -939,7 +939,7 @@ mod tests {
         use egui_kittest::kittest::Queryable;
         let mut a = app();
         a.run("file.new", json!({"width": 200, "height": 200})).unwrap();
-        let chrome = |ui: &mut egui::Ui, app: &mut PhotocraftApp| {
+        let chrome = |ui: &mut egui::Ui, app: &mut NivetaApp| {
             // The themed fonts install after the first frame; skip until they are in.
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
@@ -953,7 +953,7 @@ mod tests {
             crate::canvas::document_area(app, ui);
         };
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(chrome, a);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
         h.run_steps(60);
         assert!(is_mobile(&h.ctx));
         let r = h.state().last_canvas_rect;
@@ -981,7 +981,7 @@ mod tests {
         let mut a = app();
         a.run("file.new", json!({"width": 200, "height": 200})).unwrap();
         a.ui.mobile.panel = Some(crate::dock::Group::Layers);
-        let chrome = |ui: &mut egui::Ui, app: &mut PhotocraftApp| {
+        let chrome = |ui: &mut egui::Ui, app: &mut NivetaApp| {
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
             }
@@ -994,7 +994,7 @@ mod tests {
             crate::canvas::document_area(app, ui);
         };
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(chrome, a);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(8);
         for probe in ["Opacity", "Background"] {
             let n = h.query_all_by_label_contains(probe).next().unwrap_or_else(|| panic!("the layers body renders {probe}"));
@@ -1013,7 +1013,7 @@ mod tests {
         for panel in [crate::dock::Group::Color, crate::dock::Group::Properties, crate::dock::Group::Layers] {
             a.ui.mobile.panel = Some(panel);
             let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-                |ui, app: &mut PhotocraftApp| {
+                |ui, app: &mut NivetaApp| {
                     if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                         return;
                     }
@@ -1021,7 +1021,7 @@ mod tests {
                 },
                 a,
             );
-            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+            NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
             h.run_steps(3);
             a = h.into_state();
             a.ui.mobile.panel = None;
@@ -1039,7 +1039,7 @@ mod tests {
             let a = app();
             assert!(a.session.documents().is_empty());
             let mut h = Harness::builder().with_size(vec2(w, 800.0)).build_ui_state(
-                |ui, app: &mut PhotocraftApp| {
+                |ui, app: &mut NivetaApp| {
                     if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                         return;
                     }
@@ -1047,7 +1047,7 @@ mod tests {
                 },
                 a,
             );
-            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+            NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
             h.run_steps(6);
             assert!(h.query_all_by_label_contains("Discord").next().is_none(), "{w} pt promo");
             assert!(h.query_all_by_label_contains("GitHub").next().is_none(), "{w} pt links");
@@ -1065,7 +1065,7 @@ mod tests {
         a.ui.tool = Tool::Brush;
         a.ui.mobile.tools_open = true;
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1074,7 +1074,7 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(8);
         for probe in ["Brush Tool", "Clone Stamp Tool", "Horizontal Type Tool", "Zoom Tool"] {
             assert!(h.query_all_by_label_contains(probe).next().is_some(), "the sheet names {probe}");
@@ -1087,7 +1087,7 @@ mod tests {
     #[test]
     fn tool_card_names_stay_inside_the_card() {
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
         // The themed fonts install on the first frame.
         let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(320.0, 800.0))), ..Default::default() }, |_| {});
         out.textures_delta.clear();
@@ -1116,7 +1116,7 @@ mod tests {
         a.ui.mobile.tools_open = true;
         a.ui.mobile.tools_filter = "heal".into();
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1125,7 +1125,7 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(8);
         assert!(h.query_all_by_label_contains("Healing Brush Tool").next().is_some(), "the filter keeps matches");
         assert!(h.query_all_by_label("Brush Tool").next().is_none(), "the filter drops the rest");
@@ -1141,7 +1141,7 @@ mod tests {
         a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         a.ui.mobile.tools_open = true;
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1150,7 +1150,7 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(8);
         let win = h.query_all_by_label_contains("Tools").next().expect("the tool window renders").rect();
         assert!(win.min.y >= 0.0 && win.max.y <= 800.0 && win.max.x <= 360.0, "the window stays on screen: {win:?}");
@@ -1170,7 +1170,7 @@ mod tests {
         a.ui.mobile.panel = Some(crate::dock::Group::Properties);
         a.ui.dock_tabs.properties = 1;
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1181,7 +1181,7 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(8);
         for probe in ["Add an adjustment", "Brightness/Contrast", "Levels"] {
             let n = h.query_all_by_label_contains(probe).next().unwrap_or_else(|| panic!("the adjustments body renders {probe}"));
@@ -1199,7 +1199,7 @@ mod tests {
         a.ui.mobile.panel = Some(crate::dock::Group::History);
         a.ui.dock_tabs.history = 2;
         let mut h = Harness::builder().with_size(vec2(320.0, 700.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1210,7 +1210,7 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(8);
         // "Composição de camadas" is long enough to widen the row; the harness does not sync prefs itself.
         crate::i18n::set_current(crate::i18n::Lang::from_code("pt-br").expect("pt-br"));
@@ -1229,7 +1229,7 @@ mod tests {
         a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         a.ui.mobile.panel = Some(crate::dock::Group::Layers);
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1240,7 +1240,7 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(8);
         let del = h.query_all_by_label_contains("Delete layer").next().expect("the footer renders Delete").rect();
         assert!(del.max.y <= 800.0, "Delete stays above the bottom nav: {del:?}");
@@ -1257,7 +1257,7 @@ mod tests {
         a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         a.ui.tool = Tool::CloneStamp;
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1265,7 +1265,7 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
         assert!(h.query_all_by_label_contains("Clone Stamp Tool").next().is_none(), "the strip no longer repeats the active tool");
         assert!(h.query_all_by_label_contains("Aligned").next().is_some(), "the Clone Stamp options stay");
@@ -1279,7 +1279,7 @@ mod tests {
         let a = app();
         assert!(a.session.active().is_none());
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1287,7 +1287,7 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
         assert!(h.query_all_by_label_contains("Aligned").next().is_none(), "no tool options without a document");
     }
@@ -1304,7 +1304,7 @@ mod tests {
                 a.run("layer.new.layer", json!({})).unwrap();
             }
             a.ui.mobile.panel = Some(crate::dock::Group::Layers);
-            let chrome = |ui: &mut egui::Ui, app: &mut PhotocraftApp| {
+            let chrome = |ui: &mut egui::Ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1315,7 +1315,7 @@ mod tests {
                 crate::canvas::document_area(app, ui);
             };
             let mut h = Harness::builder().with_size(vec2(w, hh)).with_pixels_per_point(ppp).build_ui_state(chrome, a);
-            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+            NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
             h.run_steps(8);
             let sheet_top = hh - 68.0 - (hh * 0.45_f32).clamp(260.0, 420.0);
             let canvas = h.state().last_canvas_rect;
@@ -1412,7 +1412,7 @@ mod tests {
         let mut a = app();
         a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
         top_bar_frame(&mut a, &ctx); // fonts and panel state settle on the second frame
         top_bar_frame(&mut a, &ctx);
         let mut controls = 0;
@@ -1432,7 +1432,7 @@ mod tests {
     }
 
     /// One frame of the mobile top bar (header + options strip), with the painted shapes.
-    fn top_bar_frame(app: &mut PhotocraftApp, ctx: &egui::Context) -> Vec<egui::epaint::ClippedShape> {
+    fn top_bar_frame(app: &mut NivetaApp, ctx: &egui::Context) -> Vec<egui::epaint::ClippedShape> {
         let out = ctx.run_ui(
             egui::RawInput { time: Some(0.0), screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(360.0, 800.0))), ..Default::default() },
             |ui| {
@@ -1454,7 +1454,7 @@ mod tests {
         let mut a = app();
         a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         let ctx = egui::Context::default();
-        PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&ctx, crate::theme::ThemeKind::Pro);
         top_bar_frame(&mut a, &ctx); // fonts and panel state settle on the second frame
         let separator = Tokens::get(&ctx).separator;
         let lines: Vec<f32> = top_bar_frame(&mut a, &ctx)
@@ -1478,7 +1478,7 @@ mod tests {
         a.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         assert!(a.ui.chrome.home.is_none());
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 // The themed fonts install after the first frame; skip until they are in.
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
@@ -1487,7 +1487,7 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
         h.run_steps(8);
         // Touch-sized house button at the header's left edge (margin 4 + half of 48).
         let at = egui::pos2(28.0, 26.0);
@@ -1509,17 +1509,17 @@ mod tests {
     fn overflow_menu_restores_the_original_file() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let dir = std::env::temp_dir().join(format!("photocraft-mobile-revert-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("niveta-mobile-revert-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("original.png");
-        let img = photocraft_codecs::Image::from_u8(16, 16, photocraft_codecs::ChannelLayout::Rgba, [255u8, 0, 0, 255].repeat(256)).unwrap();
-        let png = photocraft_codecs::encode(&img, photocraft_codecs::Format::Png, &photocraft_codecs::EncodeOptions::default()).unwrap();
+        let img = niveta_codecs::Image::from_u8(16, 16, niveta_codecs::ChannelLayout::Rgba, [255u8, 0, 0, 255].repeat(256)).unwrap();
+        let png = niveta_codecs::encode(&img, niveta_codecs::Format::Png, &niveta_codecs::EncodeOptions::default()).unwrap();
         std::fs::write(&path, &png).unwrap();
-        let import = |name: &str, bytes: &[u8]| photocraft_io::import(name, bytes).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string());
-        let mut a = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { import: Some(Box::new(import)), ..Default::default() });
+        let import = |name: &str, bytes: &[u8]| niveta_io::import(name, bytes).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string());
+        let mut a = NivetaApp::new(niveta_engine::Session::new(), crate::Services { import: Some(Box::new(import)), ..Default::default() });
         a.open_path(&path.to_string_lossy()).unwrap();
         let mut h = Harness::builder().with_size(vec2(360.0, 800.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1528,14 +1528,14 @@ mod tests {
             },
             a,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
         h.run_steps(8);
-        let corner = |h: &Harness<'_, PhotocraftApp>| {
+        let corner = |h: &Harness<'_, NivetaApp>| {
             let st = h.state().session.active().expect("document");
-            let img = photocraft_compose::thumbnail(&st.doc, 4);
+            let img = niveta_compose::thumbnail(&st.doc, 4);
             [img.pixels[0], img.pixels[1], img.pixels[2]]
         };
-        let tap = |h: &mut Harness<'_, PhotocraftApp>, at: egui::Pos2| {
+        let tap = |h: &mut Harness<'_, NivetaApp>, at: egui::Pos2| {
             h.drag_at(at);
             h.run_steps(1);
             h.drop_at(at);
@@ -1570,7 +1570,7 @@ mod tests {
             a.ui.mobile.panel = Some(crate::dock::Group::Properties);
             a.ui.dock_tabs.properties = 0;
             let mut h = Harness::builder().with_size(vec2(600.0, 900.0)).build_ui_state(
-                |ui, app: &mut PhotocraftApp| {
+                |ui, app: &mut NivetaApp| {
                     if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                         return;
                     }
@@ -1581,7 +1581,7 @@ mod tests {
                 },
                 a,
             );
-            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+            NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
             h.run_steps(8);
             // A 300 pt column on a 600 pt screen starts ~150 pt in (the scroll bar shaves a few
             // points off the body's right); the probe sits at its left.

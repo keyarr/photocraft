@@ -31,7 +31,7 @@ Unit and UI integration tests cover selected text versus whole-layer color chang
 Generate screenshots using synthetic artwork without exposing your desktop:
 
 ```sh
-cargo run -p photocraft-ui-egui --example color_picker_demo -- /tmp/photocraft-color-picker
+cargo run -p niveta-ui-egui --example color_picker_demo -- /tmp/niveta-color-picker
 ```
 
 For reproducible native X11 capture verification, the explicitly ignored test displays an 8 × 8 synthetic swatch in an isolated Xvfb display, captures it in memory and checks the known pixel:

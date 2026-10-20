@@ -1,8 +1,8 @@
 use super::*;
-use photocraft_doc::{Knot, NamedPath, Path, Subpath};
+use niveta_doc::{Knot, NamedPath, Path, Subpath};
 
 fn tmp(name: &str) -> String {
-    let d = std::env::temp_dir().join(format!("photocraft-print-{}-{name}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("niveta-print-{}-{name}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
     d.to_string_lossy().into_owned()
@@ -73,7 +73,7 @@ fn print_dry_run_renders_a_pdf_and_reports_lp() {
 }
 
 #[test]
-fn photocraft_manages_colors_converts_to_the_printer_profile() {
+fn niveta_manages_colors_converts_to_the_printer_profile() {
     let mut s = session("rgb", 8);
     let r = s
         .execute(
@@ -122,7 +122,7 @@ fn package_copies_links_and_relinks() {
     assert!(std::path::Path::new(&copied).is_file());
     let docp = r["document"].as_str().unwrap();
     assert!(docp.ends_with("Print Me/Print Me.pcraft"));
-    let back = photocraft_io::import("Print Me.pcraft", &std::fs::read(docp).unwrap()).unwrap().document;
+    let back = niveta_io::import("Print Me.pcraft", &std::fs::read(docp).unwrap()).unwrap().document;
     let linked: Vec<String> = back
         .walk()
         .iter()
@@ -152,7 +152,7 @@ fn paths_export_as_illustrator_postscript() {
     s.edit("paths", |d, _| {
         let tri = Subpath::polygon(&[(10.0, 10.0), (100.0, 10.0), (50.0, 90.0)]);
         let mut curve = Subpath::polyline(&[(0.0, 0.0), (300.0, 150.0)]);
-        curve.knots[0] = Knot::smooth(photocraft_geom::Point::new(0.0, 0.0), photocraft_geom::Point::new(0.0, 0.0), photocraft_geom::Point::new(50.0, 0.0));
+        curve.knots[0] = Knot::smooth(niveta_geom::Point::new(0.0, 0.0), niveta_geom::Point::new(0.0, 0.0), niveta_geom::Point::new(50.0, 0.0));
         d.paths.push(NamedPath { name: "Shapes".into(), path: Path::new(vec![tri, curve]), psd_raw: None });
         Ok(())
     })

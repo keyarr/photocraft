@@ -1,5 +1,5 @@
 [package]
-name = "photocraft-engine"
+name = "niveta-engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,28 +12,28 @@ workspace = true
 corpus = []
 
 [dependencies]
-photocraft-geom = { workspace = true }
-photocraft-color = { workspace = true }
-photocraft-cms = { workspace = true }
-photocraft-raster = { workspace = true }
-photocraft-doc = { workspace = true }
-photocraft-ops = { workspace = true }
-photocraft-compose = { workspace = true }
+niveta-geom = { workspace = true }
+niveta-color = { workspace = true }
+niveta-cms = { workspace = true }
+niveta-raster = { workspace = true }
+niveta-doc = { workspace = true }
+niveta-ops = { workspace = true }
+niveta-compose = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 rayon = { workspace = true }
-photocraft-paint = { workspace = true }
-photocraft-algo = { workspace = true }
-photocraft-text = { workspace = true }
-photocraft-vector = { workspace = true }
-photocraft-io = { workspace = true }
-photocraft-psd = { workspace = true }
-photocraft-format = { workspace = true }
+niveta-paint = { workspace = true }
+niveta-algo = { workspace = true }
+niveta-text = { workspace = true }
+niveta-vector = { workspace = true }
+niveta-io = { workspace = true }
+niveta-psd = { workspace = true }
+niveta-format = { workspace = true }
 blake3 = { version = "1.8", default-features = false, features = ["pure"] }
-photocraft-codecs = { workspace = true }
+niveta-codecs = { workspace = true }
 flate2 = { workspace = true }
 
 [dev-dependencies]
 # Synthetic camera raw files for the open tests.
-photocraft-raw = { workspace = true, features = ["testgen"] }
+niveta-raw = { workspace = true, features = ["testgen"] }

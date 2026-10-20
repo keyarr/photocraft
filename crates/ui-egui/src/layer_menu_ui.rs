@@ -2,7 +2,7 @@
 //! unavailable ones are greyed using the same enablement as the main menus. Items marked as menu
 //! invocations (`Value::Null` params) go through `menus::invoke`, so dialogs open like in the menu bar.
 
-use photocraft_doc::{LabelColor, Layer, LayerContent};
+use niveta_doc::{LabelColor, Layer, LayerContent};
 use serde_json::{Value, json};
 
 /// One entry: label, command id. `None` = separator.
@@ -79,7 +79,7 @@ pub fn entries(l: &Layer, multi: bool, has_selection: bool) -> Vec<Entry> {
 
 /// Render the menu. Pushes `(command, params)` actions; `Value::Null` params mean "invoke like the
 /// menu item" (opens the command's dialog when it has one).
-pub fn show(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, on_set: bool, actions: &mut Vec<(String, Value)>) -> bool {
+pub fn show(app: &crate::NivetaApp, ui: &mut egui::Ui, l: &Layer, on_set: bool, actions: &mut Vec<(String, Value)>) -> bool {
     crate::widgets::menu_scroll(ui, |ui| {
         ui.set_min_width(220.0);
         let mut rename = false;
@@ -95,7 +95,7 @@ pub fn show(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, on_set: bo
                 }
                 Some((label, id)) => {
                     // Skip commands this build doesn't have rather than showing dead items.
-                    if photocraft_engine::commands::find(id).is_none() && !crate::menu_catalog::CATALOG.iter().any(|m| m.3 == id) {
+                    if niveta_engine::commands::find(id).is_none() && !crate::menu_catalog::CATALOG.iter().any(|m| m.3 == id) {
                         continue;
                     }
                     last_sep = false;
@@ -127,7 +127,7 @@ fn color_name(color: LabelColor) -> &'static str {
     crate::i18n::tr_ctx(crate::i18n::current(), "layerLabel", color.label())
 }
 
-fn common_color(app: &crate::PhotocraftApp, l: &Layer, on_set: bool) -> Option<LabelColor> {
+fn common_color(app: &crate::NivetaApp, l: &Layer, on_set: bool) -> Option<LabelColor> {
     if !on_set {
         return Some(l.label);
     }
@@ -138,7 +138,7 @@ fn common_color(app: &crate::PhotocraftApp, l: &Layer, on_set: bool) -> Option<L
     labels.all(|c| c == first).then_some(first)
 }
 
-fn color_menu(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, on_set: bool, actions: &mut Vec<(String, Value)>) {
+fn color_menu(app: &crate::NivetaApp, ui: &mut egui::Ui, l: &Layer, on_set: bool, actions: &mut Vec<(String, Value)>) {
     let current = common_color(app, l, on_set);
     ui.menu_button(tl!("Color"), |ui| {
         crate::widgets::menu_scroll(ui, |ui| {
@@ -198,11 +198,11 @@ mod tests {
 
     #[test]
     fn smart_object_context_menu_edits_the_clicked_layer() {
-        use crate::PhotocraftApp;
+        use crate::NivetaApp;
         use egui::{Event, Modifiers, PointerButton, Pos2, pos2, vec2};
         use egui_kittest::{Harness, kittest::Queryable};
 
-        fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, button: PointerButton) {
+        fn click(h: &mut Harness<'_, NivetaApp>, at: Pos2, button: PointerButton) {
             h.hover_at(at);
             h.step();
             for pressed in [true, false] {
@@ -213,7 +213,7 @@ mod tests {
         }
 
         for ppp in [1.0, 2.0] {
-            let mut s = photocraft_engine::Session::new();
+            let mut s = niveta_engine::Session::new();
             s.execute("file.new", json!({"width": 640, "height": 480})).unwrap();
             s.execute("layer.new.layer", json!({"name": "Smart source"})).unwrap();
             s.execute("paint.stroke", json!({"points": [[100, 100]], "size": 20})).unwrap();
@@ -221,8 +221,8 @@ mod tests {
             s.execute("layer.new.layer", json!({"name": "Other active layer"})).unwrap();
             let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_pixels_per_point(ppp).with_step_dt(1.0 / 60.0).with_max_steps(64).build_eframe(
                 move |cc| {
-                    PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-                    PhotocraftApp::new(s, crate::Services::default())
+                    NivetaApp::setup_context(&cc.egui_ctx, Default::default());
+                    NivetaApp::new(s, crate::Services::default())
                 },
             );
             let ctx = h.ctx.clone();
@@ -239,22 +239,22 @@ mod tests {
             assert!(h.state().session.is_enabled("layer.smartObjects.saveContents"));
             assert!(h.state().session.active().unwrap().doc.walk().iter().any(|(_, _, l)| l.name == "Smart source"));
             h.state_mut().session.set_active(0);
-            assert_eq!(h.state().session.active().unwrap().active_layer, Some(photocraft_doc::LayerId(smart)));
+            assert_eq!(h.state().session.active().unwrap().active_layer, Some(niveta_doc::LayerId(smart)));
         }
     }
 
     #[test]
     fn a_long_layer_menu_stays_inside_a_short_window_and_scrolls() {
-        let mut s = photocraft_engine::Session::new();
+        let mut s = niveta_engine::Session::new();
         s.execute("file.new", json!({"width": 32, "height": 24})).unwrap();
         s.execute("layer.new.layer", json!({"name": "Paint"})).unwrap();
-        let app = crate::PhotocraftApp::new(s, crate::Services::default());
+        let app = crate::NivetaApp::new(s, crate::Services::default());
         let layer = {
             let st = app.session.active().unwrap();
             st.doc.layer(st.active_layer.unwrap()).unwrap().clone()
         };
         let ctx = egui::Context::default();
-        crate::PhotocraftApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
+        crate::NivetaApp::setup_context(&ctx, crate::theme::ThemeKind::ALL[0]);
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 300.0));
         let id = egui::Id::new("layer-menu-probe");
         let mut content = 0.0;
@@ -282,10 +282,10 @@ mod tests {
 
     #[test]
     fn edit_contents_is_available_only_for_smart_objects() {
-        let mut s = photocraft_engine::Session::new();
+        let mut s = niveta_engine::Session::new();
         s.execute("file.new", json!({"width": 32, "height": 24})).unwrap();
         s.execute("layer.new.layer", json!({"name": "Source"})).unwrap();
-        let layer = |s: &photocraft_engine::Session| {
+        let layer = |s: &niveta_engine::Session| {
             let st = s.active().unwrap();
             st.doc.layer(st.active_layer.unwrap()).unwrap().clone()
         };
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn entries_follow_layer_state() {
-        let mut s = photocraft_engine::Session::new();
+        let mut s = niveta_engine::Session::new();
         s.execute("file.new", json!({"width": 10, "height": 10})).unwrap();
         s.execute("layer.new.layer", json!({})).unwrap();
         let st = s.active().unwrap();
@@ -320,7 +320,7 @@ mod tests {
         assert_eq!(add_mask_command(false, true), "layer.layerMask.hideAll");
         assert_eq!(add_mask_command(true, true), "layer.layerMask.hideSelection");
         // With a selection the new mask is the selection: inside revealed, outside hidden.
-        let mut s = photocraft_engine::Session::new();
+        let mut s = niveta_engine::Session::new();
         s.execute("file.new", json!({"width": 10, "height": 10})).unwrap();
         s.execute("layer.new.layer", json!({})).unwrap();
         s.execute("select.rect", json!({"x": 0, "y": 0, "width": 4, "height": 10})).unwrap();
@@ -332,11 +332,11 @@ mod tests {
 
     #[test]
     fn every_entry_is_a_known_command() {
-        let mut s = photocraft_engine::Session::new();
+        let mut s = niveta_engine::Session::new();
         s.execute("file.new", json!({"width": 10, "height": 10})).unwrap();
         let l = s.active().unwrap().doc.layers[0].clone();
         for (_, id) in entries(&l, false, true).into_iter().chain(entries(&l, false, false)).flatten() {
-            assert!(crate::menu_catalog::CATALOG.iter().any(|m| m.3 == id) || photocraft_engine::commands::find(id).is_some(), "{id}");
+            assert!(crate::menu_catalog::CATALOG.iter().any(|m| m.3 == id) || niveta_engine::commands::find(id).is_some(), "{id}");
         }
     }
 }

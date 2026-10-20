@@ -5,7 +5,7 @@ Niveta uses the Rust workspace at the repository root. Install the stable Rust t
 ```sh
 cargo build --workspace
 cargo run --release -p photocraft -- image.psd
-cargo run -p photocraft-cli -- --help
+cargo run -p niveta-cli -- --help
 ```
 
 The standard repository gates are:

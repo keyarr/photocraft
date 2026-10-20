@@ -1,13 +1,13 @@
 //! Fonts a host serves next to the app, for the platform shell that fetches them (the web build;
-//! see `photocraft_text::served`): reading the manifest, the families to fetch, and installing
+//! see `niveta_text::served`): reading the manifest, the families to fetch, and installing
 //! what arrived, which registers the files and re-renders the type layers drawn without them.
 
 use std::sync::{Mutex, PoisonError};
 
-use photocraft_doc::{DocId, LayerContent, LayerId, TextLayer};
-pub use photocraft_text::served::{ServedFont, add_families, parse_manifest, take_requests};
+use niveta_doc::{DocId, LayerContent, LayerId, TextLayer};
+pub use niveta_text::served::{ServedFont, add_families, parse_manifest, take_requests};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 
 /// Layers whose document was busy with a background job when their font arrived.
 static PENDING: Mutex<Vec<(DocId, LayerId)>> = Mutex::new(Vec::new());
@@ -16,7 +16,7 @@ static PENDING: Mutex<Vec<(DocId, LayerId)>> = Mutex::new(Vec::new());
 /// re-renders the type layers that use those families and show our own layout. A PSD layer still
 /// showing Photoshop's pixels (not edited yet) keeps them, as it does when its font is installed
 /// from the start. Call it every frame: it also retries the layers of a document that was busy.
-pub fn install(app: &mut PhotocraftApp, delivered: Vec<(String, Vec<u8>)>) {
+pub fn install(app: &mut NivetaApp, delivered: Vec<(String, Vec<u8>)>) {
     let mut layers = std::mem::take(&mut *PENDING.lock().unwrap_or_else(PoisonError::into_inner));
     if !delivered.is_empty() {
         let families: Vec<String> = delivered.iter().map(|(f, _)| f.clone()).collect();
@@ -33,7 +33,7 @@ pub fn install(app: &mut PhotocraftApp, delivered: Vec<(String, Vec<u8>)>) {
                 }
             }
         }
-        let mut eng = photocraft_text::shared().lock().unwrap_or_else(PoisonError::into_inner);
+        let mut eng = niveta_text::shared().lock().unwrap_or_else(PoisonError::into_inner);
         for (family, bytes) in delivered {
             let added = eng.fonts.register_font_data(bytes);
             if !added.contains(&family) {
@@ -51,7 +51,7 @@ pub fn install(app: &mut PhotocraftApp, delivered: Vec<(String, Vec<u8>)>) {
 fn uses_family(t: &TextLayer, families: &[String]) -> bool {
     t.char_runs().iter().any(|r| {
         families.contains(&r.style.font_family)
-            || r.style.postscript_name.as_deref().is_some_and(|ps| families.contains(&photocraft_text::fonts::guess_from_postscript(ps).family))
+            || r.style.postscript_name.as_deref().is_some_and(|ps| families.contains(&niveta_text::fonts::guess_from_postscript(ps).family))
     })
 }
 
@@ -65,9 +65,9 @@ mod tests {
         assert!(uses_family(&t, &["Open Sans".into()]));
         assert!(!uses_family(&t, &["Lato".into()]));
         let mut psd = TextLayer { text: "Hi".into(), font_family: "Inter".into(), ..Default::default() };
-        psd.runs = vec![photocraft_doc::text::TextRun {
+        psd.runs = vec![niveta_doc::text::TextRun {
             len: 2,
-            style: photocraft_doc::text::CharStyle { font_family: "Inter".into(), postscript_name: Some("Lato-Bold".into()), ..Default::default() },
+            style: niveta_doc::text::CharStyle { font_family: "Inter".into(), postscript_name: Some("Lato-Bold".into()), ..Default::default() },
         }];
         assert!(uses_family(&psd, &["Lato".into()]));
     }

@@ -5,16 +5,16 @@ use egui::accesskit::Role;
 use egui::{PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use photocraft_color::BlendMode;
-use photocraft_doc::LayerId;
+use niveta_color::BlendMode;
+use niveta_doc::LayerId;
 use serde_json::json;
 
 use super::{damage, display_doc, hover};
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 
 /// Background and a filled layer `top` (active).
-fn session() -> (photocraft_engine::Session, LayerId) {
-    let mut s = photocraft_engine::Session::new();
+fn session() -> (niveta_engine::Session, LayerId) {
+    let mut s = niveta_engine::Session::new();
     s.execute("file.new", json!({"width": 64, "height": 48})).unwrap();
     let top = s.execute("layer.new.layer", json!({"name": "top"})).unwrap()["layer"].as_u64().unwrap();
     s.execute("select.rect", json!({"x": 8, "y": 8, "width": 16, "height": 16})).unwrap();
@@ -23,18 +23,18 @@ fn session() -> (photocraft_engine::Session, LayerId) {
     (s, LayerId(top))
 }
 
-fn blend(app: &PhotocraftApp, id: LayerId) -> BlendMode {
+fn blend(app: &NivetaApp, id: LayerId) -> BlendMode {
     app.session.active().unwrap().doc.layer(id).unwrap().blend
 }
 
-fn steps(app: &PhotocraftApp) -> usize {
+fn steps(app: &NivetaApp) -> usize {
     app.session.active().unwrap().history.past_len()
 }
 
 #[test]
 fn a_hovered_mode_shows_on_the_canvas_until_the_pointer_leaves() {
     let (s, top) = session();
-    let mut app = PhotocraftApp::new(s, crate::Services::default());
+    let mut app = NivetaApp::new(s, crate::Services::default());
     let (undo, revision) = (steps(&app), app.session.active().unwrap().revision);
     hover(&mut app, top, Some(BlendMode::Multiply));
     let (shown, key) = display_doc(&mut app, 0).expect("previewed");
@@ -60,16 +60,16 @@ fn a_hovered_mode_shows_on_the_canvas_until_the_pointer_leaves() {
     assert!(display_doc(&mut app, 0).is_none(), "a stale hover previews nothing");
 }
 
-fn harness(session: photocraft_engine::Session) -> Harness<'static, PhotocraftApp> {
+fn harness(session: niveta_engine::Session) -> Harness<'static, NivetaApp> {
     let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::new(session, crate::Services::default())
+        NivetaApp::setup_context(&cc.egui_ctx, Default::default());
+        NivetaApp::new(session, crate::Services::default())
     });
     h.run_steps(8);
     h
 }
 
-fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2) {
+fn click(h: &mut Harness<'_, NivetaApp>, at: Pos2) {
     h.hover_at(at);
     h.run_steps(1);
     h.event(egui::Event::PointerButton { pos: at, button: PointerButton::Primary, pressed: true, modifiers: Default::default() });
@@ -78,7 +78,7 @@ fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2) {
     h.run_steps(3);
 }
 
-fn previewed(h: &mut Harness<'_, PhotocraftApp>) -> Option<BlendMode> {
+fn previewed(h: &mut Harness<'_, NivetaApp>) -> Option<BlendMode> {
     display_doc(h.state_mut(), 0).map(|(d, _)| d.layers.last().unwrap().blend)
 }
 

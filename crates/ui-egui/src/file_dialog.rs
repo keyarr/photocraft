@@ -1,7 +1,7 @@
 //! File dialogs that never block the event loop (#673, #574).
 //!
-//! A command that needs a file asks with [`PhotocraftApp::ask_file`] (or one of its wrappers) and
-//! hands over what to do with the answer. [`PhotocraftApp::poll_file_dialog`], every frame, shows
+//! A command that needs a file asks with [`NivetaApp::ask_file`] (or one of its wrappers) and
+//! hands over what to do with the answer. [`NivetaApp::poll_file_dialog`], every frame, shows
 //! the queued dialog through [`Services::file_dialog`](crate::Services::file_dialog) with the
 //! window as its parent (so it is modal to the window, as Photoshop's are) and continues the
 //! action once the platform shell answers through the [`FileDialogReply`], from any thread. The
@@ -14,10 +14,10 @@
 
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 
-use photocraft_doc::DocId;
+use niveta_doc::DocId;
 use serde_json::{Value, json};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 use crate::file_open::display_name;
 
 /// What a file dialog asks the user for.
@@ -61,7 +61,7 @@ impl FileDialogReply {
 pub type FileDialogFn = Box<dyn FnMut(FileDialogRequest, Option<&eframe::Frame>, FileDialogReply)>;
 
 /// What to do with the answer (`None`: cancelled).
-type Then = Box<dyn FnOnce(&mut PhotocraftApp, Option<FileDialogAnswer>) -> Result<Value, String>>;
+type Then = Box<dyn FnOnce(&mut NivetaApp, Option<FileDialogAnswer>) -> Result<Value, String>>;
 
 /// The file dialog in progress.
 pub(crate) struct Pending {
@@ -75,7 +75,7 @@ pub(crate) struct Pending {
 pub(crate) const CANCELLED: &str = "cancelled";
 const UNEXPECTED: &str = "the file dialog gave an unexpected answer";
 
-impl PhotocraftApp {
+impl NivetaApp {
     /// Whether a file dialog is open (or about to be shown).
     pub fn file_dialog_open(&self) -> bool {
         self.file_dialog.is_some()
@@ -214,7 +214,7 @@ fn read_picked(answer: FileDialogAnswer) -> Result<(String, Vec<u8>), String> {
         FileDialogAnswer::Contents(name, bytes) => Ok((name, bytes)),
         FileDialogAnswer::Paths(paths) => {
             let path = paths.into_iter().next().ok_or(CANCELLED)?;
-            let bytes = photocraft_format::read_file(std::path::Path::new(&path)).map_err(|e| format!("{}: {e}", display_name(&path)))?;
+            let bytes = niveta_format::read_file(std::path::Path::new(&path)).map_err(|e| format!("{}: {e}", display_name(&path)))?;
             Ok((path, bytes))
         }
         FileDialogAnswer::SaveTo(_) => Err(UNEXPECTED.into()),

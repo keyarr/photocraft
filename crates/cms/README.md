@@ -1,4 +1,4 @@
-# photocraft-cms
+# niveta-cms
 
 Pure-Rust ICC colour management for Photocraft. No workspace dependencies (L0, publishable),
 no C, no `unsafe`. Implemented from the public ICC.1:2010 (v4.3) and ICC.1:2001-04 (v2)
@@ -7,7 +7,7 @@ specifications, CIE 15, and Adobe's published black point compensation paper.
 ## API
 
 ```rust
-use photocraft_cms::{Builtin, Intent, Profile, Transform};
+use niveta_cms::{Builtin, Intent, Profile, Transform};
 
 let src = Profile::parse(&icc_bytes)?;                    // v2/v4: matrix/TRC, gray TRC, mft1/mft2/mAB/mBA
 let dst = Builtin::CoatedCmyk.profile();
@@ -64,11 +64,11 @@ redistribution conditions or unclear licences, so Photocraft generates its own
 ISO 12647-2 coated-paper Lab aims for paper/C/M/Y/RGB overprints, parabolic dot gain (14 % CMY,
 17 % K at 50 %), GCR black generation (starts at 20 % gray component, K max 95 %), total ink
 limit 300 %, perceptual tables with L* black-point scaling and soft chroma compression against a
-sampled gamut boundary. `profiles/photocraft-coated-cmyk.icc` (237 KB, AToB 11⁴ lut16, BToA
+sampled gamut boundary. `profiles/niveta-coated-cmyk.icc` (237 KB, AToB 11⁴ lut16, BToA
 21³ lut16) is that output, dedicated to the public domain (CC0-1.0). Regenerate with
 
 ```sh
-PHOTOCRAFT_REGEN_PROFILES=1 cargo test -p photocraft-cms --release --test regen
+NIVETA_REGEN_PROFILES=1 cargo test -p niveta-cms --release --test regen
 ```
 
 It is a plausible coated-offset profile, not a measured characterisation: use your printer's

@@ -16,7 +16,7 @@
 //! - the release cursor is the clip cursor struck through.
 
 use egui::{Pos2, Rangef, Rect, Sense, vec2};
-use photocraft_doc::{Document, LayerContent, LayerId};
+use niveta_doc::{Document, LayerContent, LayerId};
 use serde_json::{Value, json};
 
 use crate::layer_row_ui::{RIGHT_PAD, RowRects};

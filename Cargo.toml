@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*", "apps/*", "xtask"]
-default-members = ["crates/*", "apps/photocraft-android", "xtask"]
+default-members = ["crates/*", "apps/niveta-android", "xtask"]
 
 [workspace.package]
 version = "0.5.0"
@@ -11,26 +11,26 @@ rust-version = "1.95"
 
 [workspace.dependencies]
 # internal
-photocraft-geom = { path = "crates/geom" }
-photocraft-color = { path = "crates/color" }
-photocraft-cms = { path = "crates/cms" }
-photocraft-raster = { path = "crates/raster" }
-photocraft-doc = { path = "crates/doc" }
-photocraft-ops = { path = "crates/ops" }
-photocraft-psd = { path = "crates/psd" }
-photocraft-codecs = { path = "crates/codecs" }
-photocraft-raw = { path = "crates/raw" }
-photocraft-compose = { path = "crates/compose" }
-photocraft-gpu = { path = "crates/gpu" }
-photocraft-paint = { path = "crates/paint" }
-photocraft-algo = { path = "crates/algo" }
-photocraft-io = { path = "crates/io" }
-photocraft-text = { path = "crates/text" }
-photocraft-vector = { path = "crates/vector" }
-photocraft-format = { path = "crates/format" }
-photocraft-engine = { path = "crates/engine" }
-photocraft-ui-egui = { path = "crates/ui-egui" }
-photocraft-testkit = { path = "crates/testkit" }
+niveta-geom = { path = "crates/geom" }
+niveta-color = { path = "crates/color" }
+niveta-cms = { path = "crates/cms" }
+niveta-raster = { path = "crates/raster" }
+niveta-doc = { path = "crates/doc" }
+niveta-ops = { path = "crates/ops" }
+niveta-psd = { path = "crates/psd" }
+niveta-codecs = { path = "crates/codecs" }
+niveta-raw = { path = "crates/raw" }
+niveta-compose = { path = "crates/compose" }
+niveta-gpu = { path = "crates/gpu" }
+niveta-paint = { path = "crates/paint" }
+niveta-algo = { path = "crates/algo" }
+niveta-io = { path = "crates/io" }
+niveta-text = { path = "crates/text" }
+niveta-vector = { path = "crates/vector" }
+niveta-format = { path = "crates/format" }
+niveta-engine = { path = "crates/engine" }
+niveta-ui-egui = { path = "crates/ui-egui" }
+niveta-testkit = { path = "crates/testkit" }
 
 # external
 thiserror = "2"
@@ -69,7 +69,7 @@ debug = "line-tables-only"
 lto = "thin"
 codegen-units = 1
 
-# The browser build (apps/photocraft-web, `data-cargo-profile` in its index.html). Hosts cap the
+# The browser build (apps/niveta-web, `data-cargo-profile` in its index.html). Hosts cap the
 # size of a single file (Cloudflare Pages/Workers: 25 MiB), and the wasm is downloaded on every
 # visit, so this profile optimizes for size: fat LTO, and opt-level "s" for everything except the
 # pixel-processing crates, which keep opt-level 3 so filters and compositing stay fast. panic
@@ -86,15 +86,15 @@ strip = "debuginfo"
 [profile.wasm-release.package."*"]
 opt-level = "s"
 
-[profile.wasm-release.package.photocraft-raster]
+[profile.wasm-release.package.niveta-raster]
 opt-level = 3
-[profile.wasm-release.package.photocraft-color]
+[profile.wasm-release.package.niveta-color]
 opt-level = 3
-[profile.wasm-release.package.photocraft-cms]
+[profile.wasm-release.package.niveta-cms]
 opt-level = 3
-[profile.wasm-release.package.photocraft-compose]
+[profile.wasm-release.package.niveta-compose]
 opt-level = 3
-[profile.wasm-release.package.photocraft-algo]
+[profile.wasm-release.package.niveta-algo]
 opt-level = 3
-[profile.wasm-release.package.photocraft-paint]
+[profile.wasm-release.package.niveta-paint]
 opt-level = 3

@@ -6,23 +6,23 @@
 use egui::{Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use photocraft_doc::{LayerContent, LayerId, TextLayer};
-use photocraft_geom::{Affine, Point};
+use niveta_doc::{LayerContent, LayerId, TextLayer};
+use niveta_geom::{Affine, Point};
 use serde_json::json;
 
 use super::{layout, text_layer};
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 use crate::canvas::ViewXform;
 
-fn harness(ppp: f32, app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
+fn harness(ppp: f32, app: NivetaApp) -> Harness<'static, NivetaApp> {
     make_harness(ppp, app, false)
 }
 
-fn make_harness(ppp: f32, app: PhotocraftApp, render: bool) -> Harness<'static, PhotocraftApp> {
+fn make_harness(ppp: f32, app: NivetaApp, render: bool) -> Harness<'static, NivetaApp> {
     let builder = Harness::builder().with_size(vec2(1200.0, 800.0)).with_pixels_per_point(ppp);
     let builder = if render { builder.wgpu() } else { builder };
     let mut h = builder.build_ui_state(
-        |ui, app: &mut PhotocraftApp| {
+        |ui, app: &mut NivetaApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
@@ -32,13 +32,13 @@ fn make_harness(ppp: f32, app: PhotocraftApp, render: bool) -> Harness<'static, 
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
     h.run_steps(4);
     h
 }
 
-fn new_app() -> PhotocraftApp {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+fn new_app() -> NivetaApp {
+    let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 1600, "height": 900})).unwrap();
     app.sync_views();
     app.ui.extras.rulers = false;
@@ -46,7 +46,7 @@ fn new_app() -> PhotocraftApp {
     app
 }
 
-fn xf(app: &PhotocraftApp) -> ViewXform {
+fn xf(app: &NivetaApp) -> ViewXform {
     let v = &app.ui.views[0];
     ViewXform {
         rect: crate::rulers::content_rect(app, app.last_canvas_rect),
@@ -58,7 +58,7 @@ fn xf(app: &PhotocraftApp) -> ViewXform {
 }
 
 /// Screen position of a text-space point of layer `id`.
-fn screen(h: &mut Harness<'static, PhotocraftApp>, id: LayerId, x: f32, y: f32) -> Pos2 {
+fn screen(h: &mut Harness<'static, NivetaApp>, id: LayerId, x: f32, y: f32) -> Pos2 {
     let app = h.state_mut();
     let (_, aff, _) = layout(app, id).unwrap();
     let p = aff.apply(Point::new(f64::from(x), f64::from(y)));
@@ -67,7 +67,7 @@ fn screen(h: &mut Harness<'static, PhotocraftApp>, id: LayerId, x: f32, y: f32) 
 
 /// A point inside glyph `i` (character index): `f` of the way along its advance, in the upper
 /// half of its line.
-fn glyph(h: &mut Harness<'static, PhotocraftApp>, id: LayerId, i: usize, f: f32) -> Pos2 {
+fn glyph(h: &mut Harness<'static, NivetaApp>, id: LayerId, i: usize, f: f32) -> Pos2 {
     let (l, _, text) = layout(h.state_mut(), id).unwrap();
     let b = text.char_indices().nth(i).unwrap().0;
     let c = l.clusters.iter().find(|c| c.range.start == b).unwrap().clone();
@@ -75,12 +75,12 @@ fn glyph(h: &mut Harness<'static, PhotocraftApp>, id: LayerId, i: usize, f: f32)
     screen(h, id, c.x + c.advance * f, ln.baseline - ln.ascent * 0.35)
 }
 
-fn press(h: &mut Harness<'static, PhotocraftApp>, p: Pos2, down: bool) {
+fn press(h: &mut Harness<'static, NivetaApp>, p: Pos2, down: bool) {
     h.event(egui::Event::PointerButton { pos: p, button: PointerButton::Primary, pressed: down, modifiers: Modifiers::NONE });
     h.run_steps(1);
 }
 
-fn click(h: &mut Harness<'static, PhotocraftApp>, p: Pos2) {
+fn click(h: &mut Harness<'static, NivetaApp>, p: Pos2) {
     h.hover_at(p);
     h.run_steps(1);
     press(h, p, true);
@@ -88,7 +88,7 @@ fn click(h: &mut Harness<'static, PhotocraftApp>, p: Pos2) {
     h.run_steps(1);
 }
 
-fn drag(h: &mut Harness<'static, PhotocraftApp>, a: Pos2, b: Pos2) {
+fn drag(h: &mut Harness<'static, NivetaApp>, a: Pos2, b: Pos2) {
     h.hover_at(a);
     h.run_steps(1);
     press(h, a, true);
@@ -100,7 +100,7 @@ fn drag(h: &mut Harness<'static, PhotocraftApp>, a: Pos2, b: Pos2) {
     h.run_steps(1);
 }
 
-fn selection(h: &Harness<'static, PhotocraftApp>) -> (usize, usize) {
+fn selection(h: &Harness<'static, NivetaApp>) -> (usize, usize) {
     let Some(e) = h.state().ui.text_edit.clone() else { return (usize::MAX, usize::MAX) };
     (e.anchor, e.caret)
 }
@@ -162,7 +162,7 @@ fn clicks_and_drags_land_on_the_glyph_under_the_pointer() {
     }
 }
 
-fn text(app: &PhotocraftApp, id: LayerId) -> TextLayer {
+fn text(app: &NivetaApp, id: LayerId) -> TextLayer {
     text_layer(&app.session.active().unwrap().doc, id).unwrap().clone()
 }
 
@@ -177,7 +177,7 @@ fn editing_psd_type_shows_our_layout_and_cancel_restores_it() {
     let moved = {
         let mut t = text(&app, id);
         t.transform = Affine::translate(330.0, 380.0);
-        photocraft_text::shared().lock().unwrap().render(&t, 72.0, photocraft_color::PixelFormat::RGBA8).1.surface
+        niveta_text::shared().lock().unwrap().render(&t, 72.0, niveta_color::PixelFormat::RGBA8).1.surface
     };
     let st = app.session.active_mut().unwrap();
     let mut doc = (*st.doc).clone();
@@ -210,7 +210,7 @@ fn editing_psd_type_shows_our_layout_and_cancel_restores_it() {
     assert_eq!(h.state().session.active().unwrap().history.entries().len(), steps);
 }
 
-fn size_at(app: &PhotocraftApp, id: LayerId, ci: usize) -> f32 {
+fn size_at(app: &NivetaApp, id: LayerId, ci: usize) -> f32 {
     let t = text(app, id);
     let b = t.text.char_indices().nth(ci).map_or(t.text.len(), |(b, _)| b);
     let mut at = 0;
@@ -234,8 +234,8 @@ fn size_applies_at_layer_and_selection_scope() {
         app.run("type.edit", json!({"layer": id.0, "transform": [2.0, 0.0, 0.0, 2.0, 300.0, 420.0]})).unwrap();
         let id = if psd {
             let doc = (*app.session.active().unwrap().doc).clone();
-            let out = photocraft_io::export(&doc, "t.psd", &Default::default()).unwrap();
-            let back = photocraft_io::import("t.psd", &out.bytes).unwrap().document;
+            let out = niveta_io::export(&doc, "t.psd", &Default::default()).unwrap();
+            let back = niveta_io::import("t.psd", &out.bytes).unwrap().document;
             app.session.add_document(back, None);
             app.sync_views();
             let d = &app.session.active().unwrap().doc;
@@ -277,12 +277,12 @@ fn size_drag_is_live_and_one_history_step_per_drag() {
     let mut app = new_app();
     let id = LayerId(app.run("type.create", json!({"text": "Hello", "size": 20, "x": 300, "y": 420})).unwrap()["layer"].as_u64().unwrap());
     let mut h = Harness::builder().with_size(vec2(900.0, 60.0)).build_ui_state(
-        |ui, app: &mut PhotocraftApp| {
+        |ui, app: &mut NivetaApp| {
             ui.horizontal(|ui| super::options_bar(app, ui));
         },
         app,
     );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
     h.run_steps(3);
     let steps = h.state().session.active().unwrap().history.entries().len();
     let mut last = 20.0;
@@ -311,7 +311,7 @@ fn size_drag_is_live_and_one_history_step_per_drag() {
 
 /// A point inside glyph `i` of vertical type: `f` of the way down its advance, right of the
 /// column's centre line.
-fn vglyph(h: &mut Harness<'static, PhotocraftApp>, id: LayerId, i: usize, f: f32) -> Pos2 {
+fn vglyph(h: &mut Harness<'static, NivetaApp>, id: LayerId, i: usize, f: f32) -> Pos2 {
     let (l, _, text) = layout(h.state_mut(), id).unwrap();
     assert!(l.vertical);
     let b = text.char_indices().nth(i).unwrap().0;
@@ -321,7 +321,7 @@ fn vglyph(h: &mut Harness<'static, PhotocraftApp>, id: LayerId, i: usize, f: f32
     screen(h, id, x, y)
 }
 
-fn key(h: &mut Harness<'static, PhotocraftApp>, k: egui::Key) {
+fn key(h: &mut Harness<'static, NivetaApp>, k: egui::Key) {
     h.event(egui::Event::Key { key: k, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE });
     h.run_steps(1);
 }
@@ -378,7 +378,7 @@ fn vertical_type_caret_selection_and_arrows_follow_the_columns() {
     assert_eq!(super::flow_key(egui::Key::ArrowUp, false), egui::Key::ArrowUp);
 }
 
-fn rgb_at(app: &PhotocraftApp, id: LayerId, ci: usize) -> [u8; 4] {
+fn rgb_at(app: &NivetaApp, id: LayerId, ci: usize) -> [u8; 4] {
     let t = text(app, id);
     let b = t.text.char_indices().nth(ci).map_or(t.text.len(), |(b, _)| b);
     let mut at = 0;
@@ -427,7 +427,7 @@ fn foreground_colour_recolours_only_selected_type() {
 #[test]
 fn vertical_type_tool_creates_point_and_paragraph_text_with_one_undo() {
     use crate::canvas::{ToolEvent, tool_event};
-    use photocraft_doc::text::{Orientation, TextShape};
+    use niveta_doc::text::{Orientation, TextShape};
     for end in [[100.0, 100.0], [240.0, 230.0]] {
         let mut app = new_app();
         app.ui.tool = crate::state::Tool::VerticalType;
@@ -527,7 +527,7 @@ fn empty_ime_events_never_delete_the_selection() {
     app.ui.text_edit =
         Some(crate::state::TextEdit { layer: id.0, caret: 5, anchor: 0, session: "s".into(), created: false, dragging: false, resize: None, preedit: None });
     let mut h = harness(1.0, app);
-    let ime = |h: &mut Harness<'static, PhotocraftApp>, e: egui::ImeEvent| {
+    let ime = |h: &mut Harness<'static, NivetaApp>, e: egui::ImeEvent| {
         h.event(egui::Event::Ime(e));
         h.run_steps(1);
     };
@@ -546,17 +546,17 @@ fn type_command() -> Modifiers {
     Modifiers { command: true, ctrl: true, ..Modifiers::NONE }
 }
 
-fn hold(h: &mut Harness<'static, PhotocraftApp>, mods: Modifiers) {
+fn hold(h: &mut Harness<'static, NivetaApp>, mods: Modifiers) {
     h.event(egui::Event::ModifiersChanged(mods));
     h.run_steps(1);
 }
 
-fn transform_press(h: &mut Harness<'static, PhotocraftApp>, p: Pos2, down: bool, mods: Modifiers) {
+fn transform_press(h: &mut Harness<'static, NivetaApp>, p: Pos2, down: bool, mods: Modifiers) {
     h.event(egui::Event::PointerButton { pos: p, button: PointerButton::Primary, pressed: down, modifiers: mods });
     h.run_steps(1);
 }
 
-fn transform_drag(h: &mut Harness<'static, PhotocraftApp>, a: Pos2, b: Pos2, mods: Modifiers, release_command: bool) {
+fn transform_drag(h: &mut Harness<'static, NivetaApp>, a: Pos2, b: Pos2, mods: Modifiers, release_command: bool) {
     hold(h, mods);
     h.hover_at(a);
     h.run_steps(1);
@@ -572,7 +572,7 @@ fn transform_drag(h: &mut Harness<'static, PhotocraftApp>, a: Pos2, b: Pos2, mod
     hold(h, Modifiers::NONE);
 }
 
-fn transform_app(paragraph: bool, vertical: bool, transform: Affine) -> (PhotocraftApp, LayerId) {
+fn transform_app(paragraph: bool, vertical: bool, transform: Affine) -> (NivetaApp, LayerId) {
     let mut app = new_app();
     let mut p = json!({"text": "Hello é世界\nSecond line", "size": 32, "x": 300, "y": 420});
     if paragraph {
@@ -590,7 +590,7 @@ fn transform_app(paragraph: bool, vertical: bool, transform: Affine) -> (Photocr
     (app, id)
 }
 
-fn frame_point(app: &PhotocraftApp, p: [f64; 2]) -> Pos2 {
+fn frame_point(app: &NivetaApp, p: [f64; 2]) -> Pos2 {
     xf(app).to_screen(p[0] as f32, p[1] as f32)
 }
 
@@ -836,7 +836,7 @@ fn temporary_type_transform_control_roundtrip_and_input_safety() {
     let frame = crate::type_transform::frame(&mut app).unwrap();
     let a = frame.quad[2];
     let ctx = egui::Context::default();
-    let call = |app: &mut PhotocraftApp, params| {
+    let call = |app: &mut NivetaApp, params| {
         let (req, _) = ControlRequest::new("ui.pointer", params);
         let Outcome::Done(result) = crate::control::handle(app, &ctx, &req) else { panic!("expected immediate pointer reply") };
         assert_eq!(result["ok"], true, "{result}");
@@ -849,8 +849,8 @@ fn temporary_type_transform_control_roundtrip_and_input_safety() {
     assert_ne!(text(&app, id).transform, initial);
     let doc = &app.session.active().unwrap().doc;
     for name in ["type.pcraft", "type.psd"] {
-        let out = photocraft_io::export(doc, name, &Default::default()).unwrap();
-        let back = photocraft_io::import(name, &out.bytes).unwrap().document;
+        let out = niveta_io::export(doc, name, &Default::default()).unwrap();
+        let back = niveta_io::import(name, &out.bytes).unwrap().document;
         let t = back.walk().into_iter().find_map(|(_, _, l)| if let LayerContent::Text(t) = &l.content { Some(t) } else { None }).unwrap();
         assert_affine(t.transform, text(&app, id).transform);
         assert_eq!(t.text, text(&app, id).text);
@@ -874,7 +874,7 @@ fn temporary_type_transform_control_roundtrip_and_input_safety() {
 fn temporary_type_transform_preserves_depth_and_color_model() {
     use crate::canvas::{ToolEvent, tool_event};
     for (depth, mode) in [(8, "rgb"), (16, "rgb"), (32, "rgb"), (16, "gray"), (8, "cmyk"), (16, "lab")] {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 1200, "height": 900, "depth": depth, "mode": mode})).unwrap();
         let id = LayerId(app.run("type.create", json!({"text": "PhotoCraft é世界", "size": 32, "x": 300, "y": 350})).unwrap()["layer"].as_u64().unwrap());
         super::edit_active(&mut app).unwrap();
@@ -1038,8 +1038,8 @@ fn temporary_type_transform_imported_psd_retains_editability_and_styles() {
         .unwrap();
     app.run("layer.renameLayer", json!({"layer": original_id.0, "name": "Styled caption"})).unwrap();
     app.run("layer.layerStyle.dropShadow", json!({"layer": original_id.0, "distance": 8, "size": 4})).unwrap();
-    let exported = photocraft_io::export(&app.session.active().unwrap().doc, "type.psd", &Default::default()).unwrap();
-    let imported = photocraft_io::import("type.psd", &exported.bytes).unwrap().document;
+    let exported = niveta_io::export(&app.session.active().unwrap().doc, "type.psd", &Default::default()).unwrap();
+    let imported = niveta_io::import("type.psd", &exported.bytes).unwrap().document;
     let mut app = new_app();
     app.session.add_document(imported, None);
     app.sync_views();
@@ -1071,7 +1071,7 @@ fn temporary_type_transform_imported_psd_retains_editability_and_styles() {
 #[ignore = "release benchmark for issue #1091: 24 MP, eight text layers, 60 preview updates"]
 fn temporary_type_transform_large_document_preview() {
     use crate::canvas::{ToolEvent, tool_event};
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 6000, "height": 4000})).unwrap();
     for i in 0..8 {
         app.run("type.create", json!({"text": "PhotoCraft transform preview", "size": 60, "x": 300, "y": 300 + i * 200})).unwrap();
@@ -1109,7 +1109,7 @@ fn temporary_type_transform_large_document_preview() {
         times[29], times[56], times[59]
     );
     // Compare the same matrices with the existing live-command path on the same document.
-    let mut commands = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let mut commands = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
     commands.session.add_document(source, None);
     let mut command_times = Vec::new();
     for transform in transforms {
@@ -1137,7 +1137,7 @@ fn font_styles_keep_metadata_names_and_numeric_labels() {
 
 #[test]
 fn postscript_only_style_shows_actual_subfamily() {
-    let style = photocraft_doc::text::CharStyle { font_family: "Inter".into(), postscript_name: Some("Inter-SemiBold".into()), ..Default::default() };
+    let style = niveta_doc::text::CharStyle { font_family: "Inter".into(), postscript_name: Some("Inter-SemiBold".into()), ..Default::default() };
     assert_eq!(super::selected_style(&style), "SemiBold");
 }
 
@@ -1152,7 +1152,7 @@ fn variable_faces_list_the_weights_of_their_axis() {
             _ => "Bold",
         };
         let style = if italic { format!("{base} Italic") } else { base.to_string() };
-        photocraft_text::FaceInfo { family: "Montserrat".into(), style, postscript_name: None, weight, italic, axes }
+        niveta_text::FaceInfo { family: "Montserrat".into(), style, postscript_name: None, weight, italic, axes }
     };
     let full = || vec![("wght".to_string(), 100.0, 100.0, 900.0)];
     let names = super::style_names(&[face(100.0, false, full()), face(100.0, true, full())]);
@@ -1170,6 +1170,6 @@ fn variable_faces_list_the_weights_of_their_axis() {
 /// Families the host serves are in the font menu before they are fetched.
 #[test]
 fn the_font_menu_lists_served_families() {
-    photocraft_text::served::add_families(["Served Menu Test Serif".to_string()]);
+    niveta_text::served::add_families(["Served Menu Test Serif".to_string()]);
     assert!(super::families().iter().any(|f| f == "Served Menu Test Serif"));
 }

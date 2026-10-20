@@ -1,4 +1,4 @@
-# photocraft-raw
+# niveta-raw
 
 A clean-room, pure-Rust camera raw decoder and developer. The crate is standalone (no workspace
 dependencies), has no `unsafe`, does no I/O (`&[u8]` in), builds for `wasm32-unknown-unknown`
@@ -6,14 +6,14 @@ dependencies), has no `unsafe`, does no I/O (`&[u8]` in), builds for `wasm32-unk
 bounds-checked and sizes are checked against `Limits` before allocating.
 
 ```rust
-use photocraft_raw::{develop, DevelopOptions, Demosaic};
+use niveta_raw::{develop, DevelopOptions, Demosaic};
 
 let dev = develop(&bytes, &DevelopOptions { demosaic: Demosaic::Ahd, ..Default::default() })?;
 // dev.rgb: interleaved 16-bit RGB in ProPhoto RGB (ROMM primaries, D50, gamma 1.8)
 // dev.warnings: anything approximated or not applied
 ```
 
-`photocraft-io` uses it so opening a raw file yields a normal 16-bit RGB document tagged with the
+`niveta-io` uses it so opening a raw file yields a normal 16-bit RGB document tagged with the
 built-in ProPhoto-compatible profile.
 
 ## Sources (clean-room)
@@ -66,7 +66,7 @@ camera colour tables were copied.
 | Sony compressed ARW ("cRAW", SonyRawFileType 2) | Decoded: 11-bit min/max + 7-bit delta blocks, SonyToneCurve to 14 bits, the curve's 512 black level when no BlackLevel tag is written (the first-generation bodies, e.g. the ILCE-7) |
 | Panasonic / Leica RW2, RawFormat 5 (12- and 14-bit packed) | Decoded, with PanasonicRaw black / white / WB / sensor borders |
 | Olympus ORF, uncompressed 16-bit (E-1, E-400…) | Decoded, with ImageProcessing black / WB / ValidBits / crop |
-| Nikon "lossy after split" NEF, Sony "Compressed RAW 2", Pentax compressed PEF, RW2 RawFormat 4 and older, Olympus compressed ORF | Unsupported: no public description of these codes was found apart from GPL decoder source, which this crate may not use (clean-room). `photocraft-io` opens the embedded JPEG preview instead |
+| Nikon "lossy after split" NEF, Sony "Compressed RAW 2", Pentax compressed PEF, RW2 RawFormat 4 and older, Olympus compressed ORF | Unsupported: no public description of these codes was found apart from GPL decoder source, which this crate may not use (clean-room). `niveta-io` opens the embedded JPEG preview instead |
 | Fujifilm RAF, uncompressed (X-Trans I–V, GFX and Bayer bodies since about 2010) | Decoded: 16-bit containers (either byte order), 12-bit LSB-first packing, 14-bit packing in 32-bit words; X-Trans 6×6 or Bayer 2×2 layout, black, as-shot WB, crop, RawExposureBias, orientation from the preview's EXIF |
 | Fujifilm compressed RAF, early FinePix / SuperCCD RAF (no CFA TIFF) | Unsupported (no public description of the compression); preview fallback |
 | CR3 | Native CRX unsupported; bounded JPEG-track/PRVW preview fallback with CMT1 orientation. I/O labels the result as an 8-bit camera preview |
@@ -91,6 +91,6 @@ curve is applied: the result is a scene-referred rendering, flatter than a camer
 
 ## Tools
 
-`cargo run --release -p photocraft-raw --example rawinfo -- [--dump] [--demosaic ahd] [--png DIR] FILE...`
+`cargo run --release -p niveta-raw --example rawinfo -- [--dump] [--demosaic ahd] [--png DIR] FILE...`
 prints what was decoded, times decode and develop, and can write sRGB PNG previews and the
 embedded JPEG previews.

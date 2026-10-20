@@ -10,20 +10,20 @@
 //! ```
 //!
 //! A knot given as `[x, y]` is a corner with retracted handles; `in`/`out` default to the
-//! anchor. The serde form of `photocraft_doc::Path` is accepted too. Colours are `"#rrggbb"`,
+//! anchor. The serde form of `niveta_doc::Path` is accepted too. Colours are `"#rrggbb"`,
 //! `"#rrggbbaa"` or `[r,g,b,a]` (0..1); opacities are percentages (0..100).
 //!
-//! Every edit re-renders the shape layer's cache with `photocraft-vector` in one undoable step.
-//! PSD blocks stay byte-identical while they still decode to the model (see `photocraft-io`).
+//! Every edit re-renders the shape layer's cache with `niveta-vector` in one undoable step.
+//! PSD blocks stay byte-identical while they still decode to the model (see `niveta-io`).
 
-use photocraft_algo::selection::{self as sel, SelectionMode};
-use photocraft_color::{BlendMode, Color};
-use photocraft_doc::{
+use niveta_algo::selection::{self as sel, SelectionMode};
+use niveta_color::{BlendMode, Color};
+use niveta_doc::{
     ClippingPath, Document, Fill, FillRule, GradientStyle, Knot, Layer, LayerContent, LayerId, LineCap, LineJoin, LiveShape, NamedPath, Path, PathOp,
     ShapeLayer, ShapeStroke, StrokeAlign, Subpath, VectorMask,
 };
-use photocraft_geom::{Affine, Point, Rect};
-use photocraft_vector as vector;
+use niveta_geom::{Affine, Point, Rect};
+use niveta_vector as vector;
 use serde_json::{Value, json};
 
 use crate::commands::{CommandSpec, blend_from_str};
@@ -661,7 +661,7 @@ fn shape_rasterize(s: &mut Session, p: &Value) -> Result<Value> {
             refresh_shape(&snapshot, sh);
         }
         let fmt = snapshot.pixel_format();
-        let surface = sh.cache.take().unwrap_or_else(|| photocraft_raster::Surface::new(fmt));
+        let surface = sh.cache.take().unwrap_or_else(|| niveta_raster::Surface::new(fmt));
         let surface = if surface.format() == fmt { surface } else { surface.convert(fmt) };
         l.content = LayerContent::Raster(surface);
         l.psd_blocks.retain(|(k, _)| !SHAPE_BLOCKS.contains(&k));
@@ -978,7 +978,7 @@ fn path_fill(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 /// Composites `src` × coverage onto a surface over `area` (any pixel format).
-fn paint_coverage(surf: &mut photocraft_raster::Surface, area: Rect, cov: &[f32], src: [f32; 4], opacity: f32, mode: BlendMode, lock_alpha: bool) {
+fn paint_coverage(surf: &mut niveta_raster::Surface, area: Rect, cov: &[f32], src: [f32; 4], opacity: f32, mode: BlendMode, lock_alpha: bool) {
     let fmt = surf.format();
     let ch = fmt.channels();
     let mut vals = surf.read_region(area);
@@ -986,12 +986,12 @@ fn paint_coverage(surf: &mut photocraft_raster::Surface, area: Rect, cov: &[f32]
         if *c <= 0.0 {
             continue;
         }
-        let dst = photocraft_raster::to_rgba(&fmt, px);
-        let mut out = photocraft_compose::psblend::composite(mode, dst, [src[0], src[1], src[2], src[3] * c], opacity);
+        let dst = niveta_raster::to_rgba(&fmt, px);
+        let mut out = niveta_compose::psblend::composite(mode, dst, [src[0], src[1], src[2], src[3] * c], opacity);
         if lock_alpha {
             out[3] = dst[3];
         }
-        photocraft_raster::from_rgba_into(&fmt, out, px);
+        niveta_raster::from_rgba_into(&fmt, out, px);
     }
     surf.write_region(area, &vals);
     surf.prune();
@@ -1002,7 +1002,7 @@ fn path_stroke(s: &mut Session, p: &Value) -> Result<Value> {
     let tool = p.get("tool").and_then(Value::as_str).unwrap_or("brush");
     let base = s.tools.brush.clone();
     let fg = s.tools.foreground;
-    let mut brush = photocraft_paint::BrushSettings {
+    let mut brush = niveta_paint::BrushSettings {
         size: f64p(p, "size").map_or(base.size, |v| v as f32),
         hardness: f64p(p, "hardness").map_or(base.hardness, |v| v as f32),
         opacity: f64p(p, "opacity").map_or(base.opacity, |v| (v / 100.0) as f32),
@@ -1037,7 +1037,7 @@ fn path_stroke(s: &mut Session, p: &Value) -> Result<Value> {
         }
         let mut dmg = Rect::EMPTY;
         for pl in &lines {
-            let mut pts: Vec<photocraft_paint::StrokePoint> = pl.pts.iter().map(|&(x, y)| photocraft_paint::StrokePoint::new(x, y, 1.0)).collect();
+            let mut pts: Vec<niveta_paint::StrokePoint> = pl.pts.iter().map(|&(x, y)| niveta_paint::StrokePoint::new(x, y, 1.0)).collect();
             if pl.closed
                 && let Some(first) = pts.first().copied()
             {
@@ -1046,7 +1046,7 @@ fn path_stroke(s: &mut Session, p: &Value) -> Result<Value> {
             if pts.is_empty() {
                 continue;
             }
-            let r = photocraft_paint::apply_stroke(surf, &photocraft_paint::Stroke { brush: brush.clone(), points: pts }, sel.as_ref(), lock);
+            let r = niveta_paint::apply_stroke(surf, &niveta_paint::Stroke { brush: brush.clone(), points: pts }, sel.as_ref(), lock);
             dmg = if dmg.is_empty() { r } else { dmg.union(&r) };
         }
         Ok(dmg)
@@ -1148,7 +1148,7 @@ fn vector_mask_delete(s: &mut Session, p: &Value) -> Result<Value> {
 /// (either mask's) or the pixel mask's density shapes the rendered edge, the pixel mask instead
 /// becomes exactly what the compositor showed, with those settings baked in (#992).
 fn vector_mask_rasterize(s: &mut Session, p: &Value) -> Result<Value> {
-    use photocraft_compose::masks::{combined_mask, feather_sigma};
+    use niveta_compose::masks::{combined_mask, feather_sigma};
     let id = layer_id(s, p)?;
     s.edit("Rasterize Vector Mask", |doc, _| {
         let area = doc.bounds();
@@ -1160,15 +1160,15 @@ fn vector_mask_rasterize(s: &mut Session, p: &Value) -> Result<Value> {
         let shown = if soft { combined_mask(l, area) } else { None };
         let vm = l.vector_mask.take().ok_or_else(|| EngineError::Other("layer has no vector mask".into()))?;
         let mut mask = l.mask.take().unwrap_or_else(|| {
-            let mut m = photocraft_doc::LayerMask::reveal_all();
+            let mut m = niveta_doc::LayerMask::reveal_all();
             m.surface =
-                photocraft_raster::Surface::with_default(photocraft_color::PixelFormat::new(photocraft_color::ColorMode::Grayscale, depth, false), &[1.0]);
+                niveta_raster::Surface::with_default(niveta_color::PixelFormat::new(niveta_color::ColorMode::Grayscale, depth, false), &[1.0]);
             m
         });
         if let Some(shown) = shown {
             // Past the canvas the pixel mask keeps its own (density-applied) default, as below.
             let d = mask.surface.default_pixel().first().copied().unwrap_or(1.0);
-            let mut surface = photocraft_raster::Surface::with_default(mask.surface.format(), &[1.0 - mask.density * (1.0 - d)]);
+            let mut surface = niveta_raster::Surface::with_default(mask.surface.format(), &[1.0 - mask.density * (1.0 - d)]);
             surface.write_region(area, &shown.read_region(area));
             surface.prune();
             (mask.surface, mask.feather, mask.density) = (surface, 0.0, 1.0);

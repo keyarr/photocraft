@@ -7,7 +7,7 @@ maintainer publishes it.
 
 This is Niveta's implementation of the shared
 [release playbook](release-playbook.md). User-facing names say **Niveta**. Files, binaries
-and ids stay lowercase (`photocraft-<version>-<platform>-<arch>.<ext>`, `ai.storyteller.photocraft`).
+and ids stay lowercase (`niveta-<version>-<platform>-<arch>.<ext>`, `ai.storyteller.photocraft`).
 
 ## Cutting a release
 
@@ -48,17 +48,17 @@ in the dialog.
 
 | Platform | Artifacts | Built on |
 |---|---|---|
-| macOS 11+ (universal: Apple silicon + Intel) | `photocraft-<v>-macos-universal.dmg`, `photocraft-cli-<v>-macos-universal.zip` | `macos-15` |
-| Windows 10+ x64 | `photocraft-<v>-windows-x64.msi`, `photocraft-<v>-windows-x64-portable.zip` | `windows-latest` |
-| Windows 10+ x86 (32-bit) | `photocraft-<v>-windows-x86.msi`, `photocraft-<v>-windows-x86-portable.zip` | `windows-latest` |
-| Linux x86_64 | `photocraft-<v>-linux-x86_64.{AppImage,AppImage.zsync,deb,rpm,tar.gz,flatpak}` | `ubuntu-22.04` (Flatpak: `ubuntu-24.04`) |
-| Linux aarch64 | `photocraft-<v>-linux-aarch64.{AppImage,AppImage.zsync,deb,rpm,tar.gz,flatpak}` | `ubuntu-22.04-arm` (Flatpak: `ubuntu-24.04-arm`) |
-| FreeBSD 14 x86_64 | `photocraft-<v>-freebsd-x86_64.tar.gz` | FreeBSD 14.3 VM on `ubuntu-latest` |
-| Web | `photocraft-web-<v>.zip` (static site; see [`packaging/web/README.md`](../packaging/web/README.md)) | `ubuntu-latest` |
+| macOS 11+ (universal: Apple silicon + Intel) | `niveta-<v>-macos-universal.dmg`, `niveta-cli-<v>-macos-universal.zip` | `macos-15` |
+| Windows 10+ x64 | `niveta-<v>-windows-x64.msi`, `niveta-<v>-windows-x64-portable.zip` | `windows-latest` |
+| Windows 10+ x86 (32-bit) | `niveta-<v>-windows-x86.msi`, `niveta-<v>-windows-x86-portable.zip` | `windows-latest` |
+| Linux x86_64 | `niveta-<v>-linux-x86_64.{AppImage,AppImage.zsync,deb,rpm,tar.gz,flatpak}` | `ubuntu-22.04` (Flatpak: `ubuntu-24.04`) |
+| Linux aarch64 | `niveta-<v>-linux-aarch64.{AppImage,AppImage.zsync,deb,rpm,tar.gz,flatpak}` | `ubuntu-22.04-arm` (Flatpak: `ubuntu-24.04-arm`) |
+| FreeBSD 14 x86_64 | `niveta-<v>-freebsd-x86_64.tar.gz` | FreeBSD 14.3 VM on `ubuntu-latest` |
+| Web | `niveta-web-<v>.zip` (static site; see [`packaging/web/README.md`](../packaging/web/README.md)) | `ubuntu-latest` |
 
 Every binary reports its version, the commit and the build date: `photocraft --version`,
-`photocraft-cli --version`, and *Help › About Niveta*. CI sets `PHOTOCRAFT_BUILD_SHA` and
-`PHOTOCRAFT_BUILD_DATE`, and `crates/engine/src/build_info.rs` reads them at compile time. A plain
+`niveta-cli --version`, and *Help › About Niveta*. CI sets `NIVETA_BUILD_SHA` and
+`NIVETA_BUILD_DATE`, and `crates/engine/src/build_info.rs` reads them at compile time. A plain
 `cargo build` doesn't set them and reports `0.2.0 (dev build)`.
 
 Every desktop build job (macOS, Windows, Linux, FreeBSD) also checks out [craft-fonts](https://github.com/storytold/craft-fonts)
@@ -77,7 +77,7 @@ in `ci.yml`. Rules: `../craftrules/standards/fonts.md`; build option: `docs/deve
 - `Info.plist` is generated from `Info.plist.in`. The bundle id is `ai.storyteller.photocraft`.
   The plist sets `LSMinimumSystemVersion` 11.0, `NSHighResolutionCapable`, and document types:
   `.pcraft` (Owner), plus PSD/PSB and the image formats Niveta reads (Alternate, so it never
-  takes over Preview's defaults). The icon is `assets/app-icon/photocraft.icns`.
+  takes over Preview's defaults). The icon is `assets/app-icon/niveta.icns`.
 - **Signing** goes inside-out with the hardened runtime and a secure timestamp. The executable
   is signed first, then the bundle. There's no `--deep` on the final signature. The
   entitlements (`entitlements.plist`) are deliberately empty.
@@ -88,7 +88,7 @@ in `ci.yml`. Rules: `../craftrules/standards/fonts.md`; build option: `docs/deve
   Its Finder window (background, icon size and positions) comes from
   [`packaging/macos/dmg/`](../packaging/macos/dmg/README.md), and its volume is named `Niveta`
   without the version, which the window's background needs; the DMG file name keeps the version.
-- **CLI:** the universal `photocraft-cli` is signed with the same Developer ID, the hardened
+- **CLI:** the universal `niveta-cli` is signed with the same Developer ID, the hardened
   runtime and a secure timestamp (identifier `ai.storyteller.photocraft-cli`), zipped, and the zip
   is sent to `notarytool`. Only `.app`, `.dmg` and `.pkg` can hold a stapled ticket, not a bare
   Mach-O, so Gatekeeper looks the CLI's ticket up online the first time a downloaded
@@ -109,7 +109,7 @@ That's enough to check the bundle and the DMG on your own Mac:
 ```sh
 packaging/macos/package.sh                    # universal; needs both rustup targets
 packaging/macos/package.sh --arch aarch64     # quicker, host-only
-open dist/release/photocraft-*-macos-*.dmg
+open dist/release/niveta-*-macos-*.dmg
 ```
 
 ### Windows
@@ -119,18 +119,18 @@ The static C runtime means neither the MSI nor the portable zip needs the Visual
 redistributable, which matters for a standalone installer and costs only about 100 KB. The flag
 goes in `CARGO_TARGET_<TRIPLE>_RUSTFLAGS`, so host build scripts aren't affected.
 
-- `apps/photocraft/build.rs` and `apps/photocraft-cli/build.rs` embed the icon
-  (`assets/app-icon/photocraft.ico`) and VERSIONINFO with the `winresource` crate
+- `apps/photocraft/build.rs` and `apps/niveta-cli/build.rs` embed the icon
+  (`assets/app-icon/niveta.ico`) and VERSIONINFO with the `winresource` crate
   (build dependency `0.1`). They only do this when targeting Windows. Elsewhere each
-  script is a no-op, even if `PHOTOCRAFT_REQUIRE_WINRES` is set, and the web build
+  script is a no-op, even if `NIVETA_REQUIRE_WINRES` is set, and the web build
   doesn't touch that crate. Both set ProductName to Niveta, CompanyName to
   Learning Machines LLC and the same copyright line. The GUI description is
   "Niveta image editor" (`photocraft.exe`). The CLI description is
-  "Niveta command-line interface", with OriginalFilename `photocraft-cli.exe`
-  and InternalName `photocraft-cli`. Version strings are the Cargo package version,
+  "Niveta command-line interface", with OriginalFilename `niveta-cli.exe`
+  and InternalName `niveta-cli`. Version strings are the Cargo package version,
   so a pre-release tag is kept; the numeric file and product versions are
   winresource's `major.minor.patch.0`. A missing resource compiler warns, so an
-  optional cross-compile still links. `package.ps1` sets `PHOTOCRAFT_REQUIRE_WINRES=1`.
+  optional cross-compile still links. `package.ps1` sets `NIVETA_REQUIRE_WINRES=1`.
   The CLI build script then returns an error naming `rc.exe` or `windres` and does
   not panic.
 - Release builds use the GUI subsystem, so Start Menu launches don't open a console window.
@@ -192,7 +192,7 @@ Why these formats:
   `~/.local/share/applications/ai.storyteller.photocraft.desktop` with `Exec` rewritten to
   the AppImage's path (`TryExec` dropped, the binary isn't on the host PATH) and the
   hicolor icons beside it, rewriting only when the content changed, and any failure leaves
-  the launch untouched. `PHOTOCRAFT_NO_DESKTOP_INTEGRATION=1` opts out; to uninstall, `rm
+  the launch untouched. `NIVETA_NO_DESKTOP_INTEGRATION=1` opts out; to uninstall, `rm
   ~/.local/share/applications/ai.storyteller.photocraft.desktop` and `find
   ~/.local/share/icons/hicolor -name 'ai.storyteller.photocraft*' -delete`. The script is
   covered by `packaging/linux/apprun-test.sh` in the packaging-lint workflow.
@@ -210,12 +210,12 @@ Why these formats:
   runtime. It does no Rust build and needs no network inside `flatpak-builder`, so the bundle
   holds the same binaries as the other formats. A separate `flatpak` job per architecture
   (`ubuntu-24.04` and `ubuntu-24.04-arm`, for flatpak-builder 1.4) downloads the Linux job's
-  artifact, runs the script, installs the bundle and runs `photocraft-cli --version` inside the
+  artifact, runs the script, installs the bundle and runs `niveta-cli --version` inside the
   sandbox as a smoke test. The bundle names Flathub as its runtime repo, so users install
   it with:
 
   ```sh
-  flatpak install --user photocraft-<v>-linux-x86_64.flatpak   # pulls org.freedesktop.Platform//26.08 from Flathub if missing
+  flatpak install --user niveta-<v>-linux-x86_64.flatpak   # pulls org.freedesktop.Platform//26.08 from Flathub if missing
   flatpak run ai.storyteller.photocraft
   ```
 
@@ -241,7 +241,7 @@ doesn't bundle them. The Flatpak gets them from the freedesktop runtime. Because
 and the tarball can't declare dependencies, `photocraft` checks for the libraries its session
 (X11 or Wayland) needs before it opens a window (`apps/photocraft/src/linux_libs.rs`) and, if
 one is missing, prints the package to install and exits with status 1 instead of crashing.
-`PHOTOCRAFT_SKIP_LIB_CHECK=1` skips the check.
+`NIVETA_SKIP_LIB_CHECK=1` skips the check.
 
 Locally (on Linux): install [nfpm](https://nfpm.goreleaser.com/install/), then
 `packaging/linux/package.sh` (or `--formats "deb tar"`).
@@ -252,15 +252,15 @@ GitHub has no FreeBSD runners, so the `freebsd` job runs `packaging/freebsd/pack
 FreeBSD 14.3 VM (`vmactions/freebsd-vm`, pinned by commit), with the same packages as the
 FreeBSD CI workflow (`.github/workflows/freebsd.yml`) plus `bash`. The script builds both
 binaries with `CARGO_BUILD_JOBS=4` (more runs the 12 GB VM out of memory) and writes
-`photocraft-<v>-freebsd-x86_64.tar.gz`. FreeBSD's `uname -m` says `amd64`; the file name uses
+`niveta-<v>-freebsd-x86_64.tar.gz`. FreeBSD's `uname -m` says `amd64`; the file name uses
 `x86_64` like the other artifacts. The tarball is a `/usr/local`-style tree: `bin/photocraft`,
-`bin/photocraft-cli`, and under `share/` the same desktop entry, MIME type, AppStream metainfo
+`bin/niveta-cli`, and under `share/` the same desktop entry, MIME type, AppStream metainfo
 and hicolor icons as Linux, plus the licences, `NOTICE` and `ATTRIBUTION.md` in
 `share/doc/photocraft/`. Users install it with:
 
 ```sh
 pkg install libxkbcommon wayland libX11 libXcursor libXrandr libXi libxcb mesa-libs vulkan-loader gtk3 fontconfig freetype2 alsa-lib
-tar -xzf photocraft-<v>-freebsd-x86_64.tar.gz --strip-components 1 -C /usr/local
+tar -xzf niveta-<v>-freebsd-x86_64.tar.gz --strip-components 1 -C /usr/local
 ```
 
 The job signs nothing, so it runs outside the `release` environment and gets no secrets. The
@@ -276,10 +276,10 @@ and lists the tarball, which checks the layout without a FreeBSD machine.
 
 ### Web
 
-`packaging/web/package.sh` runs `trunk build --release` (see `apps/photocraft-web/Trunk.toml`)
+`packaging/web/package.sh` runs `trunk build --release` (see `apps/niveta-web/Trunk.toml`)
 and zips `dist/web` together with sample `_headers` and `.htaccess` files and the hosting guide.
 The site only uses relative URLs, so it works under any path and in an iframe. The wasm builds
-with the size-optimized `wasm-release` Cargo profile (set in `apps/photocraft-web/index.html`),
+with the size-optimized `wasm-release` Cargo profile (set in `apps/niveta-web/index.html`),
 and the script fails if any `.wasm` exceeds 24 MiB, below Cloudflare's 25 MiB per-file limit.
 [`packaging/web/README.md`](../packaging/web/README.md) covers MIME types, compression,
 caching, the iframe snippet and the `?webgl` / `?cpu` flags.
@@ -315,7 +315,7 @@ The keychain is deleted at the end of the job.
 
 ## Icons
 
-`assets/app-icon/photocraft.svg` is the canonical icon: the owner's stacked-N mark, traced from
+`assets/app-icon/niveta.svg` is the canonical icon: the owner's stacked-N mark, traced from
 the `newlogo.jpg` artwork (MIT OR Apache-2.0, see `LICENSE.txt` there; palette and geometry in
 `README.md`). `packaging/icons.sh` regenerates the 1024 px PNG, the `.icns`, the `.ico` (packed by
 `cargo xtask ico`) and the hicolor PNGs from it. It needs `resvg`, plus `iconutil` on macOS.

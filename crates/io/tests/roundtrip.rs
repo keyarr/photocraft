@@ -3,11 +3,11 @@
 mod common;
 
 use common::*;
-use photocraft_color::{ColorMode, SampleType};
-use photocraft_io::*;
-use photocraft_psd::PsdFile;
+use niveta_color::{ColorMode, SampleType};
+use niveta_io::*;
+use niveta_psd::PsdFile;
 
-fn roundtrip(doc: &photocraft_doc::Document) -> photocraft_doc::Document {
+fn roundtrip(doc: &niveta_doc::Document) -> niveta_doc::Document {
     let r = export(doc, "x.psd", &ExportOptions::default()).expect("export");
     let file = PsdFile::from_bytes(&r.bytes).expect("parse");
     // Written files are byte-stable through the psd crate.
@@ -66,7 +66,7 @@ fn import_sets_name() {
 
 #[test]
 fn empty_document() {
-    let d = photocraft_doc::Document::new("e", photocraft_geom::Size::new(4, 3), ColorMode::Rgb, SampleType::U8);
+    let d = niveta_doc::Document::new("e", niveta_geom::Size::new(4, 3), ColorMode::Rgb, SampleType::U8);
     let back = roundtrip(&d);
     // A flattened, fully transparent file comes back as one background layer.
     assert!(back.layers.len() <= 1);
@@ -85,7 +85,7 @@ fn zero_sized_psd_is_rejected() {
         let err = import("z.psd", &b).expect_err("zero-sized header must not open");
         assert!(err.to_string().contains("at least 1x1"), "{range:?}: {err}");
     }
-    let empty = photocraft_doc::Document::new("e", photocraft_geom::Size::new(0, 3), ColorMode::Rgb, SampleType::U8);
+    let empty = niveta_doc::Document::new("e", niveta_geom::Size::new(0, 3), ColorMode::Rgb, SampleType::U8);
     assert!(export(&empty, "x.psd", &ExportOptions::default()).is_err());
 }
 
@@ -106,17 +106,17 @@ fn round_trip_reaches_a_fixed_point() {
 
 #[test]
 fn text_shape_smart_raw_blocks_survive() {
-    use photocraft_doc::*;
+    use niveta_doc::*;
     use std::sync::Arc;
     let mut d = gen_doc(ColorMode::Rgb, SampleType::U8, Features::PIXELS);
     let fmt = d.pixel_format();
-    let cache = pattern(fmt, photocraft_geom::Rect::new(1, 1, 6, 4), 42, true);
+    let cache = pattern(fmt, niveta_geom::Rect::new(1, 1, 6, 4), 42, true);
     let placed = Arc::new(vec![1u8, 2, 3, 4]);
     let mut smart = Layer::new(
         "Smart",
         LayerContent::Smart(SmartObject {
             source: SmartSource::Linked { path: String::new() },
-            transform: photocraft_geom::Affine::IDENTITY,
+            transform: niveta_geom::Affine::IDENTITY,
             smart_filters: vec![],
             cache: Some(cache.clone()),
             psd_raw: Some(placed.clone()),
@@ -129,12 +129,12 @@ fn text_shape_smart_raw_blocks_survive() {
     );
     smart.psd_blocks = vec![(*b"PlLd", Arc::new(vec![0; 4])), (*b"vmsk", Arc::new(vec![5; 8])), (*b"luni", Arc::new(vec![0; 8]))];
     // The typed vector mask (as import produces it) keeps the raw block while unchanged.
-    smart.vector_mask = photocraft_io::vector_map::vector_mask_from_block(&[5; 8], d.size.width, d.size.height);
+    smart.vector_mask = niveta_io::vector_map::vector_mask_from_block(&[5; 8], d.size.width, d.size.height);
     d.layers.push(smart);
     let mut shape = Layer::new("Shape", LayerContent::Shape(ShapeLayer { fill: None, cache: Some(cache.clone()), psd_raw: None, ..Default::default() }));
     shape.psd_blocks = vec![(*b"vscg", Arc::new(vec![1, 2, 3, 4])), (*b"vmsk", Arc::new(vec![7; 8]))];
     if let LayerContent::Shape(s) = &mut shape.content {
-        s.path = photocraft_io::vector_map::path_from_vmsk(&[7; 8], d.size.width, d.size.height).unwrap().0;
+        s.path = niveta_io::vector_map::path_from_vmsk(&[7; 8], d.size.width, d.size.height).unwrap().0;
     }
     d.layers.push(shape);
     let back = roundtrip(&d);
@@ -162,8 +162,8 @@ fn raster_layer_blocks_preserved() {
         vec![(*b"vmsk", std::sync::Arc::new(vec![0u8; 12])), (*b"clbl", std::sync::Arc::new(vec![0u8, 0, 0, 0])), (*b"Zzzz", std::sync::Arc::new(vec![1u8]))];
     d.layers[1].psd_blocks = blocks.clone();
     // `clbl` is written from the field (in place), so the field agrees with the preserved block.
-    d.layers[1].advanced = photocraft_doc::AdvancedBlending { blend_clipped: false, ..Default::default() };
-    d.layers[1].vector_mask = photocraft_io::vector_map::vector_mask_from_block(&[0; 12], d.size.width, d.size.height);
+    d.layers[1].advanced = niveta_doc::AdvancedBlending { blend_clipped: false, ..Default::default() };
+    d.layers[1].vector_mask = niveta_io::vector_map::vector_mask_from_block(&[0; 12], d.size.width, d.size.height);
     let back = roundtrip(&d);
     // An odd-length layer block comes back with its pad byte inside the length (as Photoshop
     // lays layer blocks out, #200); everything else is verbatim.
@@ -191,7 +191,7 @@ fn psd_ids_are_kept_and_deduplicated() {
 
 #[test]
 fn edited_adjustment_regenerates_block_unedited_keeps_raw() {
-    use photocraft_doc::*;
+    use niveta_doc::*;
     use std::sync::Arc;
     let mut d = gen_doc(ColorMode::Rgb, SampleType::U8, Features::PIXELS);
     // Levels block with non-default extra records (record 5 changed).
@@ -221,8 +221,8 @@ fn edited_adjustment_regenerates_block_unedited_keeps_raw() {
 
 #[test]
 fn text_layer_roundtrip_with_tysh() {
-    use photocraft_doc::*;
-    use photocraft_psd::descriptor::{Descriptor, UnicodeString, Value, VersionedDescriptor};
+    use niveta_doc::*;
+    use niveta_psd::descriptor::{Descriptor, UnicodeString, Value, VersionedDescriptor};
     // Minimal TySh: version, transform, text version, text descriptor, warp.
     let mut tysh = 1u16.to_be_bytes().to_vec();
     for v in [1.0f64, 0.0, 0.0, 1.0, 3.0, 4.0] {
@@ -242,9 +242,9 @@ fn text_layer_roundtrip_with_tysh() {
             text: "Hello".into(),
             font_family: String::new(),
             size_pt: 0.0,
-            color: photocraft_color::Color::BLACK,
-            transform: photocraft_geom::Affine { m: [1.0, 0.0, 0.0, 1.0, 3.0, 4.0] },
-            cache: Some(pattern(fmt, photocraft_geom::Rect::new(3, 4, 9, 8), 5, true)),
+            color: niveta_color::Color::BLACK,
+            transform: niveta_geom::Affine { m: [1.0, 0.0, 0.0, 1.0, 3.0, 4.0] },
+            cache: Some(pattern(fmt, niveta_geom::Rect::new(3, 4, 9, 8), 5, true)),
             psd_raw: Some(std::sync::Arc::new(tysh)),
             ..Default::default()
         }),
@@ -265,9 +265,9 @@ fn text_layer_roundtrip_with_tysh() {
 fn effects_raw_roundtrip() {
     let mut d = gen_doc(ColorMode::Rgb, SampleType::U8, Features::PIXELS);
     let mut lfx = vec![0, 0, 0, 0];
-    lfx.extend(photocraft_psd::testgen::sample_descriptor().to_bytes());
+    lfx.extend(niveta_psd::testgen::sample_descriptor().to_bytes());
     // Typed items and the raw block must agree; the raw bytes are then kept.
-    let (master, items) = photocraft_io::effects_map::parse_lfx2(&lfx).unwrap();
+    let (master, items) = niveta_io::effects_map::parse_lfx2(&lfx).unwrap();
     d.layers[1].effects.enabled = master;
     d.layers[1].effects.items = items;
     d.layers[1].effects.psd_raw = Some(std::sync::Arc::new(lfx));
@@ -277,12 +277,12 @@ fn effects_raw_roundtrip() {
 
 #[test]
 fn gradient_and_pattern_fills_roundtrip() {
-    use photocraft_doc::*;
+    use niveta_doc::*;
     let mut d = gen_doc(ColorMode::Rgb, SampleType::U8, Features::PIXELS);
     d.layers.push(Layer::new(
         "grad",
         LayerContent::Fill(Fill::gradient(
-            vec![(0.0, photocraft_color::Color::rgb(1.0, 0.0, 0.0)), (1.0, photocraft_color::Color::rgb(0.0, 0.0, 1.0))],
+            vec![(0.0, niveta_color::Color::rgb(1.0, 0.0, 0.0)), (1.0, niveta_color::Color::rgb(0.0, 0.0, 1.0))],
             30.0,
             1.0,
             GradientStyle::Diamond,
@@ -318,30 +318,30 @@ fn document_to_psd_direct_api() {
 
 #[test]
 fn big_document_goes_psb_with_warning() {
-    let d = photocraft_doc::Document::new("big", photocraft_geom::Size::new(30_001, 1), ColorMode::Grayscale, SampleType::U8);
+    let d = niveta_doc::Document::new("big", niveta_geom::Size::new(30_001, 1), ColorMode::Grayscale, SampleType::U8);
     let (f, w) = document_to_psd_with(&d, &PsdExportOptions::default());
-    assert_eq!(f.header.version, photocraft_psd::Version::Psb);
+    assert_eq!(f.header.version, niveta_psd::Version::Psb);
     assert!(w.iter().any(|w| w.contains("PSB")));
 }
 
 #[test]
 fn effects_roundtrip_typed_and_raw() {
-    use photocraft_doc::*;
+    use niveta_doc::*;
     let mut d = gen_doc(ColorMode::Rgb, SampleType::U8, Features::PIXELS);
     d.global_light = GlobalLight { angle: 45.0, altitude: 25.0 };
     d.layers[1].effects.items = vec![
         Effect::default_drop_shadow(),
         Effect::Stroke(StrokeFx {
-            common: FxCommon::new(photocraft_color::BlendMode::Normal, 1.0),
+            common: FxCommon::new(niveta_color::BlendMode::Normal, 1.0),
             size: 3.0,
             position: StrokePosition::Center,
-            paint: FxPaint::Color(photocraft_color::Color::rgb(0.0, 1.0, 0.0)),
+            paint: FxPaint::Color(niveta_color::Color::rgb(0.0, 1.0, 0.0)),
         }),
         Effect::Stroke(StrokeFx {
-            common: FxCommon::new(photocraft_color::BlendMode::Normal, 0.5),
+            common: FxCommon::new(niveta_color::BlendMode::Normal, 0.5),
             size: 6.0,
             position: StrokePosition::Outside,
-            paint: FxPaint::Color(photocraft_color::Color::rgb(0.0, 0.0, 1.0)),
+            paint: FxPaint::Color(niveta_color::Color::rgb(0.0, 0.0, 1.0)),
         }),
     ];
     let back = roundtrip(&d);
@@ -362,19 +362,19 @@ fn effects_roundtrip_typed_and_raw() {
     let rec = f.layers().iter().find(|r| r.name() == back.layers[1].name).unwrap();
     let data = &rec.block(b"lfx2").unwrap().data;
     assert_ne!(data, &*raw);
-    let (_, items) = photocraft_io::effects_map::parse_lfx2(data).unwrap();
+    let (_, items) = niveta_io::effects_map::parse_lfx2(data).unwrap();
     assert!(matches!(&items[0], Effect::DropShadow(s) if s.distance == 20.0));
 }
 
 #[test]
 fn group_effects_use_lfxs() {
-    use photocraft_doc::*;
+    use niveta_doc::*;
     let mut d = gen_doc(ColorMode::Rgb, SampleType::U8, Features::PIXELS);
     let n = d.layers.iter().position(|l| l.is_group()).unwrap();
     d.layers[n]
         .effects
         .items
-        .push(Effect::ColorOverlay { common: FxCommon::new(photocraft_color::BlendMode::Normal, 1.0), color: photocraft_color::Color::rgb(1.0, 0.0, 0.0) });
+        .push(Effect::ColorOverlay { common: FxCommon::new(niveta_color::BlendMode::Normal, 1.0), color: niveta_color::Color::rgb(1.0, 0.0, 0.0) });
     let f = document_to_psd(&d);
     let rec = f.layers().iter().find(|r| r.name() == d.layers[n].name && r.section_type().is_folder()).unwrap();
     assert!(rec.block(b"lfxs").is_some() && rec.block(b"lfx2").is_none());
@@ -384,7 +384,7 @@ fn group_effects_use_lfxs() {
 
 #[test]
 fn clearing_effects_drops_stale_blocks() {
-    use photocraft_doc::*;
+    use niveta_doc::*;
     let mut d = gen_doc(ColorMode::Rgb, SampleType::U8, Features::PIXELS);
     d.layers[1].effects.items.push(Effect::default_drop_shadow());
     let back = roundtrip(&d);
@@ -397,11 +397,11 @@ fn clearing_effects_drops_stale_blocks() {
 
 #[test]
 fn link_groups_and_effects_reference_round_trip() {
-    use photocraft_doc::{Document, Layer, LayerContent, Size};
+    use niveta_doc::{Document, Layer, LayerContent, Size};
     let mut d = Document::new("l", Size::new(8, 8), ColorMode::Rgb, SampleType::U8);
     let fmt = d.pixel_format();
     let mut a = Layer::raster("a", fmt);
-    a.surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(0, 0, 4, 4), &[1.0, 0.0, 0.0, 1.0]);
+    a.surface_mut().unwrap().fill_rect(niveta_geom::Rect::new(0, 0, 4, 4), &[1.0, 0.0, 0.0, 1.0]);
     a.link_group = Some(7);
     a.effects.reference = Some((-201.0, 47.5));
     let mut b = Layer::raster("b", fmt);
@@ -445,10 +445,10 @@ fn link_groups_and_effects_reference_round_trip() {
 
 #[test]
 fn channel_restrictions_round_trip_as_brst() {
-    use photocraft_doc::{Document, Layer, Size};
+    use niveta_doc::{Document, Layer, Size};
     let mut d = Document::new("c", Size::new(8, 8), ColorMode::Rgb, SampleType::U8);
     let mut a = Layer::raster("a", d.pixel_format());
-    a.surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(0, 0, 4, 4), &[1.0, 0.0, 0.0, 1.0]);
+    a.surface_mut().unwrap().fill_rect(niveta_geom::Rect::new(0, 0, 4, 4), &[1.0, 0.0, 0.0, 1.0]);
     a.excluded_channels = 0b110;
     let b = Layer::raster("b", d.pixel_format());
     d.layers = vec![a, b];
@@ -471,11 +471,11 @@ fn channel_restrictions_round_trip_as_brst() {
 /// blocks, and imported blocks are rewritten in place.
 #[test]
 fn advanced_blending_round_trips_as_tagged_blocks() {
-    use photocraft_doc::{AdvancedBlending, Document, Knockout, Layer, Size};
+    use niveta_doc::{AdvancedBlending, Document, Knockout, Layer, Size};
     for depth in SampleType::ALL {
         let mut d = Document::new("a", Size::new(8, 8), ColorMode::Rgb, depth);
         let mut a = Layer::raster("a", d.pixel_format());
-        a.surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(0, 0, 4, 4), &[1.0, 0.0, 0.0, 1.0]);
+        a.surface_mut().unwrap().fill_rect(niveta_geom::Rect::new(0, 0, 4, 4), &[1.0, 0.0, 0.0, 1.0]);
         let adv = AdvancedBlending {
             knockout: Knockout::Deep,
             blend_interior: true,
@@ -518,10 +518,10 @@ fn advanced_blending_round_trips_as_tagged_blocks() {
 
 #[test]
 fn blend_if_round_trips_as_blending_ranges() {
-    use photocraft_doc::{BlendIf, BlendRange, Document, Layer, Size};
+    use niveta_doc::{BlendIf, BlendRange, Document, Layer, Size};
     let mut d = Document::new("b", Size::new(8, 8), ColorMode::Rgb, SampleType::U8);
     let mut a = Layer::raster("a", d.pixel_format());
-    a.surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(0, 0, 4, 4), &[1.0, 1.0, 1.0, 1.0]);
+    a.surface_mut().unwrap().fill_rect(niveta_geom::Rect::new(0, 0, 4, 4), &[1.0, 1.0, 1.0, 1.0]);
     let mut bi = BlendIf::default();
     // Gray › This Layer: hide the whites, fading from 200 to 230.
     bi.set(0, [BlendRange { black: [0, 0], white: [200, 230] }, BlendRange::FULL]);
@@ -543,7 +543,7 @@ fn blend_if_round_trips_as_blending_ranges() {
     assert_eq!(rec.blending_ranges.data, want);
     // Layers without Blend If keep full ranges for gray + R, G, B.
     let rb = f.layers().iter().find(|r| r.name() == "b").unwrap();
-    assert_eq!(rb.blending_ranges, photocraft_psd::BlendingRanges::full(3));
+    assert_eq!(rb.blending_ranges, niveta_psd::BlendingRanges::full(3));
     let back = roundtrip(&d);
     assert_eq!(back.layers[0].blend_if, bi);
     assert!(back.layers[1].blend_if.is_default());

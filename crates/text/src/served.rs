@@ -159,7 +159,7 @@ mod tests {
 
         // A layout that needs a served family the database lacks asks for it (and is drawn with
         // the fallback meanwhile).
-        let t = photocraft_doc::TextLayer { text: "Hi".into(), font_family: served.into(), size_pt: 12.0, ..Default::default() };
+        let t = niveta_doc::TextLayer { text: "Hi".into(), font_family: served.into(), size_pt: 12.0, ..Default::default() };
         let l = crate::TextEngine::new().layout(&t, 72.0);
         assert_eq!(l.glyphs.len(), 2);
         assert!(take_requests().iter().any(|f| f == served));

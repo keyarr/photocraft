@@ -30,7 +30,7 @@ impl Class {
     }
 }
 
-/// The layering table. Names are package names without the `photocraft-`
+/// The layering table. Names are package names without the `niveta-`
 /// prefix.
 pub const TABLE: &[(&str, Class)] = &[
     ("geom", Class::Layer(0)),
@@ -97,7 +97,7 @@ pub const UI_CRATES: &[&str] = &["egui", "eframe", "winit", "egui_kittest", "rfd
 pub const UI_MIN_LAYER: u8 = 6;
 
 pub fn short_name(pkg: &str) -> &str {
-    pkg.strip_prefix("photocraft-").unwrap_or(pkg)
+    pkg.strip_prefix("niveta-").unwrap_or(pkg)
 }
 
 pub fn classify(pkg: &str) -> Option<Class> {
@@ -155,7 +155,7 @@ impl std::fmt::Display for Violation {
                 write!(f, "{krate}: standalone crate must not depend on workspace crate {dep}")
             }
             Violation::TestkitAsNormalDep { krate } => {
-                write!(f, "{krate}: photocraft-testkit may only be a dev-dependency")
+                write!(f, "{krate}: niveta-testkit may only be a dev-dependency")
             }
             Violation::UiBelowL6 { krate, dep, layer } => {
                 write!(f, "{krate} (L{layer}) depends on UI crate `{dep}`; UI toolkits are only allowed in L6+")
@@ -266,50 +266,50 @@ mod tests {
     #[test]
     fn clean_downward_graph_passes() {
         let g = [
-            c("photocraft-geom", &[("kurbo", Normal, false)]),
-            c("photocraft-doc", &[("photocraft-geom", Normal, true)]),
-            c("photocraft-engine", &[("photocraft-doc", Normal, true), ("photocraft-testkit", Dev, true)]),
-            c("photocraft-ui-egui", &[("photocraft-engine", Normal, true), ("egui", Normal, false)]),
-            c("photocraft-android", &[("photocraft-ui-egui", Normal, true)]),
+            c("niveta-geom", &[("kurbo", Normal, false)]),
+            c("niveta-doc", &[("niveta-geom", Normal, true)]),
+            c("niveta-engine", &[("niveta-doc", Normal, true), ("niveta-testkit", Dev, true)]),
+            c("niveta-ui-egui", &[("niveta-engine", Normal, true), ("egui", Normal, false)]),
+            c("niveta-android", &[("niveta-ui-egui", Normal, true)]),
         ];
         assert!(check(&g).is_empty(), "{:?}", check(&g));
     }
 
     #[test]
     fn upward_dependency_flagged() {
-        let v = check(&[c("photocraft-doc", &[("photocraft-engine", Normal, true)])]);
+        let v = check(&[c("niveta-doc", &[("niveta-engine", Normal, true)])]);
         assert!(matches!(v[..], [Violation::Upward { from: 1, to: 5, .. }]));
     }
 
     #[test]
     fn sideways_dependency_flagged() {
-        let v = check(&[c("photocraft-ops", &[("photocraft-algo", Normal, true)])]);
+        let v = check(&[c("niveta-ops", &[("niveta-algo", Normal, true)])]);
         assert!(matches!(v[..], [Violation::Upward { from: 2, to: 2, .. }]));
     }
 
     #[test]
     fn l0_foundation_chain_allowed_one_way() {
-        assert!(check(&[c("photocraft-raster", &[("photocraft-color", Normal, true), ("photocraft-geom", Normal, true)])]).is_empty());
-        assert!(check(&[c("photocraft-color", &[("photocraft-geom", Normal, true)])]).is_empty());
-        let v = check(&[c("photocraft-geom", &[("photocraft-raster", Normal, true)])]);
+        assert!(check(&[c("niveta-raster", &[("niveta-color", Normal, true), ("niveta-geom", Normal, true)])]).is_empty());
+        assert!(check(&[c("niveta-color", &[("niveta-geom", Normal, true)])]).is_empty());
+        let v = check(&[c("niveta-geom", &[("niveta-raster", Normal, true)])]);
         assert!(matches!(v[..], [Violation::Upward { from: 0, to: 0, .. }]));
     }
 
     #[test]
     fn self_dev_dependency_ignored() {
-        assert!(check(&[c("photocraft-psd", &[("photocraft-psd", Dev, true)])]).is_empty());
+        assert!(check(&[c("niveta-psd", &[("niveta-psd", Dev, true)])]).is_empty());
     }
 
     #[test]
     fn upward_dev_dependency_flagged() {
-        let v = check(&[c("photocraft-geom", &[("photocraft-doc", Dev, true)])]);
+        let v = check(&[c("niveta-geom", &[("niveta-doc", Dev, true)])]);
         assert!(matches!(v[..], [Violation::Upward { kind: Dev, .. }]));
     }
 
     #[test]
     fn standalone_crates_have_no_workspace_deps() {
-        for s in ["photocraft-psd", "photocraft-codecs", "photocraft-adobe-assets"] {
-            let v = check(&[c(s, &[("photocraft-geom", Normal, true)])]);
+        for s in ["niveta-psd", "niveta-codecs", "niveta-adobe-assets"] {
+            let v = check(&[c(s, &[("niveta-geom", Normal, true)])]);
             assert!(matches!(v[..], [Violation::StandaloneHasWorkspaceDep { .. }]), "{s}");
             assert!(check(&[c(s, &[("image", Normal, false)])]).is_empty());
         }
@@ -317,56 +317,56 @@ mod tests {
 
     #[test]
     fn standalone_exception_is_exactly_codecs_to_heif() {
-        assert!(check(&[c("photocraft-codecs", &[("photocraft-heif", Normal, true)])]).is_empty());
-        assert!(check(&[c("photocraft-codecs", &[("photocraft-heif", Dev, true)])]).is_empty());
+        assert!(check(&[c("niveta-codecs", &[("niveta-heif", Normal, true)])]).is_empty());
+        assert!(check(&[c("niveta-codecs", &[("niveta-heif", Dev, true)])]).is_empty());
         // Not the other way round, not for other standalone crates, and heif stays dependency-free.
-        for (from, to) in [("photocraft-heif", "photocraft-codecs"), ("photocraft-psd", "photocraft-heif"), ("photocraft-heif", "photocraft-geom")] {
+        for (from, to) in [("niveta-heif", "niveta-codecs"), ("niveta-psd", "niveta-heif"), ("niveta-heif", "niveta-geom")] {
             let v = check(&[c(from, &[(to, Normal, true)])]);
             assert!(matches!(v[..], [Violation::StandaloneHasWorkspaceDep { .. }]), "{from} -> {to}");
         }
         // The exception does not open codecs up to layered crates.
-        let v = check(&[c("photocraft-codecs", &[("photocraft-geom", Normal, true)])]);
+        let v = check(&[c("niveta-codecs", &[("niveta-geom", Normal, true)])]);
         assert!(matches!(v[..], [Violation::StandaloneHasWorkspaceDep { .. }]));
     }
 
     #[test]
     fn standalone_is_usable_from_higher_layers() {
-        assert!(check(&[c("photocraft-io", &[("photocraft-psd", Normal, true)])]).is_empty());
-        let v = check(&[c("photocraft-geom", &[("photocraft-codecs", Normal, true)])]);
+        assert!(check(&[c("niveta-io", &[("niveta-psd", Normal, true)])]).is_empty());
+        let v = check(&[c("niveta-geom", &[("niveta-codecs", Normal, true)])]);
         assert!(matches!(v[..], [Violation::Upward { from: 0, to: 0, .. }]));
     }
 
     #[test]
     fn ui_crates_below_l6_flagged() {
         for dep in ["egui", "eframe", "winit", "egui_kittest", "rfd", "bevy_ecs", "bevy"] {
-            let v = check(&[c("photocraft-engine", &[(dep, Normal, false)])]);
+            let v = check(&[c("niveta-engine", &[(dep, Normal, false)])]);
             assert!(matches!(v[..], [Violation::UiBelowL6 { layer: 5, .. }]), "{dep}");
         }
-        assert!(check(&[c("photocraft-engine", &[("egui_extras_not", Normal, false)])]).is_empty());
-        assert!(check(&[c("photocraft-platform", &[("winit", Normal, false)])]).is_empty());
+        assert!(check(&[c("niveta-engine", &[("egui_extras_not", Normal, false)])]).is_empty());
+        assert!(check(&[c("niveta-platform", &[("winit", Normal, false)])]).is_empty());
     }
 
     #[test]
     fn unregistered_crate_is_error() {
-        let v = check(&[c("photocraft-mystery", &[])]);
-        assert!(matches!(&v[..], [Violation::Unregistered { krate }] if krate == "photocraft-mystery"));
+        let v = check(&[c("niveta-mystery", &[])]);
+        assert!(matches!(&v[..], [Violation::Unregistered { krate }] if krate == "niveta-mystery"));
         assert!(v[0].to_string().contains("register"));
     }
 
     #[test]
     fn testkit_only_as_dev_dependency() {
-        let v = check(&[c("photocraft-raster", &[("photocraft-testkit", Normal, true)])]);
+        let v = check(&[c("niveta-raster", &[("niveta-testkit", Normal, true)])]);
         assert!(matches!(v[..], [Violation::TestkitAsNormalDep { .. }]));
-        assert!(check(&[c("photocraft-raster", &[("photocraft-testkit", Dev, true)])]).is_empty());
+        assert!(check(&[c("niveta-raster", &[("niveta-testkit", Dev, true)])]).is_empty());
         // testkit itself may use anything up to L5 but not L6 crates.
-        assert!(check(&[c("photocraft-testkit", &[("photocraft-engine", Normal, true)])]).is_empty());
-        assert!(!check(&[c("photocraft-testkit", &[("photocraft-ui-egui", Normal, true)])]).is_empty());
+        assert!(check(&[c("niveta-testkit", &[("niveta-engine", Normal, true)])]).is_empty());
+        assert!(!check(&[c("niveta-testkit", &[("niveta-ui-egui", Normal, true)])]).is_empty());
     }
 
     #[test]
     fn apps_and_xtask_exempt() {
-        for app in ["photocraft-android", "xtask"] {
-            assert!(check(&[c(app, &[("egui", Normal, false), ("photocraft-ui-egui", Normal, true)])]).is_empty());
+        for app in ["niveta-android", "xtask"] {
+            assert!(check(&[c(app, &[("egui", Normal, false), ("niveta-ui-egui", Normal, true)])]).is_empty());
         }
     }
 
@@ -374,17 +374,17 @@ mod tests {
     fn metadata_parsing() {
         let meta: Value = serde_json::from_str(
             r#"{"packages":[
-                {"name":"photocraft-doc","dependencies":[
-                    {"name":"photocraft-geom","kind":null,"path":"/x/crates/geom"},
+                {"name":"niveta-doc","dependencies":[
+                    {"name":"niveta-geom","kind":null,"path":"/x/crates/geom"},
                     {"name":"serde","kind":null},
                     {"name":"proptest","kind":"dev"}]},
-                {"name":"photocraft-geom","dependencies":[]}
+                {"name":"niveta-geom","dependencies":[]}
             ]}"#,
         )
         .unwrap();
         let g = from_metadata(&meta).unwrap();
         assert_eq!(g.len(), 2);
-        let doc = g.iter().find(|c| c.name == "photocraft-doc").unwrap();
+        let doc = g.iter().find(|c| c.name == "niveta-doc").unwrap();
         assert!(doc.deps[0].workspace && !doc.deps[1].workspace);
         assert_eq!(doc.deps[2].kind, Dev);
         assert!(check(&g).is_empty());

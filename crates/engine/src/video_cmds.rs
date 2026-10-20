@@ -4,8 +4,8 @@
 //! writes it back into the playhead's frame before anything re-syncs. Headless and scriptable. Frame persistence in `.pcraft` is a
 //! follow-up; a saved document keeps the current frame as the layer's content.
 
-use photocraft_doc::{Document, Layer, LayerContent, Timeline, VideoData};
-use photocraft_raster::Surface;
+use niveta_doc::{Document, Layer, LayerContent, Timeline, VideoData};
+use niveta_raster::Surface;
 use serde_json::{Value, json};
 
 use crate::commands::CommandSpec;
@@ -86,7 +86,7 @@ fn edit_video(s: &mut Session, label: &str, f: impl FnOnce(&mut VideoData, usize
     Ok(json!({"frames": count}))
 }
 
-fn blank_of(fmt: photocraft_color::PixelFormat) -> Surface {
+fn blank_of(fmt: niveta_color::PixelFormat) -> Surface {
     Surface::new(fmt)
 }
 
@@ -181,7 +181,7 @@ fn rasterize(s: &mut Session, _p: &Value) -> Result<Value> {
 
 /// Load frames from `path`: a single image (1 frame), or a directory of images (sorted = an image
 /// sequence). Each becomes a full raster frame in the document's format.
-fn load_frames(path: &str, fmt: photocraft_color::PixelFormat) -> Result<Vec<Surface>> {
+fn load_frames(path: &str, fmt: niveta_color::PixelFormat) -> Result<Vec<Surface>> {
     let p = std::path::Path::new(path);
     let is_img = |f: &std::path::Path| {
         matches!(
@@ -234,7 +234,7 @@ fn new_from_file(s: &mut Session, p: &Value) -> Result<Value> {
         let name = doc.next_layer_name(std::path::Path::new(&path).file_stem().and_then(|s| s.to_str()).unwrap_or("Video"));
         let mut l = Layer::raster(name, fmt);
         let mut v = VideoData::new(frames, fps);
-        v.source = photocraft_doc::VideoSource::File { path: path.clone() };
+        v.source = niveta_doc::VideoSource::File { path: path.clone() };
         l.video = Some(v);
         let id = doc.insert_above(*active, l);
         *active = Some(id);
@@ -254,7 +254,7 @@ fn replace_footage(s: &mut Session, p: &Value) -> Result<Value> {
     let frames = load_frames(&path, fmt)?;
     edit_video(s, "Replace Footage", move |v, _| {
         v.frames = frames;
-        v.source = photocraft_doc::VideoSource::File { path: path.clone() };
+        v.source = niveta_doc::VideoSource::File { path: path.clone() };
         Ok(())
     })
 }
@@ -281,7 +281,7 @@ fn reload_frame(s: &mut Session, _p: &Value) -> Result<Value> {
             .ok_or_else(|| EngineError::BadParams { cmd: "layer.videoLayers.reloadFrame".into(), msg: "not a video layer".into() })?;
         (v.source.clone(), st.doc.pixel_format())
     };
-    let photocraft_doc::VideoSource::File { path } = src else {
+    let niveta_doc::VideoSource::File { path } = src else {
         return Err(EngineError::BadParams { cmd: "layer.videoLayers.reloadFrame".into(), msg: "this layer has no file source to reload".into() });
     };
     let frames = load_frames(&path, fmt)?;
@@ -351,7 +351,7 @@ pub fn render_video_with(
 
     // Animated GIF: one file, every frame quantised to its own palette.
     if format.eq_ignore_ascii_case("gif") {
-        use photocraft_algo::quantize::{self, Dither, Forced, PaletteKind};
+        use niveta_algo::quantize::{self, Dither, Forced, PaletteKind};
         let delay = (100.0 / fps).round().clamp(1.0, 65535.0) as u16;
         let mut gframes = Vec::with_capacity(frames);
         for f in 0..frames {
@@ -365,13 +365,13 @@ pub fn render_video_with(
             surf.read_rgba_into(bounds, &mut px);
             let pal = quantize::build_palette(&px, PaletteKind::Adaptive, 256, Forced::None).map_err(EngineError::Other)?;
             let idx = quantize::quantize(&mut px, w, &pal, Dither::None, 1.0, None);
-            gframes.push(photocraft_codecs::web::GifFrame { indices: idx, palette: pal, transparent: None, delay_cs: delay });
+            gframes.push(niveta_codecs::web::GifFrame { indices: idx, palette: pal, transparent: None, delay_cs: delay });
             // The final report follows encoding/writing, so total means the output exists.
             if !progress((f + 1).min(frames.saturating_sub(1)), frames) {
                 return Err(cancelled());
             }
         }
-        let gif = photocraft_codecs::web::encode_gif_animated(w as u32, h as u32, &gframes, true).map_err(|e| EngineError::Other(e.to_string()))?;
+        let gif = niveta_codecs::web::encode_gif_animated(w as u32, h as u32, &gframes, true).map_err(|e| EngineError::Other(e.to_string()))?;
         let name = format!("{stem}.gif");
         write(&name, &gif)?;
         if !progress(frames, frames) {
@@ -382,7 +382,7 @@ pub fn render_video_with(
     }
 
     // Image sequence.
-    let opts = photocraft_io::ExportOptions::default();
+    let opts = niveta_io::ExportOptions::default();
     let mut files = Vec::new();
     for f in 0..frames {
         let mut doc = base.clone();
@@ -391,7 +391,7 @@ pub fn render_video_with(
         }
         sync(&mut doc);
         let path = format!("{stem}_{f:04}.{format}");
-        let bytes = photocraft_io::export(&doc, format, &opts).map(|r| r.bytes).map_err(|e| EngineError::Other(format!("render frame {f}: {e}")))?;
+        let bytes = niveta_io::export(&doc, format, &opts).map(|r| r.bytes).map_err(|e| EngineError::Other(format!("render frame {f}: {e}")))?;
         write(&path, &bytes)?;
         files.push(path);
         if !progress(f + 1, frames) {

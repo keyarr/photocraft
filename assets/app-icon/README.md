@@ -22,16 +22,16 @@ the source's margins (roughly 85 units on each side). The macOS renders pad it o
 
 ## Provenance
 
-The owner's `newlogo.jpg` artwork, traced to `photocraft.svg` with potrace (flat fills, polygons
+The owner's `newlogo.jpg` artwork, traced to `niveta.svg` with potrace (flat fills, polygons
 smoothed to beziers) and coloured to the palette above. License: see `LICENSE.txt`.
 
 ## Files
 
-- `photocraft.svg`: canonical master.
-- `photocraft-small.svg`: lighter trace (from a 512 px mask); also the hicolor scalable icon.
-- `photocraft-1024.png`: 1024 px render on the macOS grid.
-- `photocraft.icns`: macOS bundle icon (`CFBundleIconFile`).
-- `photocraft.ico`: Windows icon, 16–256 px, embedded in the `.exe` by `apps/photocraft/build.rs`.
+- `niveta.svg`: canonical master.
+- `niveta-small.svg`: lighter trace (from a 512 px mask); also the hicolor scalable icon.
+- `niveta-1024.png`: 1024 px render on the macOS grid.
+- `niveta.icns`: macOS bundle icon (`CFBundleIconFile`).
+- `niveta.ico`: Windows icon, 16–256 px, embedded in the `.exe` by `apps/photocraft/build.rs`.
 - `hicolor/<size>/apps/ai.storyteller.photocraft.png` (16–512) and `hicolor/scalable/...svg`:
   Linux icon theme.
 
@@ -42,5 +42,5 @@ details and tests the `.ico` sizes and the WiX icon references.
 
 ## Regenerate
 
-Replace `photocraft.svg` (and `photocraft-small.svg`), then run `packaging/icons.sh`. It needs
+Replace `niveta.svg` (and `niveta-small.svg`), then run `packaging/icons.sh`. It needs
 `resvg`, plus `iconutil` on macOS; the `.ico` is packed by `cargo xtask ico`.

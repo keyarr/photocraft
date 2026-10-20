@@ -29,7 +29,7 @@ commands:
   corpus [--all | --pngsuite | --psd | --psd-tools | --pixls | --photoshop] [--local] [--update-manifest]
                   show where test corpora live and their pins (xtask/src/corpus_pins.rs), or fetch
                   them into corpus/ (pinned commits, sha256-verified; --all = every corpus but pixls,
-                  --photoshop --local copies from ../photocraft-corpus or $PHOTOCRAFT_CORPUS_REPO)
+                  --photoshop --local copies from ../photocraft-corpus or $NIVETA_CORPUS_REPO)
   test-corpus [-p <crate>]... [--changed] [--pixls] [--local] [-- <test args>]
                   fetch every corpus, then cargo test --release --features corpus on the corpus
                   crates; --changed runs only if psd/io/codecs/compose/gpu/text/format/raw changed;
@@ -159,7 +159,7 @@ fn wasm_set() -> Result<Vec<String>, String> {
 
 /// Optional features that official builds enable and the web app ships, also checked for wasm32:
 /// (package, feature).
-const WASM_FEATURES: &[(&str, &str)] = &[("photocraft-codecs", "heif")];
+const WASM_FEATURES: &[(&str, &str)] = &[("niveta-codecs", "heif")];
 
 fn cmd_wasm() -> Result<(), String> {
     let set = wasm_set()?;
@@ -186,8 +186,8 @@ fn cmd_wasm() -> Result<(), String> {
 
 fn cmd_parity() -> Result<(), String> {
     let mut c = cargo();
-    c.args(["run", "-q", "-p", "photocraft-ui-egui", "--example", "parity", "--", "--write", "docs/parity.md"]);
-    run(c, "cargo run -p photocraft-ui-egui --example parity")
+    c.args(["run", "-q", "-p", "niveta-ui-egui", "--example", "parity", "--", "--write", "docs/parity.md"]);
+    run(c, "cargo run -p niveta-ui-egui --example parity")
 }
 
 fn cmd_ci() -> Result<(), String> {

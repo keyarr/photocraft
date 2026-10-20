@@ -3,13 +3,13 @@
 //! All edits go through the engine's `shape.*` / `path.*` commands.
 
 use egui::{Color32, Pos2, Rect, Sense, Stroke, pos2, vec2};
-use photocraft_doc::vector::Path;
-use photocraft_doc::{Document, LayerContent};
-use photocraft_geom::Affine;
+use niveta_doc::vector::Path;
+use niveta_doc::{Document, LayerContent};
+use niveta_geom::Affine;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 use crate::canvas::ViewXform;
 use crate::state::{Tool, ToolOptions};
 use crate::theme::Tokens;
@@ -42,7 +42,7 @@ fn hex(c: [f32; 4]) -> String {
     format!("#{:02x}{:02x}{:02x}", c.r(), c.g(), c.b())
 }
 
-fn stroke_param(app: &PhotocraftApp) -> Value {
+fn stroke_param(app: &NivetaApp) -> Value {
     let o = &app.ui.tool_options;
     if o.stroke_width > 0.0 { json!({"width": o.stroke_width, "color": hex(app.session.tools.background)}) } else { Value::Null }
 }
@@ -85,7 +85,7 @@ fn shape_geometry(o: &ToolOptions, tool: Tool, start: [f64; 2], end: [f64; 2], m
 }
 
 /// Finish a Shape-tool drag: ⇧ constrains proportions, ⌥ draws from the centre.
-pub fn finish_shape(app: &mut PhotocraftApp, tool: Tool, start: [f64; 2], end: [f64; 2], mods: egui::Modifiers) {
+pub fn finish_shape(app: &mut NivetaApp, tool: Tool, start: [f64; 2], end: [f64; 2], mods: egui::Modifiers) {
     let Some(mut p) = shape_geometry(&app.ui.tool_options, tool, start, end, mods) else { return };
     let fill = if app.ui.tool_options.shape_fill { json!(hex(app.session.tools.foreground)) } else { Value::Null };
     let stroke = stroke_param(app);
@@ -106,9 +106,9 @@ pub fn finish_shape(app: &mut PhotocraftApp, tool: Tool, start: [f64; 2], end: [
 
 /// Shape-tool drag preview: the shape `finish_shape` will create, filled and stroked, under its
 /// path outline. Custom shapes show their box outline only.
-pub fn draw_shape_preview(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, tool: Tool, start: [f64; 2], end: [f64; 2], mods: egui::Modifiers) {
+pub fn draw_shape_preview(app: &NivetaApp, painter: &egui::Painter, xf: &ViewXform, tool: Tool, start: [f64; 2], end: [f64; 2], mods: egui::Modifiers) {
     let o = &app.ui.tool_options;
-    let Some(path) = shape_geometry(o, tool, start, end, mods).and_then(|p| photocraft_engine::vector_cmds::shape_path(&p).ok()) else { return };
+    let Some(path) = shape_geometry(o, tool, start, end, mods).and_then(|p| niveta_engine::vector_cmds::shape_path(&p).ok()) else { return };
     let custom = tool == Tool::CustomShape;
     // ponytail: preview colours skip the canvas's colour management; the commit renders them exactly.
     let fill = if o.shape_fill && !custom { rgb32(app.session.tools.foreground) } else { Color32::TRANSPARENT };
@@ -131,7 +131,7 @@ fn pen_to_json(pen: &PenPath, closed: bool) -> Value {
 
 /// Pen press: close on the first anchor, reshape the last anchor's outgoing handle,
 /// or add a new anchor (dragging a new anchor pulls symmetrical handles).
-pub fn pen_down(app: &mut PhotocraftApp, x: f64, y: f64) {
+pub fn pen_down(app: &mut NivetaApp, x: f64, y: f64) {
     let tol = 6.0 / app.current_zoom().max(0.01) as f64;
     let pen = app.ui.pen.get_or_insert_with(PenPath::default);
     if let Some(first) = pen.knots.first().map(|k| k[0])
@@ -160,7 +160,7 @@ pub fn pen_down(app: &mut PhotocraftApp, x: f64, y: f64) {
     pen.adjusting_last = false;
 }
 
-pub fn pen_move(app: &mut PhotocraftApp, x: f64, y: f64) {
+pub fn pen_move(app: &mut NivetaApp, x: f64, y: f64) {
     if let Some(pen) = app.ui.pen.as_mut()
         && pen.dragging
     {
@@ -179,7 +179,7 @@ pub fn pen_move(app: &mut PhotocraftApp, x: f64, y: f64) {
 /// These knots are editor-only gesture state, not document history until Enter or
 /// clicking the first anchor commits the path. Therefore Cmd/Ctrl+Z must consume one
 /// knot rather than undoing an unrelated, already committed document operation.
-pub fn pen_undo_last_point(app: &mut PhotocraftApp) -> bool {
+pub fn pen_undo_last_point(app: &mut NivetaApp) -> bool {
     let Some(pen) = app.ui.pen.as_mut() else { return false };
     if pen.knots.pop().is_none() {
         return false;
@@ -191,7 +191,7 @@ pub fn pen_undo_last_point(app: &mut PhotocraftApp) -> bool {
     true
 }
 
-pub fn pen_up(app: &mut PhotocraftApp) {
+pub fn pen_up(app: &mut NivetaApp) {
     if let Some(pen) = app.ui.pen.as_mut() {
         pen.dragging = false;
         pen.adjusting_last = false;
@@ -199,7 +199,7 @@ pub fn pen_up(app: &mut PhotocraftApp) {
 }
 
 /// Finish the pen path: a work path (Path mode) or a new shape layer (Shape mode).
-pub fn pen_commit(app: &mut PhotocraftApp, closed: bool) {
+pub fn pen_commit(app: &mut NivetaApp, closed: bool) {
     let Some(pen) = app.ui.pen.take() else { return };
     if pen.knots.len() < 2 {
         return;
@@ -212,7 +212,7 @@ pub fn pen_commit(app: &mut PhotocraftApp, closed: bool) {
         app.run("shape.create", json!({"kind": "path", "path": path, "fill": fill, "stroke": stroke}))
     } else if let Some((id, existing)) = targeted_vector_mask(app) {
         // A targeted vector mask takes the new subpath (#196), as in Photoshop.
-        let mut p = photocraft_engine::vector_cmds::path_json(&existing);
+        let mut p = niveta_engine::vector_cmds::path_json(&existing);
         if let (Some(subs), Some(new)) = (p.get_mut("subpaths").and_then(Value::as_array_mut), path.get("subpaths").and_then(Value::as_array)) {
             subs.extend(new.iter().cloned());
         }
@@ -229,7 +229,7 @@ pub fn pen_commit(app: &mut PhotocraftApp, closed: bool) {
 
 /// The path that path commands act on without a name: the one selected in the Paths panel, else
 /// the work path, else the selected layer's shape path or vector mask; `None` when there's none.
-pub fn active_path_name(app: &PhotocraftApp) -> Option<String> {
+pub fn active_path_name(app: &NivetaApp) -> Option<String> {
     let st = app.session.active()?;
     let rows = path_rows(&st.doc, st.active_layer);
     let key = |r: &PathEntry| match r.kind {
@@ -250,7 +250,7 @@ pub fn takes_path_mask(id: &str) -> bool {
 /// as in Photoshop (#1419): the command gets it as `"path"` unless the caller set one (`null`
 /// opts out). Only an explicitly selected work or saved path counts; deselect it by clicking the
 /// panel's empty area.
-pub fn with_active_path(app: &PhotocraftApp, id: &str, params: Value) -> Value {
+pub fn with_active_path(app: &NivetaApp, id: &str, params: Value) -> Value {
     if !takes_path_mask(id) || params.get("path").is_some() {
         return params;
     }
@@ -276,7 +276,7 @@ pub fn with_active_path(app: &PhotocraftApp, id: &str, params: Value) -> Value {
 /// ⌘↩ / Ctrl+Enter (#306): load a path as a selection, like Photoshop with a Pen or Path
 /// Selection tool or a path selected in the Paths panel. A path being drawn with the Pen is
 /// finished first and loads; otherwise [`active_path_name`]. `params` may set feather, mode…
-pub fn path_to_selection(app: &mut PhotocraftApp, params: Value) -> Result<Value, String> {
+pub fn path_to_selection(app: &mut NivetaApp, params: Value) -> Result<Value, String> {
     if app.ui.pen.as_ref().is_some_and(|p| p.knots.len() >= 2) {
         // The finished path becomes the work path, or a shape layer's path or a vector mask.
         let on_layer = app.ui.tool_options.vector_mode == "shape" || targeted_vector_mask(app).is_some();
@@ -302,7 +302,7 @@ enum PathTarget {
 }
 
 /// The targeted vector mask of the active layer, if the Layers panel targets it.
-pub(crate) fn targeted_vector_mask(app: &PhotocraftApp) -> Option<(u64, Path)> {
+pub(crate) fn targeted_vector_mask(app: &NivetaApp) -> Option<(u64, Path)> {
     let st = app.session.active()?;
     let l = st.active_layer.and_then(|id| st.doc.layer(id))?;
     (app.ui.vector_mask_target && !matches!(l.content, LayerContent::Shape(_))).then_some(())?;
@@ -310,7 +310,7 @@ pub(crate) fn targeted_vector_mask(app: &PhotocraftApp) -> Option<(u64, Path)> {
 }
 
 /// The active shape layer's path, if the active layer is a shape layer.
-pub(crate) fn active_shape_path(app: &PhotocraftApp) -> Option<(u64, Path)> {
+pub(crate) fn active_shape_path(app: &NivetaApp) -> Option<(u64, Path)> {
     let st = app.session.active()?;
     let l = st.active_layer.and_then(|id| st.doc.layer(id))?;
     match &l.content {
@@ -321,7 +321,7 @@ pub(crate) fn active_shape_path(app: &PhotocraftApp) -> Option<(u64, Path)> {
 
 /// The path Path Selection edits: the targeted vector mask, the active shape layer's path, else
 /// the work path.
-fn target_path(app: &PhotocraftApp) -> Option<(PathTarget, Path)> {
+fn target_path(app: &NivetaApp) -> Option<(PathTarget, Path)> {
     if let Some((id, p)) = targeted_vector_mask(app) {
         return Some((PathTarget::VectorMask(id), p));
     }
@@ -333,7 +333,7 @@ fn target_path(app: &PhotocraftApp) -> Option<(PathTarget, Path)> {
 
 /// Edit › Free Transform Path (⌘T with Path Selection or Direct Selection): the path the
 /// box transforms (the one Path Selection edits) and `path.transform`'s params that name it.
-pub(crate) fn free_transform_path(app: &PhotocraftApp) -> Option<(Value, Path)> {
+pub(crate) fn free_transform_path(app: &NivetaApp) -> Option<(Value, Path)> {
     if !matches!(app.ui.tool, Tool::PathSelection | Tool::DirectSelection) {
         return None;
     }
@@ -346,7 +346,7 @@ pub(crate) fn free_transform_path(app: &PhotocraftApp) -> Option<(Value, Path)> 
     Some((params, path))
 }
 
-pub fn path_selection_finish(app: &mut PhotocraftApp, start: [f64; 2], end: [f64; 2]) {
+pub fn path_selection_finish(app: &mut NivetaApp, start: [f64; 2], end: [f64; 2]) {
     let (dx, dy) = (end[0] - start[0], end[1] - start[1]);
     if dx.abs() + dy.abs() < 0.5 {
         return;
@@ -356,11 +356,11 @@ pub fn path_selection_finish(app: &mut PhotocraftApp, start: [f64; 2], end: [f64
         PathTarget::Shape(id) => app.run("shape.edit", json!({"layer": id, "move": [dx.round(), dy.round()]})),
         PathTarget::VectorMask(id) => {
             let moved = path.transform(&Affine::translate(dx.round(), dy.round()));
-            app.run("layer.vectorMask.edit", json!({"layer": id, "path": photocraft_engine::vector_cmds::path_json(&moved)}))
+            app.run("layer.vectorMask.edit", json!({"layer": id, "path": niveta_engine::vector_cmds::path_json(&moved)}))
         }
         PathTarget::Work => {
             let moved = path.transform(&Affine::translate(dx.round(), dy.round()));
-            app.run("path.set", json!({"name": "work", "path": photocraft_engine::vector_cmds::path_json(&moved)}))
+            app.run("path.set", json!({"name": "work", "path": niveta_engine::vector_cmds::path_json(&moved)}))
         }
     };
 }
@@ -425,7 +425,7 @@ pub(crate) fn draw_handle(painter: &egui::Painter, anchor: Pos2, handle: Pos2, a
 }
 
 /// Work path / active shape path outlines, anchors, and the pen path in progress.
-pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, doc: &Document) {
+pub fn draw_overlay(app: &NivetaApp, painter: &egui::Painter, xf: &ViewXform, doc: &Document) {
     let tool = app.ui.tool;
     let vector_tool = matches!(tool, Tool::Pen | Tool::PathSelection) || is_shape_tool(tool);
     let accent = Tokens::get(painter.ctx()).accent;
@@ -492,7 +492,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
 // Options bars
 
 /// Options bar for vector tools; false for other tools.
-pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bool {
+pub fn options_bar(app: &mut NivetaApp, ui: &mut egui::Ui, tool: Tool) -> bool {
     if !(is_shape_tool(tool) || matches!(tool, Tool::Pen | Tool::PathSelection | Tool::DirectSelection)) {
         return false;
     }
@@ -570,9 +570,9 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
 // ---------------------------------------------------------------------------------------------
 // Properties (shape layers)
 
-fn color_of(f: &photocraft_doc::Fill) -> Option<Color32> {
+fn color_of(f: &niveta_doc::Fill) -> Option<Color32> {
     match f {
-        photocraft_doc::Fill::Solid(c) => {
+        niveta_doc::Fill::Solid(c) => {
             let v = c.to_rgba8();
             Some(Color32::from_rgb(v[0], v[1], v[2]))
         }
@@ -581,7 +581,7 @@ fn color_of(f: &photocraft_doc::Fill) -> Option<Color32> {
 }
 
 /// A colour swatch that opens a picker; returns the new `#rrggbb` when changed.
-fn swatch(ui: &mut egui::Ui, fill: Option<&photocraft_doc::Fill>, tip: &str) -> Option<String> {
+fn swatch(ui: &mut egui::Ui, fill: Option<&niveta_doc::Fill>, tip: &str) -> Option<String> {
     let t = Tokens::get(ui.ctx());
     let (r, resp) = ui.allocate_exact_size(vec2(26.0, 18.0), Sense::click());
     let current = fill.and_then(color_of);
@@ -589,9 +589,9 @@ fn swatch(ui: &mut egui::Ui, fill: Option<&photocraft_doc::Fill>, tip: &str) -> 
         (Some(c), _) => {
             ui.painter().rect_filled(r, 2.0, c);
         }
-        (None, Some(photocraft_doc::Fill::Gradient { stops, .. })) if !stops.is_empty() => {
+        (None, Some(niveta_doc::Fill::Gradient { stops, .. })) if !stops.is_empty() => {
             // Gradient fills preview as a left-to-right ramp through their stops.
-            let rgb = |c: &photocraft_doc::Color| {
+            let rgb = |c: &niveta_doc::Color| {
                 let v = c.to_rgba8();
                 Color32::from_rgb(v[0], v[1], v[2])
             };
@@ -651,7 +651,7 @@ fn corner_radii_patch(radii: [f64; 4], corner: usize, radius: f32) -> Value {
 }
 
 /// Properties panel for a shape layer: Appearance (fill, stroke) and live shape geometry.
-pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocraft_doc::LayerId) {
+pub fn shape_properties(app: &mut NivetaApp, ui: &mut egui::Ui, id: niveta_doc::LayerId) {
     let Some(sh) = app.session.active().and_then(|s| s.doc.layer(id)).and_then(|l| match &l.content {
         LayerContent::Shape(sh) => Some(sh.clone()),
         _ => None,
@@ -683,8 +683,8 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
             }
             if sh.stroke.is_some() {
                 let mut align = match sh.stroke.as_ref().map(|s| s.align) {
-                    Some(photocraft_doc::vector::StrokeAlign::Inside) => "inside",
-                    Some(photocraft_doc::vector::StrokeAlign::Outside) => "outside",
+                    Some(niveta_doc::vector::StrokeAlign::Inside) => "inside",
+                    Some(niveta_doc::vector::StrokeAlign::Outside) => "outside",
                     _ => "center",
                 }
                 .to_string();
@@ -703,9 +703,9 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
             crate::widgets::value_field(ui, v, range, unit, 64.0).changed()
         };
         match live {
-            photocraft_doc::vector::LiveShape::Rect { rect, .. }
-            | photocraft_doc::vector::LiveShape::Ellipse { rect }
-            | photocraft_doc::vector::LiveShape::Polygon { rect, .. } => {
+            niveta_doc::vector::LiveShape::Rect { rect, .. }
+            | niveta_doc::vector::LiveShape::Ellipse { rect }
+            | niveta_doc::vector::LiveShape::Polygon { rect, .. } => {
                 ui.horizontal(|ui| {
                     let (mut w, mut h) = (rect[2] as f32, rect[3] as f32);
                     let cw = num(ui, "W", &mut w, 1.0..=300000.0, "px");
@@ -715,10 +715,10 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
                     }
                 });
             }
-            photocraft_doc::vector::LiveShape::Line { .. } => {}
+            niveta_doc::vector::LiveShape::Line { .. } => {}
         }
         ui.vertical(|ui| match live {
-            photocraft_doc::vector::LiveShape::Rect { radii, .. } => {
+            niveta_doc::vector::LiveShape::Rect { radii, .. } => {
                 // Keep the uniform workflow available after independent corner edits too.
                 ui.horizontal(|ui| {
                     let mut all = radii[0] as f32;
@@ -739,7 +739,7 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
                     });
                 }
             }
-            photocraft_doc::vector::LiveShape::Polygon { sides, star_ratio, .. } => {
+            niveta_doc::vector::LiveShape::Polygon { sides, star_ratio, .. } => {
                 ui.horizontal(|ui| {
                     let mut n = *sides as f32;
                     if num(ui, tl!("Sides"), &mut n, 3.0..=100.0, "") {
@@ -752,7 +752,7 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
                 })
                 .inner
             }
-            photocraft_doc::vector::LiveShape::Line { weight, .. } => {
+            niveta_doc::vector::LiveShape::Line { weight, .. } => {
                 ui.horizontal(|ui| {
                     let mut w = *weight as f32;
                     if num(ui, tl!("Weight"), &mut w, 1.0..=10000.0, "px") {
@@ -813,7 +813,7 @@ pub struct PathEntry {
 
 /// The Paths panel's rows, top to bottom: saved paths, the work path, then the selected layer's
 /// shape path ("<Layer> Shape Path") or vector mask ("<Layer> Vector Mask"), like Photoshop.
-pub fn path_rows(doc: &Document, active: Option<photocraft_doc::LayerId>) -> Vec<PathEntry> {
+pub fn path_rows(doc: &Document, active: Option<niveta_doc::LayerId>) -> Vec<PathEntry> {
     let mut rows: Vec<_> = doc.paths.iter().map(|p| PathEntry { name: p.name.clone(), path: p.path.clone(), kind: PathRow::Saved }).collect();
     if let Some(wp) = &doc.work_path {
         rows.push(PathEntry { name: "Work Path".into(), path: wp.clone(), kind: PathRow::Work });
@@ -874,7 +874,7 @@ fn path_context_actions(entry: &PathEntry, doc: &Document) -> Vec<(&'static str,
             }
         }
         let copy_name = format!("{} copy {n}", entry.name);
-        actions.push(("Duplicate Path", "path.set", json!({"name": copy_name, "path": photocraft_engine::vector_cmds::path_json(&entry.path)})));
+        actions.push(("Duplicate Path", "path.set", json!({"name": copy_name, "path": niveta_engine::vector_cmds::path_json(&entry.path)})));
     }
     if entry.kind != PathRow::Layer {
         actions.push(("Delete Path", "path.delete", json!({"name": key})));
@@ -884,7 +884,7 @@ fn path_context_actions(entry: &PathEntry, doc: &Document) -> Vec<(&'static str,
     actions
 }
 
-pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn paths_panel(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else {
         ui.label(egui::RichText::new(tl!("No document")).color(t.text_faint));
@@ -1010,8 +1010,8 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 mod tests {
     use super::*;
 
-    fn app() -> PhotocraftApp {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    fn app() -> NivetaApp {
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 200, "height": 200})).unwrap();
         app.sync_views();
         app
@@ -1032,7 +1032,7 @@ mod tests {
         let entries = path_context_actions(&first, doc);
         assert_eq!(entries[0].1, "path.toSelection");
         assert_eq!(entries[0].2["name"], "First");
-        assert!(entries.iter().all(|(_, id, _)| photocraft_engine::commands::find(id).is_some()));
+        assert!(entries.iter().all(|(_, id, _)| niveta_engine::commands::find(id).is_some()));
         let (_, id, params) = entries.into_iter().find(|(_, id, _)| *id == "path.toSelection").unwrap();
         app.run(id, params).unwrap();
         assert!(app.session.active().unwrap().doc.selection.is_some());
@@ -1061,7 +1061,7 @@ mod tests {
     }
 
     /// How many shapes the path overlay paints for `app` this frame.
-    fn overlay_shapes(app: &PhotocraftApp, ctx: &egui::Context) -> usize {
+    fn overlay_shapes(app: &NivetaApp, ctx: &egui::Context) -> usize {
         let doc = app.session.active().unwrap().doc.clone();
         let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
             let rect = Rect::from_min_size(Pos2::ZERO, vec2(400.0, 400.0));
@@ -1087,7 +1087,7 @@ mod tests {
         app.run("path.set", json!({"path": path})).unwrap();
         assert!(app.session.active().unwrap().doc.work_path.is_some());
         finish_shape(&mut app, Tool::Rectangle, [100.0, 100.0], [160.0, 150.0], egui::Modifiers::NONE);
-        let toggle = |app: &mut PhotocraftApp, id: &str| crate::menus::invoke(app, &ctx, id, Value::Null).unwrap();
+        let toggle = |app: &mut NivetaApp, id: &str| crate::menus::invoke(app, &ctx, id, Value::Null).unwrap();
         for tool in [Tool::Pen, Tool::PathSelection, Tool::DirectSelection, Tool::Rectangle] {
             app.ui.tool = tool;
             assert!(app.ui.view.show.target_path && app.ui.view.extras);
@@ -1152,9 +1152,9 @@ mod tests {
     fn shape_preview_is_the_committed_path() {
         let mut app = app();
         app.ui.tool_options.corner_radius = 8.0;
-        let preview = |app: &PhotocraftApp, tool, end| {
+        let preview = |app: &NivetaApp, tool, end| {
             shape_geometry(&app.ui.tool_options, tool, [10.0, 10.0], end, egui::Modifiers::ALT)
-                .and_then(|p| photocraft_engine::vector_cmds::shape_path(&p).ok())
+                .and_then(|p| niveta_engine::vector_cmds::shape_path(&p).ok())
         };
         for tool in [Tool::Rectangle, Tool::EllipseShape, Tool::Triangle, Tool::Polygon, Tool::Line] {
             let shown = preview(&app, tool, [60.0, 30.0]).unwrap();
@@ -1164,8 +1164,8 @@ mod tests {
             assert_eq!(sh.path, shown, "{tool:?}");
         }
         assert!(preview(&app, Tool::Rectangle, [10.2, 40.0]).is_none(), "too thin to draw");
-        assert!(photocraft_engine::vector_cmds::shape_path(&json!({"kind": "nope", "rect": [0, 0, 5, 5]})).is_err());
-        assert!(photocraft_engine::vector_cmds::shape_path(&json!({"kind": "rect"})).is_err());
+        assert!(niveta_engine::vector_cmds::shape_path(&json!({"kind": "nope", "rect": [0, 0, 5, 5]})).is_err());
+        assert!(niveta_engine::vector_cmds::shape_path(&json!({"kind": "rect"})).is_err());
     }
 
     #[test]
@@ -1238,8 +1238,8 @@ mod tests {
     #[test]
     fn new_fill_layer_takes_the_selected_path_as_its_vector_mask() {
         let mut app = app();
-        let layer = |app: &PhotocraftApp, r: Result<Value, String>| {
-            let id = photocraft_doc::LayerId(r.unwrap()["layer"].as_u64().unwrap());
+        let layer = |app: &NivetaApp, r: Result<Value, String>| {
+            let id = niveta_doc::LayerId(r.unwrap()["layer"].as_u64().unwrap());
             app.session.active().unwrap().doc.layer(id).unwrap().clone()
         };
         // Drawing a work path with the Pen selects it.
@@ -1292,9 +1292,9 @@ mod tests {
         use crate::canvas::{ToolEvent, tool_event};
         let mut app = app();
         app.ui.tool = Tool::Pen;
-        let down = |app: &mut PhotocraftApp, x, y| tool_event(app, ToolEvent::Down { x, y, pressure: 1.0 }, egui::Modifiers::NONE);
-        let move_to = |app: &mut PhotocraftApp, x, y| tool_event(app, ToolEvent::Move { x, y, pressure: 1.0 }, egui::Modifiers::NONE);
-        let up = |app: &mut PhotocraftApp, x, y| tool_event(app, ToolEvent::Up { x, y }, egui::Modifiers::NONE);
+        let down = |app: &mut NivetaApp, x, y| tool_event(app, ToolEvent::Down { x, y, pressure: 1.0 }, egui::Modifiers::NONE);
+        let move_to = |app: &mut NivetaApp, x, y| tool_event(app, ToolEvent::Move { x, y, pressure: 1.0 }, egui::Modifiers::NONE);
+        let up = |app: &mut NivetaApp, x, y| tool_event(app, ToolEvent::Up { x, y }, egui::Modifiers::NONE);
 
         down(&mut app, 20.0, 20.0);
         up(&mut app, 20.0, 20.0);
@@ -1368,12 +1368,12 @@ mod tests {
         let mut app = app();
         let created = app.run("shape.create", json!({"kind": "roundedRect", "rect": [10, 10, 150, 100], "radii": [5, 10, 15, 20]})).unwrap();
         let id = created["layer"].as_u64().unwrap();
-        let get_radii = |app: &PhotocraftApp| {
+        let get_radii = |app: &NivetaApp| {
             let st = app.session.active().unwrap();
-            let shape = st.doc.layer(photocraft_doc::LayerId(id)).unwrap();
+            let shape = st.doc.layer(niveta_doc::LayerId(id)).unwrap();
             match &shape.content {
                 LayerContent::Shape(sh) => match &sh.live {
-                    Some(photocraft_doc::vector::LiveShape::Rect { radii, .. }) => *radii,
+                    Some(niveta_doc::vector::LiveShape::Rect { radii, .. }) => *radii,
                     _ => panic!("rectangle must remain a live shape"),
                 },
                 _ => panic!("expected shape layer"),
@@ -1416,21 +1416,21 @@ mod tests {
         let mut app = app();
         let id = app.run("shape.create", json!({"kind": "rect", "rect": [10, 10, 100, 60], "fill": "#3070c0"})).unwrap()["layer"].as_u64().unwrap();
         let mut h = egui_kittest::Harness::builder().with_size(vec2(1440.0, 900.0)).build_ui_state(
-            move |ui, app: &mut PhotocraftApp| {
+            move |ui, app: &mut NivetaApp| {
                 // Fonts set up after the first frame only apply from the next one.
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
-                egui::Panel::right("properties").resizable(false).exact_size(285.0).show(ui, |ui| shape_properties(app, ui, photocraft_doc::LayerId(id)));
+                egui::Panel::right("properties").resizable(false).exact_size(285.0).show(ui, |ui| shape_properties(app, ui, niveta_doc::LayerId(id)));
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(4);
         let label = h.query_all(egui_kittest::kittest::by().label("Fill").include_labels()).next().expect("the Fill label").rect();
         // The swatch is right of its label.
         let swatch = egui::pos2(label.right() + 17.0, label.center().y);
-        let press = |h: &mut egui_kittest::Harness<'_, PhotocraftApp>, pos, pressed| {
+        let press = |h: &mut egui_kittest::Harness<'_, NivetaApp>, pos, pressed| {
             h.event(egui::Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE });
             h.step();
         };
@@ -1439,13 +1439,13 @@ mod tests {
         press(&mut h, swatch, true);
         press(&mut h, swatch, false);
         h.run_steps(3);
-        let popup = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {
+        let popup = |h: &egui_kittest::Harness<'_, NivetaApp>| {
             h.ctx.memory(|m| m.areas().visible_layer_ids().into_iter().filter(|l| l.order == egui::Order::Foreground).find_map(|l| m.area_rect(l.id)))
         };
         let opened = popup(&h).expect("the picker opened");
-        let fill = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {
+        let fill = |h: &egui_kittest::Harness<'_, NivetaApp>| {
             let st = h.state().session.active().unwrap();
-            match &st.doc.layer(photocraft_doc::LayerId(id)).unwrap().content {
+            match &st.doc.layer(niveta_doc::LayerId(id)).unwrap().content {
                 LayerContent::Shape(sh) => sh.fill.clone(),
                 _ => None,
             }

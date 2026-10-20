@@ -4,10 +4,10 @@ use egui_kittest::{
     Harness,
     kittest::{NodeT, Queryable},
 };
-use photocraft_engine::Session;
+use niveta_engine::Session;
 
-fn app() -> PhotocraftApp {
-    let mut app = PhotocraftApp::new(Session::new(), crate::Services::default());
+fn app() -> NivetaApp {
+    let mut app = NivetaApp::new(Session::new(), crate::Services::default());
     app.run("file.new", json!({"width":100,"height":80})).unwrap();
     app.sync_views();
     app.ui.tool = Tool::Brush;
@@ -16,16 +16,16 @@ fn app() -> PhotocraftApp {
     app.last_canvas_rect = Rect::from_min_size(Pos2::ZERO, vec2(500.0, 400.0));
     app
 }
-fn down(app: &mut PhotocraftApp, p: [f64; 2]) {
+fn down(app: &mut NivetaApp, p: [f64; 2]) {
     crate::canvas::tool_event(app, ToolEvent::Down { x: p[0], y: p[1], pressure: 1.0 }, Modifiers::NONE);
 }
-fn move_to(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
+fn move_to(app: &mut NivetaApp, p: [f64; 2], mods: Modifiers) {
     crate::canvas::tool_event(app, ToolEvent::Move { x: p[0], y: p[1], pressure: 1.0 }, mods);
 }
-fn up(app: &mut PhotocraftApp, p: [f64; 2]) {
+fn up(app: &mut NivetaApp, p: [f64; 2]) {
     crate::canvas::tool_event(app, ToolEvent::Up { x: p[0], y: p[1] }, Modifiers::NONE);
 }
-fn key(app: &mut PhotocraftApp, key: Key) {
+fn key(app: &mut NivetaApp, key: Key) {
     let ctx = Context::default();
     let input = RawInput {
         focused: true,

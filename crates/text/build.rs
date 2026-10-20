@@ -2,7 +2,7 @@
 //! `docs/integration.md`; rules in `craftrules/standards/fonts.md`).
 //!
 //! With `CRAFT_FONTS_DIR=<craft-fonts checkout>`, every font in its `fonts/manifest.txt` is
-//! embedded and exposed as `photocraft_text::CRAFT_FONTS`; unset, `CRAFT_FONTS` is empty and the
+//! embedded and exposed as `niveta_text::CRAFT_FONTS`; unset, `CRAFT_FONTS` is empty and the
 //! build is exactly as before (an empty value counts as unset). Use an absolute path: build
 //! scripts run in the crate's directory, so a relative one resolves from `crates/text`. A bad
 //! checkout is a warning, or an error with `CRAFT_FONTS_REQUIRED=1` (release builds).

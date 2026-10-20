@@ -22,12 +22,12 @@ The complete design narrative and dependency diagram remain in [`docs/architectu
 
 ## Core properties
 
-- `photocraft-doc` holds the pure-data document model.
-- `photocraft-engine::Session` owns open documents, active state, history, and command dispatch.
-- `photocraft-compose` is the CPU reference compositor; `photocraft-gpu` accelerates supported interactive paths.
-- `photocraft-io` maps between documents and PSD or flat formats.
-- `photocraft-format` reads and writes the native `.pcraft` bundle.
-- `photocraft-ui-egui` is a thin shell over engine commands.
-- `photocraft-automation` exposes the headless engine and the live-GUI bridge.
+- `niveta-doc` holds the pure-data document model.
+- `niveta-engine::Session` owns open documents, active state, history, and command dispatch.
+- `niveta-compose` is the CPU reference compositor; `niveta-gpu` accelerates supported interactive paths.
+- `niveta-io` maps between documents and PSD or flat formats.
+- `niveta-format` reads and writes the native `.pcraft` bundle.
+- `niveta-ui-egui` is a thin shell over engine commands.
+- `niveta-automation` exposes the headless engine and the live-GUI bridge.
 
 See [Crates and dependency layers](crates.md) for the complete workspace map.

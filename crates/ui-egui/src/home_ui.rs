@@ -3,7 +3,7 @@
 //! - Top bar: only `PhotoCraft` (semibold) on the left and the settings button
 //!   on the right. No logo image, no subtitle, no search, no overflow menu.
 //! - `Suas criações` + one-line hint + a blue `+ Nova edição` button that
-//!   reuses [`PhotocraftApp::open_interactive`] (the on-device browser on
+//!   reuses [`NivetaApp::open_interactive`] (the on-device browser on
 //!   Android, the system picker elsewhere).
 //! - `Editadas recentemente`: a 2-column grid over the real Open Recent list
 //!   (newest first, no fakes). Thumbnails decode lazily with a per-frame
@@ -23,7 +23,7 @@ use std::time::SystemTime;
 
 use egui::{Color32, Rect, Sense, vec2};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 use crate::theme::Tokens;
 
 /// Height of the home top bar (without the Android status inset).
@@ -50,7 +50,7 @@ const PHOTOS_TTL: f64 = 15.0;
 
 /// Home top bar: `PhotoCraft` left, settings right. Used on narrow screens
 /// instead of [`crate::mobile_ui::header`] when there is nothing to edit.
-pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn header(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     egui::Panel::top("home_header")
         .exact_size(BAR_H + SAFE_TOP)
@@ -70,7 +70,7 @@ pub fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 
 /// The home page: hero, recent edits (2 cols), recent device photos (3 cols).
 /// One vertical scroll; the grids never scroll on their own.
-pub fn home_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn home_screen(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let mut open: Option<String> = None;
     let mut open_clean: Option<String> = None;
@@ -153,7 +153,7 @@ struct Recent {
 
 /// Open Recent, newest first; the modification time is the last save when the
 /// file is still there, otherwise the folder stands in as secondary text.
-fn recents(app: &PhotocraftApp) -> Vec<Recent> {
+fn recents(app: &NivetaApp) -> Vec<Recent> {
     #[cfg(target_arch = "wasm32")]
     {
         let _ = app;
@@ -175,7 +175,7 @@ fn recents(app: &PhotocraftApp) -> Vec<Recent> {
     }
 }
 
-fn recent_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mut Option<String>) {
+fn recent_grid(app: &NivetaApp, ui: &mut egui::Ui, content_w: f32, open: &mut Option<String>) {
     let t = Tokens::get(ui.ctx());
     let items = recents(app);
     if items.is_empty() {
@@ -201,7 +201,7 @@ fn recent_grid(app: &PhotocraftApp, ui: &mut egui::Ui, content_w: f32, open: &mu
 }
 
 /// One recent-edit card: uniform thumbnail, name, modification age or folder.
-fn recent_card(app: &PhotocraftApp, ui: &mut egui::Ui, item: &Recent, w: f32, thumb_h: f32, h: f32, budget: &mut usize) -> egui::Response {
+fn recent_card(app: &NivetaApp, ui: &mut egui::Ui, item: &Recent, w: f32, thumb_h: f32, h: f32, budget: &mut usize) -> egui::Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(vec2(w, h), Sense::click());
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, item.name.clone()));
@@ -231,7 +231,7 @@ struct Photo {
 }
 
 fn photos_grid(
-    app: &PhotocraftApp,
+    app: &NivetaApp,
     ui: &mut egui::Ui,
     content_w: f32,
     storage: bool,
@@ -448,7 +448,7 @@ fn frame_budget(ctx: &egui::Context) -> usize {
 /// the filesystem probe is only the off-device fallback. Listing is no proof on
 /// Android: a denied app still enumerates folders on scoped storage and gets an
 /// empty view, so the probe can stay `true` across the grant.
-fn storage_access(app: &mut PhotocraftApp) -> bool {
+fn storage_access(app: &mut NivetaApp) -> bool {
     match app.services.storage_has_access.as_mut() {
         Some(has) => has(),
         None => device_dirs_readable(),
@@ -576,7 +576,7 @@ fn lexical_key(p: &Path) -> String {
 }
 
 fn is_flat_photo(name: &str) -> bool {
-    photocraft_codecs::from_extension(name).is_some_and(|f| f.caps().read)
+    niveta_codecs::from_extension(name).is_some_and(|f| f.caps().read)
 }
 
 /// "há 5 min", "há 3 h", "há 2 dias": relative age of a modification time.
@@ -621,7 +621,7 @@ fn thumb_failed_id() -> egui::Id {
 
 /// Cached grid thumbnail for `path`; decodes at most `*budget` misses per
 /// frame and repaints while visible thumbs are still pending.
-fn thumb_for(app: &PhotocraftApp, ui: &egui::Ui, path: &str, budget: &mut usize) -> Option<egui::TextureHandle> {
+fn thumb_for(app: &NivetaApp, ui: &egui::Ui, path: &str, budget: &mut usize) -> Option<egui::TextureHandle> {
     // A document open with unsaved edits is what the user is working on: the card
     // must show the editor's composite, not the file it was opened from.
     if let Some(st) = app.session.documents().iter().find(|d| d.path.as_deref() == Some(path) && d.is_dirty()) {
@@ -638,7 +638,7 @@ fn thumb_for(app: &PhotocraftApp, ui: &egui::Ui, path: &str, budget: &mut usize)
             return None;
         }
         *budget -= 1;
-        let img = photocraft_compose::thumbnail(&st.doc, THUMB_SIDE);
+        let img = niveta_compose::thumbnail(&st.doc, THUMB_SIDE);
         let tex = ui.ctx().load_texture(
             format!("home-edited-{}", st.doc.id.0),
             egui::ColorImage::from_rgba_unmultiplied([img.width as usize, img.height as usize], &img.pixels),
@@ -712,21 +712,21 @@ fn decode_thumb(path: &Path, size: Option<u64>) -> Option<egui::ColorImage> {
     if bytes.len() as u64 > MAX_THUMB_BYTES {
         return None;
     }
-    if name.rsplit('.').next().is_some_and(|ext| !name.trim_start_matches('.').is_empty() && ext.eq_ignore_ascii_case(photocraft_format::EXTENSION)) {
-        let png = photocraft_format::read_thumbnail(&bytes).ok()??;
-        let img = photocraft_codecs::decode(&png).ok()?;
+    if name.rsplit('.').next().is_some_and(|ext| !name.trim_start_matches('.').is_empty() && ext.eq_ignore_ascii_case(niveta_format::EXTENSION)) {
+        let png = niveta_format::read_thumbnail(&bytes).ok()??;
+        let img = niveta_codecs::decode(&png).ok()?;
         return Some(shrink(&img.to_rgba8(), img.width(), img.height()));
     }
     if !is_flat_photo(&name) {
         return None;
     }
-    if let Some(img) = photocraft_codecs::exif_thumbnail(&bytes).filter(|img| img.width().max(img.height()) >= THUMB_SIDE) {
+    if let Some(img) = niveta_codecs::exif_thumbnail(&bytes).filter(|img| img.width().max(img.height()) >= THUMB_SIDE) {
         // A 160x120 IFD1 stamp stretched to the grid looks worse than no
         // thumbnail at all; tiny previews fall through to the full decode.
         return Some(shrink(&img.to_rgba8(), img.width(), img.height()));
     }
-    let limits = photocraft_codecs::Limits { max_width: 12_000, max_height: 12_000, max_pixels: 64 * 1024 * 1024, max_alloc: 256 * 1024 * 1024 };
-    let img = photocraft_codecs::decode_with(&bytes, &photocraft_codecs::DecodeOptions { limits, keep_orientation: false }).ok()?;
+    let limits = niveta_codecs::Limits { max_width: 12_000, max_height: 12_000, max_pixels: 64 * 1024 * 1024, max_alloc: 256 * 1024 * 1024 };
+    let img = niveta_codecs::decode_with(&bytes, &niveta_codecs::DecodeOptions { limits, keep_orientation: false }).ok()?;
     Some(shrink(&img.to_rgba8(), img.width(), img.height()))
 }
 
@@ -796,7 +796,7 @@ mod tests {
 
     /// One frame of `thumb_for` for `path`: whether the grid got something to paint, and the
     /// image it uploaded (nothing on a cache hit).
-    fn thumbnail_frame(ctx: &egui::Context, app: &PhotocraftApp, path: &str) -> (bool, Option<egui::ColorImage>) {
+    fn thumbnail_frame(ctx: &egui::Context, app: &NivetaApp, path: &str) -> (bool, Option<egui::ColorImage>) {
         let mut budget = 4;
         let mut found = false;
         let egui::FullOutput { mut textures_delta, .. } = ctx.run_ui(Default::default(), |ui| {
@@ -813,7 +813,7 @@ mod tests {
 
     #[test]
     fn missing_files_have_no_thumbnail() {
-        let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         ctx.run_ui(Default::default(), |_| {}).textures_delta.clear(); // the font atlas uploads once
         assert!(!thumbnail_frame(&ctx, &app, "/no/such/photo-anywhere.png").0);
@@ -823,7 +823,7 @@ mod tests {
     /// showing the file it was opened from (or its icon, when the file moved) after an edit.
     #[test]
     fn open_documents_show_their_edits_on_the_grid() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.run("file.new", serde_json::json!({"width": 32, "height": 32})).unwrap();
         // The grid finds the open document by its path; no such file exists on disk.
         let path = "/no/such/photo-anywhere.png";
@@ -851,9 +851,9 @@ mod tests {
     fn home_renders_sections_and_buttons() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let mut h = Harness::builder().with_size(vec2(390.0, 844.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -862,7 +862,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
         for probe in ["PhotoCraft", "Your creations", "+ New edit", "Recently edited", "Recent photos"] {
             assert!(h.query_all_by_label_contains(probe).next().is_some(), "home shows {probe}");
@@ -876,10 +876,10 @@ mod tests {
     fn home_empty_states_invite_a_new_edit() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         assert!(app.ui.recent_files.is_empty());
         let mut h = Harness::builder().with_size(vec2(390.0, 844.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -887,7 +887,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(6);
         assert!(h.query_all_by_label_contains("No edits yet.").next().is_some(), "recent empty state");
     }
@@ -896,21 +896,21 @@ mod tests {
     fn home_lists_real_recent_files_with_thumbnails() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let dir = std::env::temp_dir().join(format!("photocraft-home-recent-{}-{}", std::process::id(), line!()));
+        let dir = std::env::temp_dir().join(format!("niveta-home-recent-{}-{}", std::process::id(), line!()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let mut paths = Vec::new();
         for (name, px) in [("red.png", [255u8, 0, 0, 255]), ("green.png", [0u8, 255, 0, 255])] {
-            let img = photocraft_codecs::Image::from_u8(16, 16, photocraft_codecs::ChannelLayout::Rgba, px.repeat(256)).unwrap();
-            let bytes = photocraft_codecs::encode(&img, photocraft_codecs::Format::Png, &photocraft_codecs::EncodeOptions::default()).unwrap();
+            let img = niveta_codecs::Image::from_u8(16, 16, niveta_codecs::ChannelLayout::Rgba, px.repeat(256)).unwrap();
+            let bytes = niveta_codecs::encode(&img, niveta_codecs::Format::Png, &niveta_codecs::EncodeOptions::default()).unwrap();
             let p = dir.join(name);
             std::fs::write(&p, &bytes).unwrap();
             paths.push(p.to_string_lossy().into_owned());
         }
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.ui.recent_files = paths.clone();
         let mut h = Harness::builder().with_size(vec2(390.0, 844.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -918,7 +918,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.run_steps(8);
         assert!(h.query_all_by_label_contains("red.png").next().is_some(), "recent card shows the file name");
         assert!(h.query_all_by_label_contains("green.png").next().is_some(), "recent card shows the file name");
@@ -930,8 +930,8 @@ mod tests {
     fn overlapping_roots_share_one_identity() {
         // `/sdcard` and `/storage/emulated/0` are the same mount on Android;
         // paths nobody can resolve fall back to a lexical normalization.
-        let a = Path::new("/storage/emulated/0/__photocraft_nope__/x.jpg");
-        let b = Path::new("/sdcard/__photocraft_nope__/x.jpg");
+        let a = Path::new("/storage/emulated/0/__niveta_nope__/x.jpg");
+        let b = Path::new("/sdcard/__niveta_nope__/x.jpg");
         assert_eq!(canonical_key(a), canonical_key(b));
         assert_eq!(lexical_key(a), lexical_key(b));
     }
@@ -1027,12 +1027,12 @@ mod tests {
         use std::sync::Arc;
         use std::sync::atomic::{AtomicBool, Ordering};
         let asked = Arc::new(AtomicBool::new(false));
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.services.storage_has_access = Some(Box::new(|| false));
         let flag = asked.clone();
         app.services.storage_request = Some(Box::new(move || flag.store(true, Ordering::Relaxed)));
         let mut h = Harness::builder().with_size(vec2(390.0, 844.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1040,7 +1040,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         // Cache an empty, finished scan so the empty state renders on the first frame.
         h.ctx.data_mut(|d| {
             d.insert_temp(egui::Id::new("home-recent-photos-perm"), false);
@@ -1058,10 +1058,10 @@ mod tests {
     fn see_all_appears_below_the_photo_grid_only() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.services.storage_has_access = Some(Box::new(|| true));
         let mut h = Harness::builder().with_size(vec2(390.0, 844.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1069,7 +1069,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         h.ctx.data_mut(|d| {
             d.insert_temp(egui::Id::new("home-recent-photos-perm"), true);
             d.insert_temp(
@@ -1085,10 +1085,10 @@ mod tests {
     fn home_uses_the_shell_permission_verdict() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.services.storage_has_access = Some(Box::new(|| true));
         let mut h = Harness::builder().with_size(vec2(390.0, 844.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -1096,7 +1096,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Pro);
         // The host probe says no, the shell hook says yes: the hook owns the
         // verdict, so the cached list survives instead of being rescanned away.
         h.ctx.data_mut(|d| {

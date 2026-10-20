@@ -14,14 +14,14 @@
 //! with [`apply`], so every change is a journaled command (Rule 1).
 
 use egui::{RichText, vec2};
-use photocraft_engine::BrushSettings;
-use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE, TipShape};
+use niveta_engine::BrushSettings;
+use niveta_engine::paint::{BrushPreset, MAX_BRUSH_SIZE, TipShape};
 use serde_json::json;
 
 use crate::brush_panel::{BrushesPanelState, BrushesView, Renaming, is_current, new_preset_name, run_or_status};
 use crate::brushes_tab::{self, Action, ListLayout};
 use crate::theme::Tokens;
-use crate::{PhotocraftApp, icons, widgets};
+use crate::{NivetaApp, icons, widgets};
 
 /// Width of the picker's contents.
 pub const WIDTH: f32 = 300.0;
@@ -72,7 +72,7 @@ pub fn list_state() -> BrushesPanelState {
 }
 
 /// Run what the picker asked for.
-pub fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, picks: Vec<Pick>) {
+pub fn apply(app: &mut NivetaApp, ctx: &egui::Context, picks: Vec<Pick>) {
     for pick in picks {
         match pick {
             Pick::List(a) => brushes_tab::apply(app, vec![a]),
@@ -93,7 +93,7 @@ pub fn apply(app: &mut PhotocraftApp, ctx: &egui::Context, picks: Vec<Pick>) {
 }
 
 /// Show the Brush Settings panel on its settings tab (what F5 does when it is hidden).
-pub fn open_settings(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn open_settings(app: &mut NivetaApp, ctx: &egui::Context) {
     if app.ui.panels.brush_settings {
         app.ui.brush_tab = 0;
         return;
@@ -105,7 +105,7 @@ pub fn open_settings(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 /// The options-bar button beside the brush chip that shows and hides the Brush Settings panel
 /// (Photoshop's "Toggle the Brush Settings panel"). It runs Window › Brush Settings (F5).
-pub fn settings_toggle(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn settings_toggle(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let on = app.ui.panels.brush_settings;
     if named(icons::button(ui, "sliders-horizontal", 24.0, on, "Toggle the Brush Settings panel  (F5)"), "Toggle the Brush Settings panel").clicked()
         && let Err(e) = crate::menus::invoke(app, ui.ctx(), "window.panel.brushSettings", json!({}))

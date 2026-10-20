@@ -1,19 +1,19 @@
-//! Flat formats through photocraft-codecs, and export warnings.
+//! Flat formats through niveta-codecs, and export warnings.
 
 mod common;
 
 use common::*;
-use photocraft_color::{ColorMode, SampleType};
-use photocraft_io::*;
+use niveta_color::{ColorMode, SampleType};
+use niveta_io::*;
 
-fn single(mode: ColorMode, depth: SampleType, alpha: bool) -> photocraft_doc::Document {
-    let mut d = photocraft_doc::Document::new("s", photocraft_geom::Size::new(9, 6), mode, depth);
+fn single(mode: ColorMode, depth: SampleType, alpha: bool) -> niveta_doc::Document {
+    let mut d = niveta_doc::Document::new("s", niveta_geom::Size::new(9, 6), mode, depth);
     let fmt = d.pixel_format();
     d.layers.push(raster("Background", fmt, d.bounds(), 3, alpha));
     d
 }
 
-fn pixels_eq(a: &photocraft_doc::Document, b: &photocraft_doc::Document, tol: f32) {
+fn pixels_eq(a: &niveta_doc::Document, b: &niveta_doc::Document, tol: f32) {
     let sa = a.layers[0].surface().unwrap();
     let sb = b.layers[0].surface().unwrap();
     let r = a.bounds();
@@ -57,7 +57,7 @@ codec_rt!(tiff_gray8, "tiff", ColorMode::Grayscale, SampleType::U8, false, 0.0);
 #[test]
 fn exr_rgba32() {
     let mut d = single(ColorMode::Rgb, SampleType::F32, true);
-    d.icc_profile = Some(photocraft_cms::Builtin::LinearSrgb.profile().to_bytes());
+    d.icc_profile = Some(niveta_cms::Builtin::LinearSrgb.profile().to_bytes());
     let r = export(&d, "exr", &ExportOptions::default()).expect("export");
     let back = import("x.exr", &r.bytes).expect("import").document;
     assert_eq!((back.size, back.mode, back.depth), (d.size, d.mode, d.depth));
@@ -69,15 +69,15 @@ fn exr_rgba32() {
     let back = import("x.exr", &r.bytes).expect("import").document;
     let (a, b) = (srgb.layers[0].surface().unwrap().pixel(2, 3), back.layers[0].surface().unwrap().pixel(2, 3));
     for c in 0..3 {
-        assert!((photocraft_color::convert::srgb_to_linear(a[c]) - b[c]).abs() < 1e-4, "{a:?} -> {b:?}");
+        assert!((niveta_color::convert::srgb_to_linear(a[c]) - b[c]).abs() < 1e-4, "{a:?} -> {b:?}");
     }
     assert!((a[3] - b[3]).abs() < 1e-6, "alpha kept");
 }
 
-fn smooth(mode: ColorMode) -> photocraft_doc::Document {
-    let mut d = photocraft_doc::Document::new("s", photocraft_geom::Size::new(32, 16), mode, SampleType::U8);
+fn smooth(mode: ColorMode) -> niveta_doc::Document {
+    let mut d = niveta_doc::Document::new("s", niveta_geom::Size::new(32, 16), mode, SampleType::U8);
     let fmt = d.pixel_format();
-    let mut s = photocraft_raster::Surface::new(fmt);
+    let mut s = niveta_raster::Surface::new(fmt);
     let n = fmt.channels();
     let mut v = Vec::new();
     for y in 0..16 {
@@ -89,7 +89,7 @@ fn smooth(mode: ColorMode) -> photocraft_doc::Document {
         }
     }
     s.write_region(d.bounds(), &v);
-    d.layers.push(photocraft_doc::Layer::new("Background", photocraft_doc::LayerContent::Raster(s)));
+    d.layers.push(niveta_doc::Layer::new("Background", niveta_doc::LayerContent::Raster(s)));
     d
 }
 
@@ -121,7 +121,7 @@ fn metadata_roundtrip_png() {
     d.icc_profile = Some(std::sync::Arc::new(sample_icc()));
     d.metadata.xmp = Some("<x:xmpmeta xmlns:x='adobe:ns:meta/'/>".into());
     // DPI and ICC always travel with the file; XMP unless Export As asks for none (#647).
-    let none = ExportOptions { xmp: photocraft_io::XmpEmbed::None, ..ExportOptions::default() };
+    let none = ExportOptions { xmp: niveta_io::XmpEmbed::None, ..ExportOptions::default() };
     let r = export(&d, "png", &none).unwrap();
     let back = import("x.png", &r.bytes).unwrap().document;
     assert!((back.resolution_dpi - 300.0).abs() < 1.0);
@@ -146,7 +146,7 @@ fn layered_to_png_warns_flatten() {
     assert!(r.warnings.iter().any(|w| w.contains("flattened")), "{:?}", r.warnings);
     let back = import("out.png", &r.bytes).unwrap().document;
     // Composite equals our flatten.
-    let flat = photocraft_compose::flatten(&d).px;
+    let flat = niveta_compose::flatten(&d).px;
     let s = back.layers[0].surface().unwrap();
     let px: Vec<[f32; 4]> = s.read_region(back.bounds()).as_chunks::<4>().0.iter().map(|p| [p[0], p[1], p[2], p[3]]).collect();
     assert!(max_diff(&px, &flat) <= 1.0 / 255.0 + 1e-4);
@@ -176,11 +176,11 @@ fn cmyk_layered_to_png_warns_conversion() {
 #[test]
 fn effects_are_written_to_psd_and_read_back() {
     let mut d = gen_doc(ColorMode::Rgb, SampleType::U8, Features::PIXELS);
-    d.layers[1].effects.items.push(photocraft_doc::Effect::ColorOverlay {
-        common: photocraft_doc::FxCommon::new(photocraft_color::BlendMode::Normal, 1.0),
-        color: photocraft_color::Color::BLACK,
+    d.layers[1].effects.items.push(niveta_doc::Effect::ColorOverlay {
+        common: niveta_doc::FxCommon::new(niveta_color::BlendMode::Normal, 1.0),
+        color: niveta_color::Color::BLACK,
     });
-    d.layers[1].effects.items.push(photocraft_doc::Effect::default_drop_shadow());
+    d.layers[1].effects.items.push(niveta_doc::Effect::default_drop_shadow());
     let r = export(&d, "a.psd", &ExportOptions::default()).unwrap();
     assert!(!r.warnings.iter().any(|w| w.contains("effects")), "{:?}", r.warnings);
     let back = import("a.psd", &r.bytes).unwrap().document;
@@ -228,23 +228,23 @@ fn psd_to_png_to_psd_chain() {
     let d3 = import("a.png", &png.bytes).unwrap().document;
     assert_eq!(d3.depth, SampleType::U16);
     let psd2 = export(&d3, "b.psd", &ExportOptions::default()).unwrap();
-    assert!(photocraft_psd::PsdFile::from_bytes(&psd2.bytes).is_ok());
+    assert!(niveta_psd::PsdFile::from_bytes(&psd2.bytes).is_ok());
 }
 
 /// A one-layer document of 16-pixel-wide columns, each one straight colour (colour channels, then alpha).
-fn columns(mode: ColorMode, depth: SampleType, cols: &[&[f32]]) -> photocraft_doc::Document {
-    let mut d = photocraft_doc::Document::new("c", photocraft_geom::Size::new(16 * cols.len() as u32, 16), mode, depth);
-    let mut s = photocraft_raster::Surface::new(d.pixel_format());
+fn columns(mode: ColorMode, depth: SampleType, cols: &[&[f32]]) -> niveta_doc::Document {
+    let mut d = niveta_doc::Document::new("c", niveta_geom::Size::new(16 * cols.len() as u32, 16), mode, depth);
+    let mut s = niveta_raster::Surface::new(d.pixel_format());
     for (i, px) in cols.iter().enumerate() {
         let x = 16 * i as i32;
-        s.fill_rect(photocraft_geom::Rect::new(x, 0, x + 16, 16), px);
+        s.fill_rect(niveta_geom::Rect::new(x, 0, x + 16, 16), px);
     }
-    d.layers.push(photocraft_doc::Layer::new("Layer", photocraft_doc::LayerContent::Raster(s)));
+    d.layers.push(niveta_doc::Layer::new("Layer", niveta_doc::LayerContent::Raster(s)));
     d
 }
 
 /// The pixel at the centre of each column of `doc`.
-fn column_pixels(doc: &photocraft_doc::Document, n: usize) -> Vec<Vec<f32>> {
+fn column_pixels(doc: &niveta_doc::Document, n: usize) -> Vec<Vec<f32>> {
     let s = doc.layers[0].surface().unwrap();
     (0..n).map(|i| s.pixel(16 * i as i32 + 8, 8)).collect()
 }
@@ -297,7 +297,7 @@ fn transparency_is_composited_over_white_for_formats_without_alpha() {
 /// through the colour engine, instead of values that only mean something under the dropped profile.
 #[test]
 fn non_srgb_rgb_is_converted_to_srgb_for_formats_without_a_profile() {
-    use photocraft_cms::{Builtin, Intent, Transform};
+    use niveta_cms::{Builtin, Intent, Transform};
     let cols: [&[f32]; 3] = [&[0.0, 0.05, 0.0, 1.0], &[0.2, 0.5, 0.8, 1.0], &[1.0, 0.25, 0.0, 1.0]];
     for (profile, depth) in [(Builtin::LinearSrgb, SampleType::F32), (Builtin::LinearSrgb, SampleType::U16), (Builtin::DisplayP3, SampleType::U8)] {
         let mut d = columns(ColorMode::Rgb, depth, &cols);
@@ -347,7 +347,7 @@ fn truncated_jpeg_imports_with_a_warning() {
         assert_eq!(import("x.jpg", &full).unwrap().warnings, Vec::<String>::new(), "{mode:?}");
         // Cut inside the scan data (most of this small file is headers).
         let r = import("x.jpg", &full[..full.len() - 4]).unwrap();
-        assert_eq!(r.document.size, photocraft_geom::Size::new(32, 16));
+        assert_eq!(r.document.size, niveta_geom::Size::new(32, 16));
         assert!(r.warnings.first().is_some_and(|w| w.starts_with("JPEG data ends early")), "{mode:?}: {:?}", r.warnings);
     }
 }

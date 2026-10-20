@@ -8,11 +8,11 @@ type Open = Rc<RefCell<Vec<(FileDialogRequest, FileDialogReply)>>>;
 
 /// An app with an untitled document, whose file dialogs stay open until the test answers them, and
 /// whose writer records the paths it wrote.
-fn app() -> (PhotocraftApp, Open, Rc<RefCell<Vec<String>>>) {
+fn app() -> (NivetaApp, Open, Rc<RefCell<Vec<String>>>) {
     let (open, written): (Open, Rc<RefCell<Vec<String>>>) = Default::default();
     let (held, w) = (open.clone(), written.clone());
     let services = Services {
-        export: Some(Box::new(|_: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"out".to_vec(), Vec::new())))),
+        export: Some(Box::new(|_: &niveta_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"out".to_vec(), Vec::new())))),
         write: Some(Box::new(move |path: &str, _: &[u8]| {
             w.borrow_mut().push(path.to_string());
             Ok(())
@@ -20,7 +20,7 @@ fn app() -> (PhotocraftApp, Open, Rc<RefCell<Vec<String>>>) {
         file_dialog: Some(Box::new(move |request, _parent, reply| held.borrow_mut().push((request, reply)))),
         ..Default::default()
     };
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+    let mut app = NivetaApp::new(niveta_engine::Session::new(), services);
     app.run("file.new", json!({"width": 4, "height": 4})).unwrap();
     (app, open, written)
 }

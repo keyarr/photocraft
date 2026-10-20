@@ -2,14 +2,14 @@ use serde_json::json;
 
 use super::*;
 
-fn app() -> PhotocraftApp {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+fn app() -> NivetaApp {
+    let mut app = NivetaApp::new(niveta_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 40, "height": 30, "background": "transparent"})).unwrap();
     app.run("tools.setColors", json!({"foreground": "#ff0000", "background": "#0000ff"})).unwrap();
     app
 }
 
-fn pixel(app: &PhotocraftApp, x: i32, y: i32) -> [f32; 4] {
+fn pixel(app: &NivetaApp, x: i32, y: i32) -> [f32; 4] {
     let st = app.session.active().unwrap();
     st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().rgba(x, y)
 }
@@ -33,7 +33,7 @@ fn menu_and_canvas_invocations_open_options_but_explicit_params_run_directly() {
     assert!(app.ui.dialogs.is_empty(), "explicit params must not show a modal dialog");
     assert!(pixel(&app, 10, 15)[1] > 0.98);
 
-    let mut empty = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    let mut empty = NivetaApp::new(niveta_engine::Session::new(), Default::default());
     assert!(crate::menus::invoke(&mut empty, &ctx, COMMAND, json!({})).is_err());
     assert!(empty.ui.dialogs.is_empty());
 }
@@ -92,9 +92,9 @@ fn preferences_remember_all_choices_and_reject_corrupt_values() {
     }
     crate::dialogs::confirm(&mut app, id).unwrap();
     let saved = app.session.prefs_to_json();
-    let mut restored = photocraft_engine::Session::new();
+    let mut restored = niveta_engine::Session::new();
     restored.load_prefs_json(&saved).unwrap();
-    let mut again = PhotocraftApp::new(restored, Default::default());
+    let mut again = NivetaApp::new(restored, Default::default());
     again.run("file.new", json!({"width": 40, "height": 30, "background": "transparent"})).unwrap();
     again.run("tools.setColors", json!({"foreground": "#ff0000"})).unwrap();
     let remembered = fields(&again);

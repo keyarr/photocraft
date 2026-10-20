@@ -32,7 +32,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
 
-use photocraft_paint::{BrushPreset, BrushSettings, GrayTile, Pattern, TipShape};
+use niveta_paint::{BrushPreset, BrushSettings, GrayTile, Pattern, TipShape};
 use serde::{Deserialize, Serialize};
 
 use crate::Session;
@@ -66,7 +66,7 @@ pub const MAX_GROUPS: usize = 4096;
 /// Most presets loaded from one group file.
 pub const MAX_PRESETS_PER_GROUP: usize = 50_000;
 
-const GROUP_FORMAT: &str = "photocraft-brush-group";
+const GROUP_FORMAT: &str = "niveta-brush-group";
 const TIP_MAGIC: &[u8; 6] = b"PCTIP1";
 const TIP_HEADER: usize = 6 + 1 + 4 + 4;
 
@@ -195,7 +195,7 @@ impl PresetBackend for DirBackend {
         let path = self.path(name)?;
         let dir = path.parent().ok_or_else(|| format!("{name}: no parent directory"))?;
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-        photocraft_format::atomic_write(&path, bytes).map_err(|e| format!("{name}: {e}"))
+        niveta_format::atomic_write(&path, bytes).map_err(|e| format!("{name}: {e}"))
     }
     fn remove(&self, name: &str) -> Result<(), String> {
         match std::fs::remove_file(self.path(name)?) {
@@ -765,7 +765,7 @@ impl PresetStore {
 
 fn builtin_names() -> &'static [String] {
     static NAMES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
-    NAMES.get_or_init(|| photocraft_paint::presets::builtin().into_iter().map(|p| p.name).collect())
+    NAMES.get_or_init(|| niveta_paint::presets::builtin().into_iter().map(|p| p.name).collect())
 }
 
 impl Session {

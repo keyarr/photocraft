@@ -3,7 +3,7 @@
 Niveta follows the same conventions as FilmCraft #28. Start a headless session:
 
 ```sh
-photocraft-cli mcp --automation-read-root /work/project --automation-write-root /work/project
+niveta-cli mcp --automation-read-root /work/project --automation-write-root /work/project
 ```
 
 Paths are relative to the corresponding root; without a root that filesystem authority is

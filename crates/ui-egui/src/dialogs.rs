@@ -3,7 +3,7 @@
 
 use serde_json::{Value, json};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 use crate::state::{Dialog, DialogKind};
 use crate::widgets::{ButtonRole, DialogButton, dialog_buttons};
 
@@ -76,7 +76,7 @@ fn place_id(d: &Dialog) -> egui::Id {
     }
 }
 
-pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut NivetaApp, ctx: &egui::Context) {
     let dialogs = app.ui.dialogs.clone();
     let mut shown = Vec::new();
     for d in dialogs {
@@ -193,7 +193,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                         "models" => crate::credits::models_ui(ui),
                         _ => {
                             ui.label(tl!("Niveta — an open-source, native image editor written in Rust."));
-                            ui.label(crate::i18n::fmt(tl!("Version {version}"), &[("version", &photocraft_engine::build_info::long_version())]));
+                            ui.label(crate::i18n::fmt(tl!("Version {version}"), &[("version", &niveta_engine::build_info::long_version())]));
                             ui.add_space(12.0);
                             ui.vertical_centered(|ui| {
                                 crate::links::discord_button(app, ui, 220.0);
@@ -201,7 +201,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                                 crate::links::link_row(app, ui);
                             });
                             ui.add_space(10.0);
-                            ui.weak("egui · wgpu · photocraft-engine");
+                            ui.weak("egui · wgpu · niveta-engine");
                         }
                     }
                 }
@@ -367,7 +367,7 @@ pub fn title(d: &Dialog) -> String {
 }
 
 /// Confirm a dialog: run its action and close it. Used by the OK button and by automation.
-pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
+pub fn confirm(app: &mut NivetaApp, id: u64) -> Result<Value, String> {
     let d = app.ui.close_dialog(id).ok_or_else(|| format!("no dialog {id}"))?;
     match d.kind {
         DialogKind::NewDocument => {
@@ -419,7 +419,7 @@ pub fn confirm(app: &mut PhotocraftApp, id: u64) -> Result<Value, String> {
 /// Open the parameter dialog of `command`: the adjustment editor for `image.adjustments.*`, the
 /// schema dialog for filters, the Color Range dialog for `select.colorRange`, otherwise a bare
 /// confirm dialog.
-pub fn open_command_dialog(app: &mut PhotocraftApp, command: &str, label: &str) -> u64 {
+pub fn open_command_dialog(app: &mut NivetaApp, command: &str, label: &str) -> u64 {
     if command == crate::stroke_ui::COMMAND {
         return crate::stroke_ui::open(app);
     }
@@ -445,8 +445,8 @@ mod tests {
     use super::*;
 
     /// A filter dialog over a 256×256 layer, with the preview the canvas computed for it on screen.
-    fn filter_dialog_with_preview(background: bool) -> (PhotocraftApp, u64) {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    fn filter_dialog_with_preview(background: bool) -> (NivetaApp, u64) {
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.background_jobs = background;
         app.run("file.new", serde_json::json!({"width": 256, "height": 256, "background": "#3366cc"})).unwrap();
         let id = open_command_dialog(&mut app, "filter.blur.gaussianBlur", "Gaussian Blur");
@@ -503,9 +503,9 @@ mod tests {
         use egui_kittest::{Harness, kittest::Queryable};
 
         for size in [egui::vec2(760.0, 480.0), egui::vec2(960.0, 640.0)] {
-            let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+            let app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
             let mut h = Harness::builder().with_size(size).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-            PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+            NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
             crate::color_picker_ui::open(h.state_mut(), "foreground");
             h.run_steps(4);
             let frame = rects(&h.ctx)[0];
@@ -532,9 +532,9 @@ mod tests {
     fn dragging_the_title_bar_moves_the_dialog() {
         use egui_kittest::{Harness, kittest::Queryable};
 
-        let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let mut harness = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
+        NivetaApp::setup_context(&harness.ctx, crate::theme::ThemeKind::ALL[0]);
         harness.state_mut().ui.open_dialog(DialogKind::LayerStyle, serde_json::Map::new());
         harness.run_steps(3);
         let before = harness.get_by_label("Layer Style").rect();
@@ -556,11 +556,11 @@ mod tests {
         assert_eq!(harness.state().ui.dialogs.len(), 1, "dragging must not close the dialog");
     }
 
-    fn dialog_harness(size: egui::Vec2, command: &str) -> egui_kittest::Harness<'static, PhotocraftApp> {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    fn dialog_harness(size: egui::Vec2, command: &str) -> egui_kittest::Harness<'static, NivetaApp> {
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         let mut h = egui_kittest::Harness::builder().with_size(size).build_ui_state(|ui, app| show(app, ui.ctx()), app);
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
         crate::filter_dialog::open(h.state_mut(), command).unwrap();
         h.run_steps(4);
         h

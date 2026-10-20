@@ -1,5 +1,5 @@
 [package]
-name = "photocraft-raw"
+name = "niveta-raw"
 description = "Clean-room, pure-Rust camera raw decoder and developer (DNG, CR2, TIFF/EP raws)"
 version.workspace = true
 edition.workspace = true
@@ -21,7 +21,7 @@ corpus = []
 rayon = { workspace = true }
 
 [dev-dependencies]
-photocraft-raw = { path = ".", features = ["testgen"] }
+niveta-raw = { path = ".", features = ["testgen"] }
 # Writes sRGB PNG previews in the `rawinfo` example.
 png = "0.18"
 

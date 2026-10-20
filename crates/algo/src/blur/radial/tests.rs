@@ -1,6 +1,6 @@
 use super::*;
-use photocraft_color::{ColorMode, PixelFormat, SampleType};
-use photocraft_raster::Surface;
+use niveta_color::{ColorMode, PixelFormat, SampleType};
+use niveta_raster::Surface;
 
 fn fixture(format: PixelFormat, rect: Rect, hdr: bool) -> Surface {
     let mut surface = Surface::new(format);

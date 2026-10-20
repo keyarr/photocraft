@@ -770,7 +770,7 @@ pub struct Preferences {
     fn corpus_floors_parse() {
         let src = r#"
 /// Hand-picked mix in `corpus/psd` (170 files: 121 vs the merged image + 12 vs the thumbnail).
-const MIXED: Source = Source { label: "io corpus", env: "PHOTOCRAFT_CORPUS", default_dir: "corpus/psd", pass_floor: 133, roundtrip_floor: 169 };
+const MIXED: Source = Source { label: "io corpus", env: "NIVETA_CORPUS", default_dir: "corpus/psd", pass_floor: 133, roundtrip_floor: 169 };
 
 /// The full psd-tools test set (309 files at the pinned commit):
 /// 202 vs the merged image.

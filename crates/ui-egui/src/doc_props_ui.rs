@@ -3,11 +3,11 @@
 //! Rulers & Grids toggles. Every edit dispatches an engine or view command, so the panel stays thin.
 
 use egui::{Align2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
-use photocraft_doc::{ColorMode, Document, Layer, LayerContent, LayerId, SampleType};
+use niveta_doc::{ColorMode, Document, Layer, LayerContent, LayerId, SampleType};
 use serde_json::{Value, json};
 
 use crate::theme::Tokens;
-use crate::{PhotocraftApp, icons, widgets};
+use crate::{NivetaApp, icons, widgets};
 
 /// Photoshop's Background layer: the locked, opaque raster layer at the bottom of the stack.
 pub fn is_background(doc: &Document, l: &Layer) -> bool {
@@ -117,7 +117,7 @@ fn dim_field(ui: &mut egui::Ui, text: &str) {
     ui.painter().text(r.left_center() + vec2(6.0, 0.0), Align2::LEFT_CENTER, text, crate::theme::mono(12.0), t.text_faint);
 }
 
-pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn properties(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let Some(st) = app.session.active() else { return };
     // Top padding: the first size fields started at the scroll origin and read as
@@ -308,10 +308,10 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use photocraft_doc::Document;
+    use niveta_doc::Document;
 
-    fn doc_with_background() -> photocraft_engine::Session {
-        let mut s = photocraft_engine::Session::new();
+    fn doc_with_background() -> niveta_engine::Session {
+        let mut s = niveta_engine::Session::new();
         s.execute("file.new", json!({"width": 40, "height": 20, "background": "white"})).unwrap();
         s
     }
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn transparent_documents_have_no_background() {
-        let mut s = photocraft_engine::Session::new();
+        let mut s = niveta_engine::Session::new();
         s.execute("file.new", json!({"width": 40, "height": 20, "background": "transparent"})).unwrap();
         let st = s.active().unwrap();
         let d: &Document = &st.doc;
@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn document_dropdowns_map_to_live_mode_commands() {
         for id in MODES.iter().map(|m| m.2).chain(DEPTHS.iter().map(|d| d.2)) {
-            assert!(photocraft_engine::commands::find(id).is_some(), "{id} is not an engine command");
+            assert!(niveta_engine::commands::find(id).is_some(), "{id} is not an engine command");
         }
     }
 

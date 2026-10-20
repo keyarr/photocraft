@@ -10,12 +10,12 @@
 //! pixels. Skips when no GPU adapter exists (like `drag_preview_canvas.rs`).
 
 use egui::{Key, Modifiers, PointerButton, Pos2};
-use photocraft_ui_egui::PhotocraftApp;
-use photocraft_ui_egui::canvas::ViewXform;
-use photocraft_ui_egui::control::{ControlRequest, handle};
+use niveta_ui_egui::NivetaApp;
+use niveta_ui_egui::canvas::ViewXform;
+use niveta_ui_egui::control::{ControlRequest, handle};
 use serde_json::{Value, json};
 
-type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
+type Harness = egui_kittest::Harness<'static, NivetaApp>;
 
 /// A rendered frame: RGBA8, physical pixels.
 struct Image {
@@ -36,8 +36,8 @@ impl Image {
 fn harness() -> Option<Harness> {
     let built = std::panic::catch_unwind(|| {
         egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 640.0)).with_max_steps(64).wgpu().build_eframe(|cc| {
-            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-            let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+            NivetaApp::setup_context(&cc.egui_ctx, Default::default());
+            let mut app = NivetaApp::new(niveta_engine::Session::new(), Default::default());
             if let Some(rs) = cc.wgpu_render_state.as_ref() {
                 app.set_wgpu(rs.clone());
             }
@@ -64,7 +64,7 @@ fn screen(h: &Harness, x: f32, y: f32) -> Pos2 {
     let app = h.state();
     let v = &app.ui.views[0];
     let xf = ViewXform {
-        rect: photocraft_ui_egui::rulers::content_rect(app, app.last_canvas_rect),
+        rect: niveta_ui_egui::rulers::content_rect(app, app.last_canvas_rect),
         zoom: v.zoom,
         center: v.center,
         flip: app.ui.view.flip_horizontal,

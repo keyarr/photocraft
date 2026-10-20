@@ -275,7 +275,7 @@ pub fn language_scope(lang: Lang) -> impl Drop {
 pub fn sync_context(ctx: &egui::Context, language: &str) {
     let lang = Lang::from_pref(language);
     set_current(lang);
-    let id = egui::Id::new("photocraft-ui-language");
+    let id = egui::Id::new("niveta-ui-language");
     let changed = ctx.data(|data| data.get_temp::<Lang>(id) != Some(lang));
     if changed {
         ctx.data_mut(|data| data.insert_temp(id, lang));
@@ -669,7 +669,7 @@ mod tests {
             strings.extend(path.iter().copied());
             strings.insert(label);
         }
-        for c in photocraft_engine::command_specs().iter().filter(|c| !c.menu.is_empty()) {
+        for c in niveta_engine::command_specs().iter().filter(|c| !c.menu.is_empty()) {
             strings.extend(c.menu.iter().copied());
             strings.insert(c.label);
         }
@@ -737,7 +737,7 @@ mod tests {
     #[test]
     fn layer_color_names_are_translated() {
         for lang in Lang::all().filter(|l| l.complete_menus()) {
-            for color in photocraft_doc::LabelColor::ALL {
+            for color in niveta_doc::LabelColor::ALL {
                 let cat = lang.0.catalog();
                 assert!(
                     cat.contextual("layerLabel", color.label()).or_else(|| cat.plain(color.label())).is_some(),
@@ -771,7 +771,7 @@ mod tests {
     #[test]
     fn blend_mode_names_are_translated() {
         for l in LANGUAGES.iter().filter(|l| l.complete_menus) {
-            for m in std::iter::once(photocraft_color::BlendMode::PassThrough).chain(photocraft_color::BlendMode::LAYER_MODES) {
+            for m in std::iter::once(niveta_color::BlendMode::PassThrough).chain(niveta_color::BlendMode::LAYER_MODES) {
                 assert!(l.catalog().plain(m.label()).is_some(), "{}: blend mode {:?}", l.code, m.label());
             }
         }

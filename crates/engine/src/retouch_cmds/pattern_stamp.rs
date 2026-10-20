@@ -4,13 +4,13 @@
 //! the first point of that stroke. Impressionist jitters each dab's phase with a seeded RNG so a
 //! replay of the same points is identical.
 
-use photocraft_color::{BlendMode, PixelFormat};
-use photocraft_compose::pattern::{Placement, Tile, render};
-use photocraft_doc::Pattern;
-use photocraft_geom::Rect;
-use photocraft_paint::retouch::{Footprint, Region, apply_coverage, apply_dab_stroke, over_native, stroke_coverage};
-use photocraft_paint::{Stroke, StrokePoint};
-use photocraft_raster::{Surface, from_rgba_into, to_rgba};
+use niveta_color::{BlendMode, PixelFormat};
+use niveta_compose::pattern::{Placement, Tile, render};
+use niveta_doc::Pattern;
+use niveta_geom::Rect;
+use niveta_paint::retouch::{Footprint, Region, apply_coverage, apply_dab_stroke, over_native, stroke_coverage};
+use niveta_paint::{Stroke, StrokePoint};
+use niveta_raster::{Surface, from_rgba_into, to_rgba};
 use serde_json::{Value, json};
 
 use super::{bad, blend_param, damage_json, flag, has_pixel_layer, parse_brush};
@@ -50,7 +50,7 @@ pub(super) fn run(s: &mut Session, p: &Value) -> Result<Value> {
 
     let seed = p.get("seed").and_then(Value::as_u64).unwrap_or_else(|| {
         let bytes = p.get("points").map(std::string::ToString::to_string).unwrap_or_default();
-        photocraft_paint::rng::seed_from_bytes(bytes.as_bytes())
+        niveta_paint::rng::seed_from_bytes(bytes.as_bytes())
     });
     stroke.brush.seed = seed;
 
@@ -258,8 +258,8 @@ fn stamp_dab(
         return;
     }
     let i = fp.index as u64;
-    let jx = photocraft_paint::rng::rand_signed(seed, i, STREAM_PHASE_X) * tw;
-    let jy = photocraft_paint::rng::rand_signed(seed, i, STREAM_PHASE_Y) * th;
+    let jx = niveta_paint::rng::rand_signed(seed, i, STREAM_PHASE_X) * tw;
+    let jy = niveta_paint::rng::rand_signed(seed, i, STREAM_PHASE_Y) * th;
     let place = placement((phase.0 + jx, phase.1 + jy), scale, angle);
     let rgba = render(tile, &place, r);
     let rw = r.width() as usize;
@@ -282,7 +282,7 @@ fn stamp_dab(
                 }
             } else {
                 let d = to_rgba(fmt, dst);
-                let o = photocraft_color::blend::composite(mode, d, *px, k);
+                let o = niveta_color::blend::composite(mode, d, *px, k);
                 from_rgba_into(fmt, o, &mut enc);
                 if let Some(src) = enc.get(..n) {
                     dst.copy_from_slice(src);
@@ -297,7 +297,7 @@ mod tests {
     use super::*;
 
     fn stroke(points: &[(f64, f64)], size: f32) -> Stroke {
-        let brush = photocraft_paint::BrushSettings { size, ..Default::default() };
+        let brush = niveta_paint::BrushSettings { size, ..Default::default() };
         Stroke { brush, points: points.iter().map(|&(x, y)| StrokePoint::new(x, y, 1.0)).collect() }
     }
 

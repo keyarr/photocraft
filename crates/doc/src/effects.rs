@@ -1,11 +1,11 @@
-//! Layer styles (effects): data only. Rendering lives in `photocraft-compose`,
-//! PSD mapping in `photocraft-io`.
+//! Layer styles (effects): data only. Rendering lives in `niveta-compose`,
+//! PSD mapping in `niveta-io`.
 //!
 //! Angles are in degrees, counter-clockwise from 3 o'clock, and give the
 //! direction the light comes *from* (Photoshop convention). Sizes and
 //! distances are in pixels, opacities and percentages in `0..=1`.
 
-use photocraft_color::{BlendMode, Color};
+use niveta_color::{BlendMode, Color};
 use serde::{Deserialize, Serialize};
 
 use crate::adjust::CurvePoint;

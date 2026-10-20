@@ -150,22 +150,22 @@ fn write_cursor_preview() {
             }
         }
     }
-    let image = photocraft_codecs::Image::from_u8(width as u32, height as u32, photocraft_codecs::ChannelLayout::Rgba, rgba).unwrap();
-    let png = photocraft_codecs::encode(&image, photocraft_codecs::Format::Png, &Default::default()).unwrap();
+    let image = niveta_codecs::Image::from_u8(width as u32, height as u32, niveta_codecs::ChannelLayout::Rgba, rgba).unwrap();
+    let png = niveta_codecs::encode(&image, niveta_codecs::Format::Png, &Default::default()).unwrap();
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/tool-cursor-preview.png");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, png).unwrap();
 }
 
 #[cfg(target_os = "windows")]
-fn harness() -> Harness<'static, crate::PhotocraftApp> {
-    let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+fn harness() -> Harness<'static, crate::NivetaApp> {
+    let mut app = crate::NivetaApp::new(niveta_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
     app.run("tools.setBrush", json!({"brush": {"size": 40, "hardness": 1.0}})).unwrap();
     app.ui.tool = crate::Tool::Brush;
     app.sync_views();
     let mut h = Harness::builder().with_size(vec2(600.0, 500.0)).build_ui_state(
-        |ui, app: &mut crate::PhotocraftApp| {
+        |ui, app: &mut crate::NivetaApp| {
             let ctx = ui.ctx().clone();
             if !ctx.fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
@@ -178,7 +178,7 @@ fn harness() -> Harness<'static, crate::PhotocraftApp> {
         },
         app,
     );
-    crate::PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    crate::NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
     h.run_steps(4);
     h.event(Event::PointerMoved(h.state().last_canvas_rect.center()));
     h.run_steps(3);

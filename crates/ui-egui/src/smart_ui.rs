@@ -2,11 +2,11 @@
 //! (eye toggles; double-click a filter to re-open its dialog with the recorded parameters).
 
 use egui::{Align2, Color32, Rect, Sense, Stroke, pos2, vec2};
-use photocraft_doc::{Layer, LayerContent, SmartObject};
+use niveta_doc::{Layer, LayerContent, SmartObject};
 use serde_json::{Value, json};
 
 use crate::theme::Tokens;
-use crate::{PhotocraftApp, icons};
+use crate::{NivetaApp, icons};
 
 /// Smart-object badge in the bottom-right corner of a layer thumbnail.
 pub fn thumb_badge(ui: &egui::Ui, l: &Layer, thumb: Rect) {
@@ -22,19 +22,19 @@ pub fn thumb_badge(ui: &egui::Ui, l: &Layer, thumb: Rect) {
 
 /// The display name of a smart filter (its command's label without the ellipsis). A Photoshop
 /// filter PhotoCraft doesn't implement shows its own name and is marked as kept as is.
-fn filter_label(f: &photocraft_doc::SmartFilter) -> String {
+fn filter_label(f: &niveta_doc::SmartFilter) -> String {
     let command = f.command.as_str();
-    if command == photocraft_engine::smart_cmds::UNSUPPORTED_FILTER {
+    if command == niveta_engine::smart_cmds::UNSUPPORTED_FILTER {
         let name = f.params.get("name").and_then(Value::as_str).unwrap_or("Photoshop filter");
         return format!("{} (kept, not editable)", name.trim_end_matches("...").trim_end_matches('…'));
     }
-    photocraft_engine::commands::find(command)
+    niveta_engine::commands::find(command)
         .map_or_else(|| command.rsplit('.').next().unwrap_or(command).to_string(), |c| tl!(c.label).trim_end_matches('…').to_string())
 }
 
 /// Smart Filters header + one row per filter (top filter first, as in Photoshop) under a smart
 /// layer. Edits are queued in `actions` as engine commands.
-pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, l: &Layer, depth: usize, actions: &mut Vec<(String, Value)>) {
+pub fn filter_rows(app: &mut NivetaApp, ui: &mut egui::Ui, l: &Layer, depth: usize, actions: &mut Vec<(String, Value)>) {
     let LayerContent::Smart(sm) = &l.content else { return };
     if sm.smart_filters.is_empty() {
         return;
@@ -86,11 +86,11 @@ pub fn filter_rows(app: &mut PhotocraftApp, ui: &mut egui::Ui, l: &Layer, depth:
 
 /// Re-opens a smart filter's dialog with its recorded parameters; OK runs
 /// `layer.smartFilter.setParams` instead of adding another filter (see `dialogs::confirm`).
-pub fn open_editor(app: &mut PhotocraftApp, ctx: &egui::Context, layer: u64, sm: &SmartObject, index: usize) {
+pub fn open_editor(app: &mut NivetaApp, ctx: &egui::Context, layer: u64, sm: &SmartObject, index: usize) {
     let Some(f) = sm.smart_filters.get(index) else { return };
     // Camera Raw has its own full-window dialog rather than a generic parameter form.
-    if f.command == photocraft_engine::lens_cmds::RAW {
-        if let Err(e) = crate::camera_raw_ui::open_smart_filter(app, ctx, photocraft_doc::LayerId(layer), index) {
+    if f.command == niveta_engine::lens_cmds::RAW {
+        if let Err(e) = crate::camera_raw_ui::open_smart_filter(app, ctx, niveta_doc::LayerId(layer), index) {
             app.ui.status = e;
             app.ui.status_error = true;
         }

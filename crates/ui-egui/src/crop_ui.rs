@@ -25,7 +25,7 @@
 
 use egui::{CursorIcon, Modifiers};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 use crate::canvas::ToolEvent;
 use crate::state::Tool;
 
@@ -180,7 +180,7 @@ fn size_ok(r: [f64; 4]) -> bool {
 }
 
 /// The options-bar ratio preset as width / height.
-fn preset_ratio(app: &PhotocraftApp) -> Option<f64> {
+fn preset_ratio(app: &NivetaApp) -> Option<f64> {
     let size = app.session.active().map_or((1.0, 1.0), |s| (s.doc.size.width as f64, s.doc.size.height as f64));
     crate::chrome_ui::crop_ratio(&app.ui.tool_options.crop_ratio, size.0, size.1).map(|(w, h)| w / h).filter(|k| k.is_finite() && *k > 0.0)
 }
@@ -234,13 +234,13 @@ pub fn resized(r: [f64; 4], hx: i8, hy: i8, d: [f64; 2], ratio: Option<f64>, alt
 }
 
 /// Space is held (set by the canvas each frame, or by `ui.pointer`'s `space` flag).
-pub fn set_space(app: &mut PhotocraftApp, down: bool) {
+pub fn set_space(app: &mut NivetaApp, down: bool) {
     app.crop.space = down;
 }
 
 /// As in Photoshop, the Crop tool always shows a frame: on picking the tool, and after a crop is
 /// cancelled or committed, it frames the selection's bounds, or the whole canvas.
-pub fn ensure_frame(app: &mut PhotocraftApp) {
+pub fn ensure_frame(app: &mut NivetaApp) {
     if app.ui.tool != Tool::Crop {
         app.crop.editing = false;
         // Leaving the tool drops an untouched default frame (a drawn one stays pending).
@@ -279,19 +279,19 @@ pub fn ensure_frame(app: &mut PhotocraftApp) {
 }
 
 /// A crop gesture is in progress: Space repositions the frame rather than panning.
-pub fn active(app: &PhotocraftApp) -> bool {
+pub fn active(app: &NivetaApp) -> bool {
     app.ui.tool == Tool::Crop && app.crop.drag.is_some()
 }
 
 /// The frame is being edited, so the canvas shows the pixels past its edges (Photoshop's crop
 /// preview): from the first press with the tool until the crop is committed or cancelled.
-pub fn shows_beyond_canvas(app: &PhotocraftApp) -> bool {
+pub fn shows_beyond_canvas(app: &NivetaApp) -> bool {
     app.ui.tool == Tool::Crop && app.ui.crop_rect.is_some() && (app.crop.editing || app.crop.drag.is_some())
 }
 
 /// The button went down on the canvas with the Crop tool: the frame is being edited from now on.
 /// Returns true when that is new.
-pub fn press(app: &mut PhotocraftApp) -> bool {
+pub fn press(app: &mut NivetaApp) -> bool {
     let new = app.ui.tool == Tool::Crop && app.ui.crop_rect.is_some() && !app.crop.editing;
     if new {
         app.crop.editing = true;
@@ -299,37 +299,37 @@ pub fn press(app: &mut PhotocraftApp) -> bool {
     new
 }
 
-fn tolerance(app: &PhotocraftApp) -> f64 {
+fn tolerance(app: &NivetaApp) -> f64 {
     HANDLE_PX / (app.current_zoom() as f64).max(0.01)
 }
 
 /// The pending frame's angle (degrees), 0 when it isn't a finite number.
-pub fn angle(app: &PhotocraftApp) -> f64 {
+pub fn angle(app: &NivetaApp) -> f64 {
     normalized_angle(app.ui.crop_angle)
 }
 
 /// A press at document point `p` would turn the frame (Crop tool, outside the frame and its
 /// handles) rather than draw, move or resize one.
-pub fn turns_at(app: &PhotocraftApp, p: [f64; 2]) -> bool {
+pub fn turns_at(app: &NivetaApp, p: [f64; 2]) -> bool {
     app.ui.tool == Tool::Crop
         && app.ui.crop_rect.filter(|r| r.iter().all(|v| v.is_finite())).is_some_and(|r| hit_turned(r, angle(app), p, tolerance(app)) == Hit::Outside)
 }
 
 /// A double-click at document point `p` commits the crop (Photoshop: double-click inside the box,
 /// like ↵): Crop tool, a pending frame, and `p` inside it (not on a handle, not outside).
-pub fn commits_at(app: &PhotocraftApp, p: [f64; 2]) -> bool {
+pub fn commits_at(app: &NivetaApp, p: [f64; 2]) -> bool {
     app.ui.tool == Tool::Crop
         && app.crop.drag.is_none()
         && app.ui.crop_rect.filter(|r| r.iter().all(|v| v.is_finite())).is_some_and(|r| hit_turned(r, angle(app), p, tolerance(app)) == Hit::Inside)
 }
 
 /// The frame is being turned: its angle, for the readout beside the pointer.
-pub fn turning(app: &PhotocraftApp) -> Option<f64> {
+pub fn turning(app: &NivetaApp) -> Option<f64> {
     matches!(app.crop.drag, Some(CropDrag::Rotate { .. })).then(|| angle(app))
 }
 
 /// Pointer input for the Crop tool. Returns true when the event was its.
-pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool {
+pub fn pointer(app: &mut NivetaApp, ev: ToolEvent, mods: Modifiers) -> bool {
     if app.ui.tool != Tool::Crop {
         app.crop.drag = None;
         return false;
@@ -380,7 +380,7 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool 
 }
 
 /// The frame follows the pointer at `p`.
-fn update(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
+fn update(app: &mut NivetaApp, p: [f64; 2], mods: Modifiers) {
     let ratio = preset_ratio(app);
     let space = app.crop.space;
     let deg = angle(app);
@@ -423,7 +423,7 @@ fn update(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers) {
 }
 
 /// Cursor over the canvas at document point `p`: resize arrows on the edges, move inside.
-pub fn cursor(app: &PhotocraftApp, p: [f64; 2]) -> Option<CursorIcon> {
+pub fn cursor(app: &NivetaApp, p: [f64; 2]) -> Option<CursorIcon> {
     if app.ui.tool != Tool::Crop {
         return None;
     }
@@ -446,7 +446,7 @@ pub fn cursor(app: &PhotocraftApp, p: [f64; 2]) -> Option<CursorIcon> {
 /// Where the turn cursor's arc bends at document point `p` (pointer outside the frame, or turning
 /// it): towards the frame corner of `p`'s quadrant, along the diagonal of the frame's own axes.
 /// As in Photoshop that gives four cursors, one per corner; they turn with the frame.
-pub fn turn_cursor_dir(app: &PhotocraftApp, p: [f64; 2]) -> Option<[f64; 2]> {
+pub fn turn_cursor_dir(app: &NivetaApp, p: [f64; 2]) -> Option<[f64; 2]> {
     if app.ui.tool != Tool::Crop {
         return None;
     }
@@ -515,24 +515,24 @@ fn resize_icon(hx: i8, hy: i8, deg: f64) -> CursorIcon {
 mod tests {
     use super::*;
     use crate::canvas::tool_event;
-    use photocraft_doc::{Color, ColorMode, Document, SampleType, Size};
+    use niveta_doc::{Color, ColorMode, Document, SampleType, Size};
     use serde_json::json;
 
     const NONE: Modifiers = Modifiers::NONE;
     const SHIFT: Modifiers = Modifiers::SHIFT;
 
-    fn app(depth: SampleType) -> PhotocraftApp {
+    fn app(depth: SampleType) -> NivetaApp {
         let doc = Document::with_background("crop", Size::new(200, 100), ColorMode::Rgb, depth, Color::WHITE);
-        let mut s = photocraft_engine::Session::new();
+        let mut s = niveta_engine::Session::new();
         s.add_document(doc, None);
-        let mut app = PhotocraftApp::new(s, crate::Services::default());
+        let mut app = NivetaApp::new(s, crate::Services::default());
         app.ui.tool = Tool::Crop;
         app.ui.extras.snap = false;
         app.ui.view.show.smart_guides = false;
         app
     }
 
-    fn drag(app: &mut PhotocraftApp, pts: &[[f64; 2]], mods: Modifiers) {
+    fn drag(app: &mut NivetaApp, pts: &[[f64; 2]], mods: Modifiers) {
         let (first, last) = (pts[0], pts[pts.len() - 1]);
         tool_event(app, ToolEvent::Down { x: first[0], y: first[1], pressure: 1.0 }, mods);
         for p in &pts[1..] {
@@ -842,7 +842,7 @@ mod tests {
         let view = crate::state::View { zoom: 2.0, center: [100.0, 50.0], fit_pending: false, fill_pending: false, doc_size: [200, 100], rotation: 0.0 };
         a.ui.views = vec![view.clone()];
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(600.0, 400.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 let v = app.ui.views[0].clone();
                 crate::canvas::canvas_view(app, ui, 0, ui.max_rect(), v, true);
             },
@@ -928,7 +928,7 @@ mod tests {
         drag(&mut app, &[[10.0, 10.0], [30.0, 30.0]], SHIFT);
         crate::canvas::commit_crop(&mut app);
         // No document: events are swallowed quietly.
-        let mut empty = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut empty = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         empty.ui.tool = Tool::Crop;
         drag(&mut empty, &[[1.0, 1.0], [9.0, 9.0]], NONE);
         assert!(empty.ui.crop_rect.is_none());

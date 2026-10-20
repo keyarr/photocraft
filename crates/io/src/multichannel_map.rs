@@ -6,13 +6,13 @@
 //! solid ink, max = paper. Channel names come from resources 1006 / 1045 and ink colours from
 //! DisplayInfo (1077), exactly as for spot channels in the other modes.
 
-use photocraft_color::{Color, ColorMode, PixelFormat, SampleType};
-use photocraft_doc::{AlphaChannel, Document};
-use photocraft_geom::Rect;
-use photocraft_psd::file::LayerInfoPlacement;
-use photocraft_psd::resources::{ImageResource, ResolutionInfo, ids, version_info_resource};
-use photocraft_psd::{ColorMode as PsdMode, Compression, Header, ImageData, PsdFile};
-use photocraft_raster::Surface;
+use niveta_color::{Color, ColorMode, PixelFormat, SampleType};
+use niveta_doc::{AlphaChannel, Document};
+use niveta_geom::Rect;
+use niveta_psd::file::LayerInfoPlacement;
+use niveta_psd::resources::{ImageResource, ResolutionInfo, ids, version_info_resource};
+use niveta_psd::{ColorMode as PsdMode, Compression, Header, ImageData, PsdFile};
+use niveta_raster::Surface;
 
 use crate::pixels::{encode_be, psd_depth};
 
@@ -108,7 +108,7 @@ pub(crate) fn document_to_psd(doc: &Document, force_psb: bool) -> (PsdFile, Vec<
         resources.push(ImageResource::new(ids::XMP, x.as_bytes().to_vec()));
     }
     resources.push(version_info_resource(true));
-    let color_mode_data = photocraft_psd::hdr::color_mode_data_for_depth(header.depth);
+    let color_mode_data = niveta_psd::hdr::color_mode_data_for_depth(header.depth);
     let file = PsdFile {
         header,
         color_mode_data,

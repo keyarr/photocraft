@@ -6,7 +6,7 @@
 
 use serde_json::{Value, json};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 
 /// Extensions handled here rather than by the document importer (`.aco`/`.ase` swatches go to
 /// the Swatches panel through [`crate::swatches_ui::import_bytes`]).
@@ -28,11 +28,11 @@ fn source(name: &str, bytes: &[u8]) -> Value {
         return json!({"path": name});
     }
     let _ = name;
-    json!({"data": photocraft_engine::paint::tile::b64_encode(bytes)})
+    json!({"data": niveta_engine::paint::tile::b64_encode(bytes)})
 }
 
 /// Import a preset file; `None` when `name` isn't one.
-pub fn open(app: &mut PhotocraftApp, name: &str, bytes: &[u8]) -> Option<Result<(), String>> {
+pub fn open(app: &mut NivetaApp, name: &str, bytes: &[u8]) -> Option<Result<(), String>> {
     let (cmd, what) = match ext(name).as_str() {
         "abr" => ("brush.presets.importAbr", "brushes"),
         "grd" => ("gradient.presets.importGrd", "gradients"),

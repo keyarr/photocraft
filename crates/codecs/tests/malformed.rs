@@ -2,7 +2,7 @@
 
 mod common;
 use common::*;
-use photocraft_codecs::*;
+use niveta_codecs::*;
 use proptest::prelude::*;
 
 fn tight() -> DecodeOptions {

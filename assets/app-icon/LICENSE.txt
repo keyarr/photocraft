@@ -1,5 +1,5 @@
-PhotoCraft app icon (photocraft.svg, photocraft-small.svg and every file derived from them in
-this directory: photocraft-1024.png, photocraft.icns, photocraft.ico, hicolor/).
+PhotoCraft app icon (niveta.svg, niveta-small.svg and every file derived from them in
+this directory: niveta-1024.png, niveta.icns, niveta.ico, hicolor/).
 
 Original artwork made for this project by the project owner: an engraving-style drawing created
 in ArtCraft, then vectorised. No third-party material. Licensed like the rest of PhotoCraft,

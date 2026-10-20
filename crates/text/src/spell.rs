@@ -294,7 +294,7 @@ mod tests {
         assert_eq!(&text[mm.start..mm.end], "wrld");
     }
 
-    /// `cargo test --release -p photocraft-text -- --ignored --nocapture spell_timing`
+    /// `cargo test --release -p niveta-text -- --ignored --nocapture spell_timing`
     #[test]
     #[ignore]
     fn spell_timing() {

@@ -122,10 +122,10 @@ pub struct Metadata {
     /// Free-form key/value text (PNG tEXt/iTXt, TIFF ASCII tags).
     pub text: Vec<(String, String)>,
     /// Photoshop image resources (`8BIM` resource blocks): TIFF tag 34377. Kept opaque here;
-    /// `photocraft-io` reads and writes them through `photocraft-psd`.
+    /// `niveta-io` reads and writes them through `niveta-psd`.
     pub photoshop_resources: Option<Vec<u8>>,
     /// Photoshop layer data (TIFF tag 37724 `ImageSourceData`): a layered TIFF's layers. Kept
-    /// opaque here; `photocraft-io` reads and writes it through `photocraft-psd`.
+    /// opaque here; `niveta-io` reads and writes it through `niveta-psd`.
     pub photoshop_layers: Option<Vec<u8>>,
 }
 
@@ -503,7 +503,7 @@ fn rgb_to_cmyk(r: f32, g: f32, b: f32) -> [f32; 4] {
 
 /// Convert normalized interleaved samples between layouts. Naive
 /// (non-colour-managed) formulas; colour-managed conversion belongs in
-/// `photocraft-color`.
+/// `niveta-color`.
 pub(crate) fn convert_layout(src: &[f32], from: ChannelLayout, to: ChannelLayout) -> Vec<f32> {
     if from == to {
         return src.to_vec();

@@ -2,9 +2,9 @@
 
 Niveta automation has three entry styles:
 
-1. `photocraft-cli` runs finite convert, inspect, command, batch, and droplet jobs.
-2. `photocraft-cli serve` keeps a headless session alive over JSON lines on stdio or loopback TCP.
-3. `photocraft-cli mcp` exposes MCP tools over stdio, either against an in-process headless session or through a bridge to the desktop control server.
+1. `niveta-cli` runs finite convert, inspect, command, batch, and droplet jobs.
+2. `niveta-cli serve` keeps a headless session alive over JSON lines on stdio or loopback TCP.
+3. `niveta-cli mcp` exposes MCP tools over stdio, either against an in-process headless session or through a bridge to the desktop control server.
 
 The desktop application can start an authenticated loopback JSON control server with `photocraft --control <port>`. It exposes engine and UI operations, including pointer/type input and screenshots. Each TCP connection must present the configured bearer token before any operation is dispatched.
 

@@ -1,6 +1,6 @@
 use super::*;
-use photocraft_psd::abr::{LegacyBrush, write_v6, write_v12};
-use photocraft_psd::descriptor::{Id, UnicodeString};
+use niveta_psd::abr::{LegacyBrush, write_v6, write_v12};
+use niveta_psd::descriptor::{Id, UnicodeString};
 
 fn sample(id: &str, w: u32, h: u32, depth: u16) -> AbrSample {
     let bpp = usize::from(depth / 8);
@@ -267,7 +267,7 @@ fn tilt_scale_projection_spacing_and_mixer_fields_map() {
     // Defaults when the file says nothing.
     let p = &imp.presets[1].brush;
     assert!(p.spacing_enabled && !p.shape_dynamics.brush_projection && p.shape_dynamics.tilt_scale == 0.0);
-    assert_eq!(p.mixer, photocraft_paint::MixerSettings::default());
+    assert_eq!(p.mixer, niveta_paint::MixerSettings::default());
     assert_eq!((p.transfer.wetness, p.transfer.mix), (Dynamic::default(), Dynamic::default()));
 }
 
@@ -283,10 +283,10 @@ fn sampled_tip_paints_the_brush_colour_never_black() {
     // An imported tip is coverage: its pixels decide where paint lands, never what colour.
     // A black tip pixel must mean "no paint", and a painted pixel must carry the brush colour,
     // so a regression that treats the tip bitmap as RGB shows up here as black output.
-    use photocraft_color::PixelFormat;
-    use photocraft_paint::StrokePoint;
-    use photocraft_paint::render::render_stroke;
-    use photocraft_raster::Surface;
+    use niveta_color::PixelFormat;
+    use niveta_paint::StrokePoint;
+    use niveta_paint::render::render_stroke;
+    use niveta_raster::Surface;
 
     let preset = Descriptor::new("brushPreset").with("Nm  ", t("Tip")).with("Brsh", Value::Descriptor(sampled_tip("$tip-1")));
     let bytes = write_v6(2, &[sample("$tip-1", 8, 8, 8)], &[], &[preset], false).unwrap();

@@ -1,6 +1,6 @@
 # Command-line interface
 
-`apps/photocraft-cli` provides the following current subcommands:
+`apps/niveta-cli` provides the following current subcommands:
 
 | Command | Purpose |
 |---|---|
@@ -13,10 +13,10 @@
 | `mcp` | Start the MCP server on stdio, optionally bridged to the desktop app |
 | `serve` | Start the JSON-lines headless server on stdio or loopback TCP |
 
-Use `photocraft-cli --help` (or `photocraft-cli <subcommand> --help`) as the executable source of truth. A typical bounded command run is:
+Use `niveta-cli --help` (or `niveta-cli <subcommand> --help`) as the executable source of truth. A typical bounded command run is:
 
 ```sh
-photocraft-cli run input.psd \
+niveta-cli run input.psd \
   --cmd image.adjustments.invert \
   --out output.png
 ```

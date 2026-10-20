@@ -1,7 +1,7 @@
 //! Edit › Check Spelling… and glyph insertion (Window › Glyphs).
 //!
 //! `edit.checkSpelling` checks type layers against the bundled English dictionary
-//! (`photocraft_text::spell`, SCOWL size 50) plus the user dictionary in the preferences
+//! (`niveta_text::spell`, SCOWL size 50) plus the user dictionary in the preferences
 //! (`userDictionary`). Headless, it lists misspellings with suggestions and changes, changes all,
 //! or adds words to the dictionary; the UI's dialog drives the same actions. Offsets are
 //! character indices.
@@ -11,8 +11,8 @@
 
 use std::collections::HashSet;
 
-use photocraft_doc::{Document, LayerContent, LayerId};
-use photocraft_text::spell::Dictionary;
+use niveta_doc::{Document, LayerContent, LayerId};
+use niveta_text::spell::Dictionary;
 use serde_json::{Value, json};
 
 use crate::commands::{CommandSpec, layer_param};
@@ -121,7 +121,7 @@ fn change_all(s: &mut Session, p: &Value) -> Result<Value> {
         .into_iter()
         .filter_map(|id| {
             let t = text(&doc, id)?;
-            let hits: Vec<(usize, usize)> = photocraft_text::spell::words(t).into_iter().filter(|(a, b)| t[*a..*b] == word).collect();
+            let hits: Vec<(usize, usize)> = niveta_text::spell::words(t).into_iter().filter(|(a, b)| t[*a..*b] == word).collect();
             (!hits.is_empty()).then_some((id, hits))
         })
         .collect();

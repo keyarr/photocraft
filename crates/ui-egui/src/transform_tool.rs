@@ -12,12 +12,12 @@
 use std::sync::Arc;
 
 use egui::{Color32, CursorIcon, Pos2, Stroke, pos2, vec2};
-use photocraft_algo::transform::Homography;
-use photocraft_doc::{DocId, Document, LayerContent, LayerId};
-use photocraft_geom::warp::{BezierMesh, Warp, WarpStyle};
+use niveta_algo::transform::Homography;
+use niveta_doc::{DocId, Document, LayerContent, LayerId};
+use niveta_geom::warp::{BezierMesh, Warp, WarpStyle};
 use serde_json::json;
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 use crate::canvas::{ToolEvent, ViewXform};
 use crate::state::{MadeLayer, Tool, TransformMode, TransformSession};
 
@@ -68,7 +68,7 @@ pub struct TransformPreview {
     /// The tool the session began with: picking another one applies the transform.
     tool: Tool,
     /// Free Transform Path: the path as it was, drawn through the box instead of pixels.
-    path: Option<photocraft_doc::vector::Path>,
+    path: Option<niveta_doc::vector::Path>,
 }
 
 /// Grab radius of the box's handles, in screen points. Generous, so a corner is easy to catch;
@@ -84,14 +84,14 @@ pub const HANDLE_TOUCH_PX: f64 = 24.0;
 pub const TOUCH_ACTION_PX: f32 = 48.0;
 
 /// [`HANDLE_PX`] in document pixels at the current zoom.
-pub fn handle_tolerance(app: &PhotocraftApp) -> f64 {
+pub fn handle_tolerance(app: &NivetaApp) -> f64 {
     let px = if app.touch_active { HANDLE_TOUCH_PX } else { HANDLE_PX };
     px / app.current_zoom().max(0.01) as f64
 }
 
 /// Drop an in-progress box or warp drag when a two-finger gesture takes over the canvas for
 /// pan and pinch: the view moves under the box, so the stale grab would jump on release.
-pub(crate) fn cancel_gesture(app: &mut PhotocraftApp) {
+pub(crate) fn cancel_gesture(app: &mut NivetaApp) {
     if let Some(pv) = app.transform_preview.as_mut() {
         pv.gesture = None;
         pv.warp_drag = None;
@@ -100,7 +100,7 @@ pub(crate) fn cancel_gesture(app: &mut PhotocraftApp) {
 
 /// A box or warp drag is in progress: egui's long-touch clears its own drag state after
 /// holding still, so the canvas follows the pointer directly while this is true.
-pub(crate) fn gesture_active(app: &PhotocraftApp) -> bool {
+pub(crate) fn gesture_active(app: &NivetaApp) -> bool {
     app.transform_preview.as_ref().is_some_and(|pv| pv.gesture.is_some() || pv.warp_drag.is_some())
 }
 
@@ -179,14 +179,14 @@ pub fn transformed_outline(segs: &[crate::outline::Segment], rect: [f64; 4], qua
 
 /// Start Free Transform on the active layer (or its selected pixels), or on the targeted unlinked
 /// layer mask, alpha channel or Quick Mask.
-pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String> {
+pub fn begin(app: &mut NivetaApp, ctx: &egui::Context) -> Result<(), String> {
     if let Some((params, path)) = crate::vector_ui::free_transform_path(app) {
         return begin_path(app, ctx, params, path);
     }
     let target = crate::canvas::paint_target(app);
     let st = app.session.active().ok_or("no document")?;
     let doc = st.doc.clone();
-    let lone = photocraft_engine::transform_cmds::lone_target(&doc, st.active_layer, &json!({ "target": target })).map_err(|e| e.to_string())?.cloned();
+    let lone = niveta_engine::transform_cmds::lone_target(&doc, st.active_layer, &json!({ "target": target })).map_err(|e| e.to_string())?.cloned();
     if let Some(surf) = lone {
         return begin_lone(app, ctx, doc, surf, target);
     }
@@ -195,7 +195,7 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
     if matches!(layer.content, LayerContent::Adjustment(_)) && layer.mask.is_none() {
         return Err("Adjustment layers have nothing to transform".into());
     }
-    let b = photocraft_engine::transform_cmds::transform_bounds(&doc, layer);
+    let b = niveta_engine::transform_cmds::transform_bounds(&doc, layer);
     if b.is_empty() {
         return Err("Could not transform: the layer is empty".into());
     }
@@ -207,7 +207,7 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
     let mut lifted = None;
     if let Some(sel) = doc.selection.clone().filter(|_| !layer.is_group() && layer.surface().is_some()) {
         if let Some(surf) = pd.layer_mut(id).and_then(|l| l.surface_mut()) {
-            let (l, rest) = photocraft_engine::transform_cmds::split_selected(surf, &sel);
+            let (l, rest) = niveta_engine::transform_cmds::split_selected(surf, &sel);
             *surf = rest;
             lifted = Some(l);
         }
@@ -253,7 +253,7 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
 
 /// Free Transform on a copy (⌥⌘T, no menu item): duplicates the active layer (with a selection,
 /// its selected pixels, as Layer via Copy) and transforms the copy (#352).
-pub fn begin_copy(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String> {
+pub fn begin_copy(app: &mut NivetaApp, ctx: &egui::Context) -> Result<(), String> {
     let selection = app.session.active().is_some_and(|d| d.doc.selection.is_some());
     let params = if selection { json!({}) } else { json!({"inPlace": true}) };
     app.run(if selection { "layer.new.layerViaCopy" } else { "layer.duplicate" }, params)?;
@@ -272,7 +272,7 @@ pub fn begin_copy(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), St
 
 /// Free Transform on the layer a file dropped on the canvas just placed, like the reference app's
 /// Place: Esc takes the place back, ↩ makes the place and the transform one Place Embedded step.
-pub fn begin_placed(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String> {
+pub fn begin_placed(app: &mut NivetaApp, ctx: &egui::Context) -> Result<(), String> {
     begin(app, ctx)?;
     if let Some(t) = app.ui.transform.as_mut() {
         t.made = Some(MadeLayer::Place);
@@ -282,7 +282,7 @@ pub fn begin_placed(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), 
 
 /// Undoes the layer a cancelled or failed session made (⌥⌘T's copy, a placed file), leaving
 /// nothing to redo.
-fn take_back_made(app: &mut PhotocraftApp, document: DocId, layer: LayerId) {
+fn take_back_made(app: &mut NivetaApp, document: DocId, layer: LayerId) {
     // Tabs can move or close while transforming. Only undo the creation in its own document,
     // and only while it is still the latest step (it may already have been undone).
     let Some(index) = app.session.documents().iter().position(|st| {
@@ -307,11 +307,11 @@ fn take_back_made(app: &mut PhotocraftApp, document: DocId, layer: LayerId) {
 
 /// After the transform: the step that made the layer and the transform become one history step,
 /// the transform's for a copy and Place Embedded for a placed file.
-fn fold_made(app: &mut PhotocraftApp, made: MadeLayer) {
+fn fold_made(app: &mut NivetaApp, made: MadeLayer) {
     if let Some(st) = app.session.active_mut() {
         st.history.purge_last();
         if made == MadeLayer::Place {
-            st.history.set_current_label(photocraft_engine::file_cmds::PLACE_EMBEDDED);
+            st.history.set_current_label(niveta_engine::file_cmds::PLACE_EMBEDDED);
         }
     }
 }
@@ -320,13 +320,13 @@ fn fold_made(app: &mut PhotocraftApp, made: MadeLayer) {
 /// box frames its content (within the selection) and previews the moving values in grey over the
 /// document with them vacated.
 fn begin_lone(
-    app: &mut PhotocraftApp,
+    app: &mut NivetaApp,
     ctx: &egui::Context,
     doc: Arc<Document>,
-    surf: photocraft_raster::Surface,
+    surf: niveta_raster::Surface,
     target: serde_json::Value,
 ) -> Result<(), String> {
-    use photocraft_engine::transform_cmds as tc;
+    use niveta_engine::transform_cmds as tc;
     let b = tc::target_bounds(&doc, &surf);
     if b.is_empty() {
         return Err("Could not transform: nothing is selected".into());
@@ -335,7 +335,7 @@ fn begin_lone(
     let sel = match &doc.selection {
         Some(s) => s,
         None => {
-            let mut s = photocraft_raster::Surface::new(photocraft_color::PixelFormat::GRAY8);
+            let mut s = niveta_raster::Surface::new(niveta_color::PixelFormat::GRAY8);
             s.fill_rect(b, &[1.0]);
             whole = s;
             &whole
@@ -389,7 +389,7 @@ fn begin_lone(
 
 /// Edit › Free Transform Path: the box frames the path's anchors and handles and draws the
 /// path through it; OK commits one `path.transform` step.
-fn begin_path(app: &mut PhotocraftApp, ctx: &egui::Context, params: serde_json::Value, path: photocraft_doc::vector::Path) -> Result<(), String> {
+fn begin_path(app: &mut NivetaApp, ctx: &egui::Context, params: serde_json::Value, path: niveta_doc::vector::Path) -> Result<(), String> {
     let (x0, y0, x1, y1) = path.control_bounds().ok_or("the path has no points to transform")?;
     let st = app.session.active().ok_or("no document")?;
     let doc = st.doc.clone();
@@ -435,7 +435,7 @@ fn begin_path(app: &mut PhotocraftApp, ctx: &egui::Context, params: serde_json::
 
 /// The affine map taking `rect`'s corners to `quad`'s; `None` when the box was distorted out of a
 /// parallelogram (Distort, Perspective), which an affine path transform can't follow.
-fn rect_to_quad_affine(r: [f64; 4], q: [[f64; 2]; 4]) -> Option<photocraft_geom::Affine> {
+fn rect_to_quad_affine(r: [f64; 4], q: [[f64; 2]; 4]) -> Option<niveta_geom::Affine> {
     let (w, h) = (r[2] - r[0], r[3] - r[1]);
     if w <= 0.0 || h <= 0.0 {
         return None;
@@ -447,12 +447,12 @@ fn rect_to_quad_affine(r: [f64; 4], q: [[f64; 2]; 4]) -> Option<photocraft_geom:
     let (a, b) = ((q[1][0] - q[0][0]) / w, (q[1][1] - q[0][1]) / w);
     let (c, d) = ((q[3][0] - q[0][0]) / h, (q[3][1] - q[0][1]) / h);
     let m = [a, b, c, d, q[0][0] - a * r[0] - c * r[1], q[0][1] - b * r[0] - d * r[1]];
-    m.iter().all(|v| v.is_finite()).then_some(photocraft_geom::Affine { m })
+    m.iter().all(|v| v.is_finite()).then_some(niveta_geom::Affine { m })
 }
 
 /// Start Select › Transform Selection: the same box over the selection's bounds, previewing the
 /// selection mask (the marching ants are hidden meanwhile); commits `select.transformSelection`.
-pub fn begin_selection(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String> {
+pub fn begin_selection(app: &mut NivetaApp, ctx: &egui::Context) -> Result<(), String> {
     let st = app.session.active().ok_or("no document")?;
     let doc = st.doc.clone();
     let sel = doc.selection.clone().ok_or("no selection")?;
@@ -512,7 +512,7 @@ pub fn begin_selection(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(
 }
 
 /// Start (or switch an active Free Transform into) Warp mode.
-pub fn begin_warp(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String> {
+pub fn begin_warp(app: &mut NivetaApp, ctx: &egui::Context) -> Result<(), String> {
     let fresh = app.ui.transform.is_none();
     if fresh {
         begin(app, ctx)?;
@@ -527,9 +527,9 @@ pub fn begin_warp(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), St
 
 /// Switch to Warp mode: a smart object's existing warp (when the box is untouched), else a
 /// custom mesh following the current box (so a transform made first carries over).
-pub fn enter_warp(app: &mut PhotocraftApp) {
+pub fn enter_warp(app: &mut NivetaApp) {
     let existing =
-        app.session.active().and_then(|d| d.doc.layer(LayerId(app.ui.transform.as_ref()?.layer)).and_then(photocraft_engine::warp_cmds::smart_warp_doc_space));
+        app.session.active().and_then(|d| d.doc.layer(LayerId(app.ui.transform.as_ref()?.layer)).and_then(niveta_engine::warp_cmds::smart_warp_doc_space));
     let Some(t) = app.ui.transform.as_mut() else { return };
     // Warp moves layers only: a lone mask, channel or path keeps the box.
     if t.warp.is_some() || t.target.is_some() || t.path.is_some() {
@@ -554,7 +554,7 @@ pub fn enter_warp(app: &mut PhotocraftApp) {
 
 /// Leave Warp mode (back to the box; warp edits are dropped, like Photoshop's mode toggle on an
 /// untouched warp).
-pub fn leave_warp(app: &mut PhotocraftApp) {
+pub fn leave_warp(app: &mut NivetaApp) {
     if let Some(t) = app.ui.transform.as_mut() {
         t.warp = None;
     }
@@ -572,8 +572,8 @@ pub fn leave_warp(app: &mut PhotocraftApp) {
 fn preview_image(
     doc: &Document,
     id: LayerId,
-    lifted: Option<&photocraft_raster::Surface>,
-    b: photocraft_geom::Rect,
+    lifted: Option<&niveta_raster::Surface>,
+    b: niveta_geom::Rect,
     max_side: usize,
 ) -> (egui::ColorImage, [f32; 2]) {
     let layer = doc.layer(id);
@@ -581,7 +581,7 @@ fn preview_image(
     let mask = layer.and_then(|l| preview_mask(l, b));
     // Groups and type/fill layers preview from a flattened render of just that layer.
     let rendered;
-    let surf: Option<&photocraft_raster::Surface> = match (lifted, layer.and_then(|l| l.surface())) {
+    let surf: Option<&niveta_raster::Surface> = match (lifted, layer.and_then(|l| l.surface())) {
         (Some(s), _) => Some(s),
         (None, Some(s)) if layer.is_some_and(|l| matches!(l.content, LayerContent::Raster(_))) => Some(s),
         _ => {
@@ -591,8 +591,8 @@ fn preview_image(
                     l.visible = false;
                 }
             }
-            let buf = photocraft_compose::render(&solo, b);
-            let mut s = photocraft_raster::Surface::new(photocraft_color::PixelFormat::RGBA8);
+            let buf = niveta_compose::render(&solo, b);
+            let mut s = niveta_raster::Surface::new(niveta_color::PixelFormat::RGBA8);
             let flat: Vec<f32> = buf.px.iter().flat_map(|p| *p).collect();
             s.write_region(b, &flat);
             rendered = s;
@@ -608,25 +608,25 @@ fn preview_image(
 /// The layer's masks as the moving texels carry them: the enabled masks when all of them are linked
 /// (the vector mask and feathering folded in as the compositor applies them), else the linked
 /// pixel mask alone. `None` when no enabled mask moves with the pixels.
-fn preview_mask(l: &photocraft_doc::Layer, b: photocraft_geom::Rect) -> Option<crate::transform_tex::PreviewMask> {
+fn preview_mask(l: &niveta_doc::Layer, b: niveta_geom::Rect) -> Option<crate::transform_tex::PreviewMask> {
     use crate::transform_tex::PreviewMask;
     let pixel = l.mask.as_ref().filter(|m| m.enabled);
     let vector = l.vector_mask.as_ref().filter(|v| v.enabled);
     let linked_pixel = pixel.filter(|m| m.linked);
     if pixel.is_none_or(|m| m.linked)
         && vector.is_some_and(|v| v.linked)
-        && let Some(surface) = photocraft_compose::masks::combined_mask(l, b)
+        && let Some(surface) = niveta_compose::masks::combined_mask(l, b)
     {
         return Some(PreviewMask { surface, density: 1.0 });
     }
     linked_pixel.map(|m| PreviewMask { surface: m.surface.clone(), density: m.density })
 }
 
-fn contains(l: &photocraft_doc::Layer, id: LayerId) -> bool {
+fn contains(l: &niveta_doc::Layer, id: LayerId) -> bool {
     l.id == id || matches!(&l.content, LayerContent::Group(g) if g.children.iter().any(|c| contains(c, id)))
 }
 
-pub fn commit(app: &mut PhotocraftApp) {
+pub fn commit(app: &mut NivetaApp) {
     let document = app.transform_preview.as_ref().map(|pv| pv.doc.id);
     if document.is_some_and(|id| app.session.active().is_none_or(|st| st.doc.id != id)) {
         cancel(app);
@@ -700,7 +700,7 @@ pub fn commit(app: &mut PhotocraftApp) {
 /// never stays on a layer that is no longer the active one (#1400). Checked every frame and before
 /// each pointer event, so a press with a tool chosen just before it (`ui.pointer`'s `tool`) goes to
 /// that tool.
-pub fn end_if_left(app: &mut PhotocraftApp) {
+pub fn end_if_left(app: &mut NivetaApp) {
     let Some(t) = &app.ui.transform else { return };
     let Some(st) = app.session.active() else { return cancel(app) };
 
@@ -727,7 +727,7 @@ pub fn end_if_left(app: &mut PhotocraftApp) {
     }
 }
 
-pub fn cancel(app: &mut PhotocraftApp) {
+pub fn cancel(app: &mut NivetaApp) {
     let transform = app.ui.transform.take();
     let preview = app.transform_preview.take();
     if let (Some(t), Some(pv)) = (transform, preview)
@@ -738,7 +738,7 @@ pub fn cancel(app: &mut PhotocraftApp) {
 }
 
 /// The session's starting box: where Undo stops.
-fn start_steps(app: &mut PhotocraftApp) {
+fn start_steps(app: &mut NivetaApp) {
     if let (Some(t), Some(pv)) = (&app.ui.transform, app.transform_preview.as_mut()) {
         pv.steps = Steps { settled: Some(Step::of(t)), ..Steps::default() };
     }
@@ -746,7 +746,7 @@ fn start_steps(app: &mut PhotocraftApp) {
 
 /// Record the box as an undo step whenever it comes to rest in a new state: once per drag (on
 /// release), nudge or option edit (once typing in its field ends). Call once per frame.
-pub fn track_steps(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn track_steps(app: &mut NivetaApp, ctx: &egui::Context) {
     let (Some(t), Some(pv)) = (&app.ui.transform, app.transform_preview.as_mut()) else { return };
     if pv.gesture.is_some() || pv.warp_drag.is_some() || ctx.input(|i| i.pointer.any_down()) || ctx.text_edit_focused() {
         return;
@@ -756,7 +756,7 @@ pub fn track_steps(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 /// While transforming, Undo and Redo apply to the box: `Some(enabled)` for those commands (and
 /// Toggle Last State, which would change the document under the box), `None` for the rest.
-pub fn is_enabled(app: &PhotocraftApp, id: &str) -> Option<bool> {
+pub fn is_enabled(app: &NivetaApp, id: &str) -> Option<bool> {
     let t = app.ui.transform.as_ref()?;
     let steps = app.transform_preview.as_ref().map(|pv| &pv.steps);
     match id {
@@ -770,7 +770,7 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> Option<bool> {
 /// While transforming, the box owns the history for every caller (menus, shortcuts, the control
 /// channel, MCP): Undo and Redo step through it, and Toggle Last State, which would change the
 /// document under the box, is refused. `None` for other commands or when not transforming.
-pub fn intercept(app: &mut PhotocraftApp, id: &str) -> Option<Result<serde_json::Value, String>> {
+pub fn intercept(app: &mut NivetaApp, id: &str) -> Option<Result<serde_json::Value, String>> {
     app.ui.transform.as_ref()?;
     match id {
         "edit.undo" => Some(Ok(step(app, false))),
@@ -781,7 +781,7 @@ pub fn intercept(app: &mut PhotocraftApp, id: &str) -> Option<Result<serde_json:
 }
 
 /// Undo (or redo) one step of the open session; nothing mid-drag or with no step to take.
-fn step(app: &mut PhotocraftApp, redo: bool) -> serde_json::Value {
+fn step(app: &mut NivetaApp, redo: bool) -> serde_json::Value {
     let Some(t) = app.ui.transform.as_mut() else { return serde_json::Value::Null };
     let Some(pv) = app.transform_preview.as_mut().filter(|pv| pv.gesture.is_none() && pv.warp_drag.is_none()) else {
         return serde_json::Value::Null;
@@ -844,7 +844,7 @@ pub(crate) struct Gesture {
 }
 
 /// Pointer input while transforming. Returns false when no transform is active.
-pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) -> bool {
+pub fn pointer(app: &mut NivetaApp, ev: ToolEvent, mods: egui::Modifiers) -> bool {
     let Some(t) = app.ui.transform.clone() else { return false };
     let tol = handle_tolerance(app);
     if t.warp.is_some() {
@@ -1200,7 +1200,7 @@ fn split_cursor(tool: SplitTool) -> CursorIcon {
 
 /// Armed split tool, or Option held: the guide tracks the pointer and the split lands on release.
 /// Returns false when this event is an ordinary control-point drag.
-fn split_gesture(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) -> bool {
+fn split_gesture(app: &mut NivetaApp, ev: ToolEvent, mods: egui::Modifiers) -> bool {
     let armed = app.transform_preview.as_ref().and_then(|p| p.split_tool);
     let placing = app.transform_preview.as_ref().is_some_and(|p| p.split_placing);
     match ev {
@@ -1245,7 +1245,7 @@ fn split_gesture(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) 
 /// Drags a warp control point. Anchors (patch corners) carry their handles along. Preset warps
 /// turn into a custom mesh on the first drag. An armed split tool (or Option) places a split
 /// where the pointer is released instead of moving a point.
-fn warp_pointer(app: &mut PhotocraftApp, ev: ToolEvent, tol: f64, mods: egui::Modifiers) {
+fn warp_pointer(app: &mut NivetaApp, ev: ToolEvent, tol: f64, mods: egui::Modifiers) {
     if split_gesture(app, ev, mods) {
         return;
     }
@@ -1287,7 +1287,7 @@ fn warp_pointer(app: &mut PhotocraftApp, ev: ToolEvent, tol: f64, mods: egui::Mo
 }
 
 /// Runs a warp-edit command against the mesh in the open Warp session and writes the mesh back.
-pub fn edit_session_warp(app: &mut PhotocraftApp, id: &str, params: &serde_json::Value) -> Result<(), String> {
+pub fn edit_session_warp(app: &mut NivetaApp, id: &str, params: &serde_json::Value) -> Result<(), String> {
     let Some(w) = app.ui.transform.as_ref().and_then(|t| t.warp.clone()) else { return Err("not warping".into()) };
     let mut p = if params.is_object() { params.clone() } else { json!({}) };
     if p.get("warp").is_none() {
@@ -1308,7 +1308,7 @@ pub fn edit_session_warp(app: &mut PhotocraftApp, id: &str, params: &serde_json:
 }
 
 /// Applies a split-warp command to the mesh being edited (at the box centre unless `at`).
-pub fn split(app: &mut PhotocraftApp, id: &str, at: Option<[f64; 2]>) -> Result<(), String> {
+pub fn split(app: &mut NivetaApp, id: &str, at: Option<[f64; 2]>) -> Result<(), String> {
     let mut p = json!({});
     if let Some(a) = at {
         p["at"] = json!(a);
@@ -1318,7 +1318,7 @@ pub fn split(app: &mut PhotocraftApp, id: &str, at: Option<[f64; 2]>) -> Result<
 
 /// Cursor for hovering a document point while transforming. `alt` is Option, which arms a quick
 /// split while a warp is active.
-pub fn cursor(app: &PhotocraftApp, p: [f64; 2], alt: bool) -> Option<CursorIcon> {
+pub fn cursor(app: &NivetaApp, p: [f64; 2], alt: bool) -> Option<CursorIcon> {
     let t = app.ui.transform.as_ref()?;
     let tol = handle_tolerance(app);
     if let Some(w) = &t.warp {
@@ -1346,7 +1346,7 @@ pub fn cursor(app: &PhotocraftApp, p: [f64; 2], alt: bool) -> Option<CursorIcon>
 }
 
 /// Warped preview of the moving pixels plus the box, handles and reference point.
-pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
+pub fn draw_overlay(app: &NivetaApp, painter: &egui::Painter, xf: &ViewXform) {
     let (Some(t), Some(pv)) = (&app.ui.transform, &app.transform_preview) else { return };
     let scr = |q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
     if let Some(w) = &t.warp {
@@ -1424,7 +1424,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
 
 /// Index of the handle under the finger: 0-3 corners, 4-7 edge mids (4=top,5=right,6=bottom,7=left).
 /// An in-progress drag wins; otherwise the nearest handle within the touch hitbox.
-fn hot_handle(app: &PhotocraftApp, pv: &TransformPreview, xf: &ViewXform, pts: &[Pos2], mids: &[Pos2], ctx: &egui::Context) -> Option<usize> {
+fn hot_handle(app: &NivetaApp, pv: &TransformPreview, xf: &ViewXform, pts: &[Pos2], mids: &[Pos2], ctx: &egui::Context) -> Option<usize> {
     if let Some(g) = pv.gesture {
         return match g.hit {
             Hit::Corner(i) => Some(i),
@@ -1616,7 +1616,7 @@ fn scale_limit_pct(side: f64) -> f32 {
 
 /// Options bar while transforming: reference point X/Y, W/H %, angle, interpolation, and, pinned
 /// to the right, the warp switch, cancel and commit.
-pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn options_bar(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let Some(t) = app.ui.transform.clone() else { return };
     let bar = ui.available_rect_before_wrap();
     // Inside a horizontal ScrollArea the available rect is unbounded, so pinning the actions
@@ -1652,7 +1652,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 
 /// Compact transform bar for phones: single-line horizontal strip. Coordinates (X, Y, W, H)
 /// are grouped in a "Position and Size" popover to eliminate label/value collision and save space.
-pub fn mobile_options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn mobile_options_bar(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let Some(t) = app.ui.transform.clone() else { return };
     if let Some(w) = t.warp.clone() {
         ui.horizontal(|ui| {
@@ -1784,7 +1784,7 @@ pub fn mobile_options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     });
 }
 
-fn apply_mobile_scale(app: &mut PhotocraftApp, link: bool, w: Option<f32>, h: Option<f32>, sx: f64, sy: f64, lim: (f32, f32)) {
+fn apply_mobile_scale(app: &mut NivetaApp, link: bool, w: Option<f32>, h: Option<f32>, sx: f64, sy: f64, lim: (f32, f32)) {
     let (wlim, hlim) = lim;
     let (kx, ky) = if link {
         let k = match (w, h) {
@@ -1800,7 +1800,7 @@ fn apply_mobile_scale(app: &mut PhotocraftApp, link: bool, w: Option<f32>, h: Op
     scale_about_pivot(app, kx, ky);
 }
 
-fn transform_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSession) {
+fn transform_fields(app: &mut NivetaApp, ui: &mut egui::Ui, t: &TransformSession) {
     let tk = crate::theme::Tokens::get(ui.ctx());
     let (sx, sy, angle, _) = readout(t);
     let lbl = |ui: &mut egui::Ui, s: &str| {
@@ -1883,7 +1883,7 @@ fn transform_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &TransformSes
 }
 
 /// Options bar fields in Warp mode: style, bend, the split icons and the grid menu.
-fn warp_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, w: &Warp) {
+fn warp_fields(app: &mut NivetaApp, ui: &mut egui::Ui, w: &Warp) {
     let tk = crate::theme::Tokens::get(ui.ctx());
     let lbl = |ui: &mut egui::Ui, s: &str| {
         ui.label(egui::RichText::new(s).color(tk.text_dim).size(12.0));
@@ -2019,7 +2019,7 @@ fn split_icon(ui: &mut egui::Ui, kind: &str, tip: &str, on: bool) -> egui::Respo
 }
 
 /// Warp switch, cancel and commit, kept on the right of the options bar.
-fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool) {
+fn transform_actions(app: &mut NivetaApp, ui: &mut egui::Ui, warping: bool) {
     ui.add_space(8.0);
     let commit_tip = if warping {
         crate::i18n::fmt(tl!("Commit warp ({key})"), &[("key", &crate::shortcuts::pretty("Enter"))])
@@ -2050,7 +2050,7 @@ fn transform_actions(app: &mut PhotocraftApp, ui: &mut egui::Ui, warping: bool) 
 }
 
 /// Scale the box along its own axes about the reference point.
-fn scale_about_pivot(app: &mut PhotocraftApp, kx: f64, ky: f64) {
+fn scale_about_pivot(app: &mut NivetaApp, kx: f64, ky: f64) {
     let Some(s) = app.ui.transform.as_mut() else { return };
     let Some(h) = Homography::rect_to_quad([0.0, 0.0, 1.0, 1.0], s.quad) else { return };
     let Some(inv) = h.inverse() else { return };
@@ -2062,7 +2062,7 @@ fn scale_about_pivot(app: &mut PhotocraftApp, kx: f64, ky: f64) {
     s.quad = [m(0.0, 0.0), m(1.0, 0.0), m(1.0, 1.0), m(0.0, 1.0)];
 }
 
-fn rotate_about_pivot(app: &mut PhotocraftApp, da: f64) {
+fn rotate_about_pivot(app: &mut NivetaApp, da: f64) {
     let Some(s) = app.ui.transform.as_mut() else { return };
     let (sn, cs) = da.sin_cos();
     let c = s.pivot;
@@ -2103,11 +2103,11 @@ mod tests {
     fn transform_bar_pins_warp_cancel_and_commit() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.ui.transform = Some(session());
         let width = 720.0;
         let mut h = Harness::builder().with_size(vec2(width, 48.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -2115,7 +2115,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
         h.run_steps(6);
         let commit = h.get_by_label("Commit transform").rect();
         let cancel = h.get_by_label("Cancel transform").rect();
@@ -2138,10 +2138,10 @@ mod tests {
     fn type_into_bar_field(n: usize, text: &str) -> TransformSession {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.ui.transform = Some(session());
         let mut h = Harness::builder().with_size(vec2(900.0, 48.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -2149,7 +2149,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
         h.run_steps(6);
         h.get_all_by_role(egui::accesskit::Role::SpinButton).nth(n).unwrap().click();
         h.run();
@@ -2164,7 +2164,7 @@ mod tests {
 
     #[test]
     fn editing_the_contents_of_a_dropped_file_keeps_the_layer() {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
 
         app.session.execute("layer.smartObjects.convertToSmartObject", json!({})).unwrap();
         app.sync_views();
@@ -2235,10 +2235,10 @@ mod tests {
     fn rotate_slider_drags_the_box_without_touching_history() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::{NodeT, Queryable};
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.ui.transform = Some(session());
         let mut h = Harness::builder().with_size(vec2(900.0, 48.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -2246,7 +2246,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
         h.run_steps(6);
         let slider = h
             .query_all_by_role(egui::accesskit::Role::Slider)
@@ -2319,19 +2319,19 @@ mod tests {
 
     #[test]
     fn split_tool_places_the_line_where_the_pointer_releases() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
         app.sync_views();
         app.session.execute("layer.new.layer", json!({})).unwrap();
         app.session
             .edit("paint", |doc, a| {
-                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(8, 8, 32, 32), &[1.0, 0.0, 0.0, 1.0]);
+                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(niveta_geom::Rect::new(8, 8, 32, 32), &[1.0, 0.0, 0.0, 1.0]);
                 Ok(())
             })
             .unwrap();
         begin_warp(&mut app, &egui::Context::default()).unwrap();
         app.transform_preview.as_mut().unwrap().split_tool = Some(SplitTool::Vertical);
-        let knots = |app: &PhotocraftApp| app.ui.transform.as_ref().unwrap().warp.as_ref().unwrap().mesh.as_ref().unwrap().us.clone();
+        let knots = |app: &NivetaApp| app.ui.transform.as_ref().unwrap().warp.as_ref().unwrap().mesh.as_ref().unwrap().us.clone();
         assert_eq!(knots(&app).len(), 2);
         let mods = egui::Modifiers::NONE;
         warp_pointer(&mut app, ToolEvent::Down { x: 20.0, y: 20.0, pressure: 1.0 }, 2.0, mods);
@@ -2356,13 +2356,13 @@ mod tests {
 
     #[test]
     fn split_of_a_grid_cuts_one_section_and_keeps_the_rest() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
         app.sync_views();
         app.session.execute("layer.new.layer", json!({})).unwrap();
         app.session
             .edit("paint", |doc, a| {
-                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(8, 8, 32, 32), &[1.0, 0.0, 0.0, 1.0]);
+                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(niveta_geom::Rect::new(8, 8, 32, 32), &[1.0, 0.0, 0.0, 1.0]);
                 Ok(())
             })
             .unwrap();
@@ -2528,13 +2528,13 @@ mod tests {
 
     #[test]
     fn begin_and_commit_through_the_engine() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
         app.sync_views();
         app.session.execute("layer.new.layer", json!({})).unwrap();
         app.session
             .edit("paint", |doc, a| {
-                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(8, 8, 24, 24), &[1.0, 0.0, 0.0, 1.0]);
+                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(niveta_geom::Rect::new(8, 8, 24, 24), &[1.0, 0.0, 0.0, 1.0]);
                 Ok(())
             })
             .unwrap();
@@ -2555,8 +2555,8 @@ mod tests {
     #[test]
     fn free_transform_a_copy() {
         let ctx = egui::Context::default();
-        let bounds = |app: &PhotocraftApp, i: usize| app.session.active().unwrap().doc.layers[i].surface().unwrap().content_bounds();
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let bounds = |app: &NivetaApp, i: usize| app.session.active().unwrap().doc.layers[i].surface().unwrap().content_bounds();
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         let (layers, steps) = (app.session.active().unwrap().doc.layers.len(), app.session.active().unwrap().history.past_len());
         crate::menus::invoke(&mut app, &ctx, "edit.freeTransformCopy", json!({})).unwrap();
         assert_eq!(app.ui.transform.as_ref().unwrap().made, Some(MadeLayer::Copy));
@@ -2574,8 +2574,8 @@ mod tests {
         commit(&mut app);
         let st = app.session.active().unwrap();
         assert_eq!((st.doc.layers.len(), st.history.past_len()), (layers + 1, steps + 1));
-        assert_eq!(bounds(&app, layers - 1), photocraft_geom::Rect::new(8, 8, 24, 24), "the original stays");
-        assert_eq!(bounds(&app, layers), photocraft_geom::Rect::new(28, 8, 44, 24), "the copy moved");
+        assert_eq!(bounds(&app, layers - 1), niveta_geom::Rect::new(8, 8, 24, 24), "the original stays");
+        assert_eq!(bounds(&app, layers), niveta_geom::Rect::new(28, 8, 44, 24), "the copy moved");
         app.session.undo();
         assert_eq!(app.session.active().unwrap().doc.layers.len(), layers, "one undo removes copy and move");
         // With a selection: Layer via Copy, so only the selected pixels are copied.
@@ -2592,7 +2592,7 @@ mod tests {
     fn cancelling_a_copy_after_switching_documents_preserves_the_active_document() {
         for reorder in [false, true] {
             for finish in [cancel, end_if_left, commit] {
-                let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+                let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
                 let original = app.session.active().unwrap().doc.clone();
                 let steps = app.session.active().unwrap().history.past_len();
                 begin_copy(&mut app, &egui::Context::default()).unwrap();
@@ -2625,7 +2625,7 @@ mod tests {
 
     #[test]
     fn cancelling_a_copy_after_its_document_closes_does_not_undo_another_document() {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         begin_copy(&mut app, &egui::Context::default()).unwrap();
         app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
@@ -2641,7 +2641,7 @@ mod tests {
 
     #[test]
     fn cancelling_an_already_undone_copy_preserves_history_and_redo() {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         begin_copy(&mut app, &egui::Context::default()).unwrap();
         assert!(app.session.undo());
         let st = app.session.active().unwrap();
@@ -2656,7 +2656,7 @@ mod tests {
 
     #[test]
     fn cancelling_a_copy_does_not_undo_a_later_edit() {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         begin_copy(&mut app, &egui::Context::default()).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         let st = app.session.active().unwrap();
@@ -2670,11 +2670,11 @@ mod tests {
     /// #670: picking another tool applies the open transform, as one history step.
     #[test]
     fn picking_another_tool_applies_the_transform() {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         app.ui.tool = Tool::Move;
         let steps = app.session.active().unwrap().history.past_len();
         let mut h = egui_kittest::Harness::builder().with_size(vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(move |cc| {
-            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+            NivetaApp::setup_context(&cc.egui_ctx, Default::default());
             app
         });
         h.run_steps(4);
@@ -2692,7 +2692,7 @@ mod tests {
         assert!(app.ui.transform.is_none() && app.transform_preview.is_none());
         let st = app.session.active().unwrap();
         assert_eq!(st.history.past_len(), steps + 1);
-        assert_eq!(st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().content_bounds(), photocraft_geom::Rect::new(28, 8, 44, 24));
+        assert_eq!(st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().content_bounds(), niveta_geom::Rect::new(28, 8, 44, 24));
     }
 
     /// #1400: selecting another layer while transforming applies the box to the layer it was on,
@@ -2700,12 +2700,12 @@ mod tests {
     #[test]
     fn selecting_another_layer_applies_the_transform_and_the_next_one_follows() {
         let ctx = egui::Context::default();
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         let first = app.session.active().unwrap().active_layer.unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         app.session
             .edit("paint", |doc, a| {
-                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(40, 40, 56, 60), &[0.0, 0.0, 1.0, 1.0]);
+                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(niveta_geom::Rect::new(40, 40, 56, 60), &[0.0, 0.0, 1.0, 1.0]);
                 Ok(())
             })
             .unwrap();
@@ -2724,8 +2724,8 @@ mod tests {
         assert_eq!(st.active_layer, Some(second));
         assert_eq!(st.history.past_len(), steps + 1, "applied as one step");
         let bounds = |id: LayerId| st.doc.layer(id).unwrap().surface().unwrap().content_bounds();
-        assert_eq!(bounds(first), photocraft_geom::Rect::new(28, 8, 44, 24), "applied to the layer it was on");
-        assert_eq!(bounds(second), photocraft_geom::Rect::new(40, 40, 56, 60), "the new layer is untouched");
+        assert_eq!(bounds(first), niveta_geom::Rect::new(28, 8, 44, 24), "applied to the layer it was on");
+        assert_eq!(bounds(second), niveta_geom::Rect::new(40, 40, 56, 60), "the new layer is untouched");
         crate::menus::invoke(&mut app, &ctx, "edit.freeTransform", json!({})).unwrap();
         let t = app.ui.transform.as_ref().unwrap();
         assert_eq!((t.layer, t.rect), (second.0, [40.0, 40.0, 56.0, 60.0]), "the next box is on the selected layer");
@@ -2735,7 +2735,7 @@ mod tests {
     #[test]
     fn selecting_another_layer_keeps_a_transform_selection_open() {
         let ctx = egui::Context::default();
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         let first = app.session.active().unwrap().active_layer.unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         app.run("select.all", json!({})).unwrap();
@@ -2749,7 +2749,7 @@ mod tests {
     #[test]
     fn a_pointer_request_with_another_tool_applies_the_transform_first() {
         let ctx = egui::Context::default();
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         app.ui.tool = Tool::Move;
         crate::menus::invoke(&mut app, &ctx, "edit.freeTransform", json!({})).unwrap();
         if let Some(t) = app.ui.transform.as_mut() {
@@ -2768,14 +2768,14 @@ mod tests {
     }
 
     /// Drags with real pointer events (snapping off so the drops land exactly).
-    fn press_drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2], m: egui::Modifiers) {
+    fn press_drag(app: &mut NivetaApp, from: [f64; 2], to: [f64; 2], m: egui::Modifiers) {
         crate::canvas::tool_event(app, ToolEvent::Down { x: from[0], y: from[1], pressure: 1.0 }, m);
         crate::canvas::tool_event(app, ToolEvent::Up { x: to[0], y: to[1] }, m);
     }
 
     #[test]
     fn distort_mode_moves_one_corner_and_ignores_rotate_and_edges() {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         app.ui.extras.snap = false;
         let ctx = egui::Context::default();
         crate::menus::invoke(&mut app, &ctx, "edit.transform.distort", json!({})).unwrap();
@@ -2799,7 +2799,7 @@ mod tests {
     fn a_distort_corner_stops_before_the_box_folds_over() {
         // #1323: dragging a corner across the opposite diagonal stops short of it, so the box
         // stays convex instead of folding into a bow tie.
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         app.ui.extras.snap = false;
         let ctx = egui::Context::default();
         crate::menus::invoke(&mut app, &ctx, "edit.transform.distort", json!({})).unwrap();
@@ -2845,7 +2845,7 @@ mod tests {
         // Through the box: a plain corner drag, then a plain right-edge drag, on a 16×16 square.
         for (legacy, proportional) in [(false, true), (true, false)] {
             for at_edge in [false, true] {
-                let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+                let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
                 app.ui.extras.snap = false;
                 app.session.prefs.edit(|p| p.general.use_legacy_free_transform = legacy);
                 begin(&mut app, &egui::Context::default()).unwrap();
@@ -2861,7 +2861,7 @@ mod tests {
 
     #[test]
     fn right_click_while_transforming_switches_the_mode() {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         let ctx = egui::Context::default();
         begin(&mut app, &ctx).unwrap();
         assert!(crate::canvas_tool_menu::open_transform(&mut app, [10.0, 10.0]));
@@ -2872,8 +2872,8 @@ mod tests {
         assert_eq!(app.ui.transform.as_ref().unwrap().mode, TransformMode::Distort);
     }
 
-    fn app_with_square(size: u32, fill: photocraft_geom::Rect) -> PhotocraftApp {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    fn app_with_square(size: u32, fill: niveta_geom::Rect) -> NivetaApp {
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": size, "height": size})).unwrap();
         app.sync_views();
         app.session.execute("layer.new.layer", json!({})).unwrap();
@@ -2898,7 +2898,7 @@ mod tests {
     #[test]
     fn preview_texture_is_full_resolution() {
         // #91: the preview used to be sampled down to 2048 px, so big layers looked blurry at 100%.
-        let mut app = app_with_square(3000, photocraft_geom::Rect::new(10, 20, 2810, 2420));
+        let mut app = app_with_square(3000, niveta_geom::Rect::new(10, 20, 2810, 2420));
         let ctx = gpu_ctx();
         begin(&mut app, &ctx).unwrap();
         let pv = app.transform_preview.as_ref().unwrap();
@@ -2922,7 +2922,7 @@ mod tests {
 
     #[test]
     fn alt_click_moves_the_reference_point_and_edges_skew() {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         let ctx = egui::Context::default();
         begin(&mut app, &ctx).unwrap();
         assert!(pointer(&mut app, ToolEvent::Down { x: 40.0, y: 40.0, pressure: 1.0 }, egui::Modifiers::ALT));
@@ -2944,12 +2944,12 @@ mod tests {
         assert_eq!((s.quad[1], s.quad[2]), ([100.0, -10.0], [100.0, 60.0]));
     }
 
-    /// `cargo test --release -p photocraft-ui-egui transform_preview_bench -- --ignored --nocapture`
+    /// `cargo test --release -p niveta-ui-egui transform_preview_bench -- --ignored --nocapture`
     #[test]
     #[ignore]
     fn transform_preview_bench() {
         let (w, h) = (6000, 4000);
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": w, "height": h})).unwrap();
         app.sync_views();
         app.session.execute("layer.new.layer", json!({})).unwrap();
@@ -2993,11 +2993,11 @@ mod tests {
 
     #[test]
     fn transform_selection_moves_only_the_outline() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
         app.sync_views();
         app.session.execute("select.rect", json!({"x": 8, "y": 8, "width": 16, "height": 16})).unwrap();
-        let px0 = app.session.active().unwrap().doc.layers[0].surface().unwrap().read_region(photocraft_geom::Rect::new(0, 0, 64, 64));
+        let px0 = app.session.active().unwrap().doc.layers[0].surface().unwrap().read_region(niveta_geom::Rect::new(0, 0, 64, 64));
         let ctx = egui::Context::default();
         crate::menus::invoke(&mut app, &ctx, "select.transformSelection", json!({})).unwrap();
         let t = app.ui.transform.as_ref().unwrap();
@@ -3008,18 +3008,18 @@ mod tests {
         let st = app.session.active().unwrap();
         let b = st.doc.selection.as_ref().unwrap().content_bounds();
         assert!(b.width().abs_diff(32) <= 2 && b.x0.abs_diff(0) <= 1, "{b:?}");
-        assert_eq!(st.doc.layers[0].surface().unwrap().read_region(photocraft_geom::Rect::new(0, 0, 64, 64)), px0);
+        assert_eq!(st.doc.layers[0].surface().unwrap().read_region(niveta_geom::Rect::new(0, 0, 64, 64)), px0);
     }
 
     #[test]
     fn warp_mode_drags_anchor_with_handles_splits_and_commits() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
         app.sync_views();
         app.session.execute("layer.new.layer", json!({})).unwrap();
         app.session
             .edit("paint", |doc, a| {
-                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(8, 8, 32, 32), &[1.0, 0.0, 0.0, 1.0]);
+                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(niveta_geom::Rect::new(8, 8, 32, 32), &[1.0, 0.0, 0.0, 1.0]);
                 Ok(())
             })
             .unwrap();
@@ -3052,7 +3052,7 @@ mod tests {
 
     #[test]
     fn replacing_the_warp_mesh_cancels_a_pending_point_drag() {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 32, 32));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 32, 32));
         let ctx = egui::Context::default();
         begin_warp(&mut app, &ctx).unwrap();
         for _ in 0..3 {
@@ -3073,13 +3073,13 @@ mod tests {
     /// step); grabbing a point turns it into a custom mesh.
     #[test]
     fn a_press_on_a_preset_warp_converts_it_only_when_it_grabs_a_point() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
         app.sync_views();
         app.session.execute("layer.new.layer", json!({})).unwrap();
         app.session
             .edit("paint", |doc, a| {
-                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(8, 8, 32, 32), &[1.0, 0.0, 0.0, 1.0]);
+                doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(niveta_geom::Rect::new(8, 8, 32, 32), &[1.0, 0.0, 0.0, 1.0]);
                 Ok(())
             })
             .unwrap();
@@ -3098,13 +3098,13 @@ mod tests {
     // ---- Layer masks (#205) ----
 
     /// `app_with_square` (red over 8..24) plus a reveal-all mask hiding x < 16.
-    fn masked_app(linked: bool) -> PhotocraftApp {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    fn masked_app(linked: bool) -> NivetaApp {
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         app.session.execute("layer.layerMask.revealAll", json!({})).unwrap();
         app.session
             .edit("mask", |doc, a| {
                 let m = doc.layer_mut(a.unwrap()).unwrap().mask.as_mut().unwrap();
-                m.surface.fill_rect(photocraft_geom::Rect::new(0, 0, 16, 64), &[0.0]);
+                m.surface.fill_rect(niveta_geom::Rect::new(0, 0, 16, 64), &[0.0]);
                 m.linked = linked;
                 Ok(())
             })
@@ -3122,7 +3122,7 @@ mod tests {
             let app = masked_app(linked);
             let st = app.session.active().unwrap();
             let id = st.active_layer.unwrap();
-            let b = photocraft_geom::Rect::new(8, 8, 24, 24);
+            let b = niveta_geom::Rect::new(8, 8, 24, 24);
             let (img, _) = preview_image(&st.doc, id, None, b, 4096);
             // Texel x = doc x − 8: x 10 is hidden by the mask, x 20 shows.
             assert_eq!(texel_alpha(&img, 12, 4), 255);
@@ -3136,8 +3136,8 @@ mod tests {
         let st = app.session.active().unwrap();
         let sel = st.doc.selection.clone().unwrap();
         let id = st.active_layer.unwrap();
-        let (lifted, _) = photocraft_engine::transform_cmds::split_selected(st.doc.layer(id).unwrap().surface().unwrap(), &sel);
-        let b = photocraft_geom::Rect::new(8, 8, 20, 24);
+        let (lifted, _) = niveta_engine::transform_cmds::split_selected(st.doc.layer(id).unwrap().surface().unwrap(), &sel);
+        let b = niveta_geom::Rect::new(8, 8, 20, 24);
         let (img, _) = preview_image(&st.doc, id, Some(&lifted), b, 4096);
         assert_eq!(texel_alpha(&img, 2, 4), 0, "masked");
         assert_eq!(texel_alpha(&img, 10, 4), 255, "revealed");
@@ -3164,7 +3164,7 @@ mod tests {
         let l = st.doc.layer(st.active_layer.unwrap()).unwrap();
         let m = &l.mask.as_ref().unwrap().surface;
         assert!(m.sample_channel(4, 30, 0) > 0.99 && m.sample_channel(30, 30, 0) < 0.01, "mask moved 20 px right");
-        assert_eq!(l.surface().unwrap().content_bounds(), photocraft_geom::Rect::new(8, 8, 24, 24), "pixels untouched");
+        assert_eq!(l.surface().unwrap().content_bounds(), niveta_geom::Rect::new(8, 8, 24, 24), "pixels untouched");
         // Warp mode doesn't apply to a lone mask.
         app.ui.mask_target = true;
         begin(&mut app, &ctx).unwrap();
@@ -3187,7 +3187,7 @@ mod tests {
     #[test]
     fn free_transform_moves_the_selected_path_not_pixels() {
         let ctx = egui::Context::default();
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
         app.sync_views();
         app.run("path.set", json!({"name": "work", "path": {"subpaths": [{"closed": true, "knots": [[10, 10], [30, 10], [30, 20], [10, 20]]}]}})).unwrap();
@@ -3224,7 +3224,7 @@ mod tests {
 
     #[test]
     fn touch_grab_is_twice_the_mouse_one() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.touch_active = false;
         assert!((handle_tolerance(&app) - 12.0).abs() < 1e-6);
         app.touch_active = true;
@@ -3233,7 +3233,7 @@ mod tests {
 
     #[test]
     fn a_two_finger_gesture_drops_the_box_drag() {
-        let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+        let mut app = app_with_square(64, niveta_geom::Rect::new(8, 8, 24, 24));
         begin(&mut app, &egui::Context::default()).unwrap();
         pointer(&mut app, ToolEvent::Down { x: 8.0, y: 8.0, pressure: 1.0 }, egui::Modifiers::NONE);
         assert!(app.transform_preview.as_ref().unwrap().gesture.is_some());
@@ -3248,10 +3248,10 @@ mod tests {
     fn bar_inside_a_horizontal_scroll_keeps_actions_near() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.ui.transform = Some(session());
         let mut h = Harness::builder().with_size(vec2(360.0, 48.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -3261,7 +3261,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
         h.run_steps(6);
         let commit = h.get_by_label("Commit transform").rect();
         assert!(commit.left() < 1200.0, "actions flow after the fields: {commit:?}");
@@ -3272,10 +3272,10 @@ mod tests {
     fn mobile_bar_shows_everything_without_scrolling() {
         use egui_kittest::Harness;
         use egui_kittest::kittest::Queryable;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.ui.transform = Some(session());
         let mut h = Harness::builder().with_size(vec2(360.0, 48.0)).build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
+            |ui, app: &mut NivetaApp| {
                 if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                     return;
                 }
@@ -3283,7 +3283,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::Studio);
         h.run_steps(6);
         for label in ["Position and Size", "Switch between free transform and warp modes"] {
             let r = h.get_by_label(label).rect();

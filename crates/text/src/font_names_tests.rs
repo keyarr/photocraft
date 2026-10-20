@@ -1,6 +1,6 @@
 //! Reproduce numeric subfamilies without redistributing proprietary fonts.
 use super::*;
-use photocraft_doc::text::CharStyle;
+use niveta_doc::text::CharStyle;
 
 fn numeric_font(source: &[u8], style: &str, ps: &str) -> Vec<u8> {
     let mut bytes = source.to_vec();
@@ -63,7 +63,7 @@ fn numeric_subfamilies_with_identical_weights_select_distinct_faces() {
 
 #[test]
 fn numeric_styles_shape_different_outlines_and_keep_psd_identity() {
-    use photocraft_doc::{TextLayer, text::TextRun};
+    use niveta_doc::{TextLayer, text::TextRun};
     let mut engine = crate::TextEngine::new();
     engine.fonts.register_font_data(numeric_font(INTER_REGULAR, "20", "UnrelatedPS20"));
     engine.fonts.register_font_data(numeric_font(INTER_SEMIBOLD, "30", "UnrelatedPS30"));

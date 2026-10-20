@@ -1,4 +1,4 @@
-use photocraft_codecs::{Image, decode, exif_orientation, upright_exif};
+use niveta_codecs::{Image, decode, exif_orientation, upright_exif};
 
 mod common;
 
@@ -103,7 +103,7 @@ fn big_tiff_orientation_6_and_8_are_applied_to_decoded_pixels() {
 /// means uncompressed strips with no predictor, classic offsets and unassociated alpha.
 #[test]
 fn default_tiff_is_baseline() {
-    use photocraft_codecs::{ChannelLayout, EncodeOptions, Format, SampleType, encode};
+    use niveta_codecs::{ChannelLayout, EncodeOptions, Format, SampleType, encode};
     use std::io::Cursor;
     use tiff::tags::Tag;
 

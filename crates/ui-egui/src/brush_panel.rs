@@ -15,18 +15,18 @@
 //! (`locks` in the brush, applied by the engine). The Brushes tab lives in [`crate::brushes_tab`].
 
 use egui::{Color32, CornerRadius, RichText, Sense, Stroke, vec2};
-use photocraft_engine::BrushSettings;
-use photocraft_engine::paint;
+use niveta_engine::BrushSettings;
+use niveta_engine::paint;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::brush_preview;
 use crate::theme::{self, Tokens};
-use crate::{PhotocraftApp, icons, widgets};
+use crate::{NivetaApp, icons, widgets};
 
 pub use crate::brush_preview::{preview_pixels, preview_sig};
 pub use crate::brush_sections::section_body;
-pub use photocraft_engine::brush_cmds::brush_patch;
+pub use niveta_engine::brush_cmds::brush_patch;
 
 /// Sections in Photoshop's order. The bool says whether the section has an enable box.
 pub const SECTIONS: [(&str, bool); 13] = [
@@ -122,11 +122,11 @@ pub fn section_lock(b: &mut BrushSettings, i: usize) -> Option<&mut bool> {
 }
 
 /// Send the panel's edits (`before` → `after`) through `tools.setBrush`.
-pub fn commit(app: &mut PhotocraftApp, before: &BrushSettings, after: &BrushSettings) {
+pub fn commit(app: &mut NivetaApp, before: &BrushSettings, after: &BrushSettings) {
     send(app, before, after, None);
 }
 
-fn send(app: &mut PhotocraftApp, before: &BrushSettings, after: &BrushSettings, key: Option<String>) -> bool {
+fn send(app: &mut NivetaApp, before: &BrushSettings, after: &BrushSettings, key: Option<String>) -> bool {
     if before == after {
         return false;
     }
@@ -164,7 +164,7 @@ fn gesture(ctx: &egui::Context) -> u64 {
 /// [`commit`] as part of a gesture: every call of one drag carries the same `coalesce` key, so
 /// the engine journals the drag as a single `tools.setBrush` (Rule 1: one command per gesture).
 /// Call it every frame (it tracks presses even when nothing changed).
-pub fn commit_gesture(app: &mut PhotocraftApp, ctx: &egui::Context, before: &BrushSettings, after: &BrushSettings) {
+pub fn commit_gesture(app: &mut NivetaApp, ctx: &egui::Context, before: &BrushSettings, after: &BrushSettings) {
     let g = gesture(ctx);
     if send(app, before, after, Some(format!("brush-ui:{g}"))) && !ctx.input(|i| i.pointer.any_down()) {
         ctx.data_mut(|d| d.get_temp_mut_or_default::<(u64, u64)>(egui::Id::new(GESTURE)).0 += 1);
@@ -209,7 +209,7 @@ pub(crate) fn new_preset_name(presets: &[paint::BrushPreset]) -> String {
     (1..).map(|n| format!("Brush {n}")).find(|n| !presets.iter().any(|p| &p.name == n)).unwrap_or_else(|| "Brush".into())
 }
 
-pub(crate) fn run_or_status(app: &mut PhotocraftApp, id: &str, p: Value) {
+pub(crate) fn run_or_status(app: &mut NivetaApp, id: &str, p: Value) {
     if let Err(e) = app.run(id, p) {
         app.ui.status = e;
     }
@@ -222,7 +222,7 @@ pub(crate) fn full_uv() -> egui::Rect {
 /// The section list: enable boxes, names, locks, the selection. Clicking a name shows the section
 /// and turns it on (Photoshop); clicking a box only toggles it; the lock on the right keeps the
 /// section when another preset is picked.
-fn section_list(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSettings) {
+fn section_list(app: &mut NivetaApp, ui: &mut egui::Ui, b: &mut BrushSettings) {
     let t = Tokens::get(ui.ctx());
     // On a phone the column sits above the controls, so it takes the panel's whole width.
     let w = if crate::mobile_ui::is_mobile(ui.ctx()) { ui.available_width() } else { 150.0 };
@@ -299,7 +299,7 @@ fn section_list(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSetting
     });
 }
 
-fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+fn settings_tab(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let before = app.session.tools.brush.clone();
     let mut b = before.clone();
@@ -347,7 +347,7 @@ fn settings_tab(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 
 /// The live stroke preview of `b` beside the create and reset buttons, taking the width
 /// it is given (a fixed strip on desktop, the sheet's width on a phone).
-fn stroke_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSettings) {
+fn stroke_strip(app: &mut NivetaApp, ui: &mut egui::Ui, b: &mut BrushSettings) {
     let t = Tokens::get(ui.ctx());
     // Leave the buttons their room: taking the full available width overflows the sheet by the
     // button column, and egui then measures the sheet wider and pins it out of centre.
@@ -371,7 +371,7 @@ fn stroke_strip(app: &mut PhotocraftApp, ui: &mut egui::Ui, b: &mut BrushSetting
     });
 }
 
-pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn window(app: &mut NivetaApp, ctx: &egui::Context) {
     if !app.ui.panels.brush_settings {
         return;
     }
@@ -461,7 +461,7 @@ pub fn window(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 /// The sheet's header: the two tabs as pill tabs and a close button. Returns true when it
 /// asked to close.
-fn sheet_header(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> bool {
+fn sheet_header(app: &mut NivetaApp, ui: &mut egui::Ui) -> bool {
     let mut close = false;
     ui.horizontal(|ui| {
         let mut tab = app.ui.brush_tab;

@@ -1,5 +1,5 @@
 [package]
-name = "photocraft-io"
+name = "niveta-io"
 description = "Import/export between photocraft documents and PSD/PSB and flat raster formats"
 version.workspace = true
 edition.workspace = true
@@ -12,24 +12,24 @@ workspace = true
 [features]
 # Real-file corpus tests (opt-in; `cargo xtask test-corpus`). Fail when the corpus is missing.
 corpus = []
-# HEIC/HEIF decode (forwarded to photocraft-codecs; see its `heif` feature).
-heif = ["photocraft-codecs/heif"]
+# HEIC/HEIF decode (forwarded to niveta-codecs; see its `heif` feature).
+heif = ["niveta-codecs/heif"]
 
 [dependencies]
-photocraft-geom = { workspace = true }
-photocraft-color = { workspace = true }
-photocraft-cms = { workspace = true }
-photocraft-raster = { workspace = true }
-photocraft-doc = { workspace = true }
-photocraft-compose = { workspace = true }
-photocraft-algo = { workspace = true }
-photocraft-psd = { workspace = true }
-photocraft-codecs = { workspace = true }
-photocraft-raw = { workspace = true }
-photocraft-text = { workspace = true }
-photocraft-paint = { workspace = true }
-photocraft-vector = { workspace = true }
-photocraft-format = { path = "../format" }
+niveta-geom = { workspace = true }
+niveta-color = { workspace = true }
+niveta-cms = { workspace = true }
+niveta-raster = { workspace = true }
+niveta-doc = { workspace = true }
+niveta-compose = { workspace = true }
+niveta-algo = { workspace = true }
+niveta-psd = { workspace = true }
+niveta-codecs = { workspace = true }
+niveta-raw = { workspace = true }
+niveta-text = { workspace = true }
+niveta-paint = { workspace = true }
+niveta-vector = { workspace = true }
+niveta-format = { path = "../format" }
 thiserror = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { version = "1.8", default-features = false, features = ["pure"] }
@@ -50,6 +50,6 @@ resvg = { version = "0.45", default-features = false, features = ["text", "raste
 [dev-dependencies]
 crc32fast = "1.5"
 flate2 = { workspace = true }
-photocraft-psd = { workspace = true, features = ["testgen"] }
-photocraft-raw = { workspace = true, features = ["testgen"] }
+niveta-psd = { workspace = true, features = ["testgen"] }
+niveta-raw = { workspace = true, features = ["testgen"] }
 proptest = { workspace = true }

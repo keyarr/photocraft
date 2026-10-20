@@ -35,7 +35,7 @@ use std::sync::mpsc::Sender;
 use base64::Engine as _;
 use serde_json::{Value, json};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 use crate::canvas::{ToolEvent, tool_event};
 use crate::state::{DialogKind, Tool, UiState};
 
@@ -67,7 +67,7 @@ pub enum Outcome {
     AfterInput,
     /// A command started a background job and the caller waits for it: reply with its result
     /// once it has been applied (or with its error / "cancelled").
-    AfterJob(photocraft_engine::jobs::JobId),
+    AfterJob(niveta_engine::jobs::JobId),
 }
 
 /// The fields `ui.set` reads. Anything else is rejected before a field is applied, and every
@@ -184,7 +184,7 @@ fn wrap(r: Result<Value, String>) -> Outcome {
 /// Run a command the way automation does (script events off). Long commands may run as
 /// background jobs: by default the reply waits for the job's result (backward compatible); with
 /// `wait` false it is `{job, pending: true}` at once.
-fn run_waiting(app: &mut PhotocraftApp, wait: bool, run: impl FnOnce(&mut PhotocraftApp) -> Result<Value, String>) -> Outcome {
+fn run_waiting(app: &mut NivetaApp, wait: bool, run: impl FnOnce(&mut NivetaApp) -> Result<Value, String>) -> Outcome {
     let events_enabled = app.session.prefs().script_events.enabled;
     if events_enabled {
         app.session.edit_prefs(|prefs| prefs.script_events.enabled = false);
@@ -202,7 +202,7 @@ fn run_waiting(app: &mut PhotocraftApp, wait: bool, run: impl FnOnce(&mut Photoc
 
 /// Screen position of document point (x, y) on the main canvas, where a `ui.pointer` right-click
 /// opens its menu (the mouse's opens at the pointer); the canvas centre when it can't be mapped.
-fn screen_point(app: &PhotocraftApp, x: f64, y: f64) -> [f32; 2] {
+fn screen_point(app: &NivetaApp, x: f64, y: f64) -> [f32; 2] {
     let p = crate::canvas::ViewXform::active(app)
         .map(|xf| xf.to_screen(x as f32, y as f32))
         .filter(|p| p.is_finite())
@@ -213,7 +213,7 @@ fn screen_point(app: &PhotocraftApp, x: f64, y: f64) -> [f32; 2] {
 /// The `dialog` id of the shell's own dialog (`workspace_ui`) in `ui.inspect` and `ui.dialog.*`.
 const SHELL_DIALOG: &str = "shell";
 
-pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Outcome {
+pub fn handle(app: &mut NivetaApp, ctx: &egui::Context, req: &ControlRequest) -> Outcome {
     let saved = app.session.authorize;
     if let Some(gate) = app.services.automation_authorize {
         app.session.authorize = Some(gate);
@@ -223,7 +223,7 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest
     outcome
 }
 
-fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Outcome {
+fn dispatch(app: &mut NivetaApp, ctx: &egui::Context, req: &ControlRequest) -> Outcome {
     let p = &req.params;
     let s = |k: &str| p.get(k).and_then(Value::as_str);
     let u = |k: &str| p.get(k).and_then(Value::as_u64);
@@ -259,7 +259,7 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
             // `engine.execute` is programmatic: engine commands run directly with their default
             // params and never open a dialog (an agent would otherwise get a modal instead of a
             // result). `ui.menu.invoke` behaves like a menu click, so it may open the dialog.
-            if req.method == "engine.execute" && photocraft_engine::commands::find(id).is_some() {
+            if req.method == "engine.execute" && niveta_engine::commands::find(id).is_some() {
                 return run_waiting(app, wait, |app| app.run(id, params));
             }
             run_waiting(app, wait, |app| crate::menus::invoke(app, ctx, id, params))
@@ -270,8 +270,8 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
         "jobs.cancel" => {
             let all = p.get("job").is_none_or(Value::is_null);
             match p.get("job").and_then(Value::as_u64) {
-                Some(j) if app.session.job(photocraft_engine::jobs::JobId(j)).is_some() => {
-                    crate::jobs_ui::cancel(app, photocraft_engine::jobs::JobId(j));
+                Some(j) if app.session.job(niveta_engine::jobs::JobId(j)).is_some() => {
+                    crate::jobs_ui::cancel(app, niveta_engine::jobs::JobId(j));
                     ok(json!({"cancelled": 1}))
                 }
                 Some(j) => err(format!("no running job {j}")),
@@ -293,7 +293,7 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
             }
             let gradient_blend = if let Some(value) = p.get("gradientBlendMode") {
                 let Some(name) = value.as_str() else { return err("gradientBlendMode must be a blend mode name") };
-                let Some(mode) = photocraft_engine::commands::blend_from_str(name).filter(|m| photocraft_color::BlendMode::LAYER_MODES.contains(m)) else {
+                let Some(mode) = niveta_engine::commands::blend_from_str(name).filter(|m| niveta_color::BlendMode::LAYER_MODES.contains(m)) else {
                     return err(format!("unknown gradient blend mode `{name}`"));
                 };
                 Some(mode)
@@ -312,14 +312,14 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
                 // The Eyedropper's options bar (#1649): Sample Size, Sample, Show Sampling Ring.
                 let eyedropper_size = match p.get("eyedropperSampleSize") {
                     Some(v) => Some(
-                        photocraft_engine::sample_cmds::size_param("ui.set", &json!({"size": v}))
-                            .map_err(|_| format!("eyedropperSampleSize must be \"point\" or one of {:?}", photocraft_engine::sample_cmds::SAMPLE_SIZES))?,
+                        niveta_engine::sample_cmds::size_param("ui.set", &json!({"size": v}))
+                            .map_err(|_| format!("eyedropperSampleSize must be \"point\" or one of {:?}", niveta_engine::sample_cmds::SAMPLE_SIZES))?,
                     ),
                     None => None,
                 };
                 let eyedropper_sample = match p.get("eyedropperSample") {
                     Some(v) => {
-                        let ids: Vec<&str> = photocraft_engine::sample_cmds::SampleLayers::ALL.iter().map(|(_, n)| *n).collect();
+                        let ids: Vec<&str> = niveta_engine::sample_cmds::SampleLayers::ALL.iter().map(|(_, n)| *n).collect();
                         let id = v.as_str().filter(|id| ids.contains(id)).ok_or_else(|| format!("eyedropperSample must be one of {}", ids.join(", ")))?;
                         Some(id.to_string())
                     }
@@ -392,8 +392,8 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
                 // applied; non-numeric values keep the API's historical silent no-op.
                 let brush_size: Option<f64> = match p.get("brushSize").and_then(Value::as_f64) {
                     Some(size) => {
-                        if !size.is_finite() || size > f64::from(photocraft_paint::MAX_BRUSH_SIZE) {
-                            return Err(format!("brushSize must be finite and at most {} px", photocraft_paint::MAX_BRUSH_SIZE));
+                        if !size.is_finite() || size > f64::from(niveta_paint::MAX_BRUSH_SIZE) {
+                            return Err(format!("brushSize must be finite and at most {} px", niveta_paint::MAX_BRUSH_SIZE));
                         }
                         Some(size)
                     }
@@ -520,7 +520,7 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
                 }
                 "command" | "Command" => {
                     let Some(cmd) = s("command") else { return err("command dialogs need `command`") };
-                    let label = photocraft_engine::commands::find(cmd).map(|c| c.label).unwrap_or(cmd);
+                    let label = niveta_engine::commands::find(cmd).map(|c| c.label).unwrap_or(cmd);
                     return ok(json!({"dialog": crate::dialogs::open_command_dialog(app, cmd, label)}));
                 }
                 other => return err(format!("unknown dialog kind `{other}`")),
@@ -754,9 +754,9 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
         "ui.gpu.simulateLoss" => {
             let error = p.get("error").and_then(Value::as_bool).unwrap_or(false);
             let fault = if error {
-                photocraft_gpu::Fault::Error("simulated error (ui.gpu.simulateLoss)".into())
+                niveta_gpu::Fault::Error("simulated error (ui.gpu.simulateLoss)".into())
             } else {
-                photocraft_gpu::Fault::Lost("simulated (ui.gpu.simulateLoss)".into())
+                niveta_gpu::Fault::Lost("simulated (ui.gpu.simulateLoss)".into())
             };
             let active = match app.gpu_health() {
                 Some(h) => {
@@ -781,7 +781,7 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
             if p.get("focus").and_then(Value::as_bool).unwrap_or(true) {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
             }
-            // The capture itself is issued by `PhotocraftApp::issue_screenshots` once open/close
+            // The capture itself is issued by `NivetaApp::issue_screenshots` once open/close
             // animations (modals, popups) have settled.
             let token = app.ui.alloc_id();
             ctx.request_repaint();
@@ -816,7 +816,7 @@ fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) 
 }
 
 /// Snapshot of everything on screen, addressable by id.
-pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
+pub fn inspect(app: &NivetaApp, ctx: &egui::Context) -> Value {
     let screen = ctx.content_rect();
     let mut dialogs: Vec<Value> =
         app.ui.dialogs.iter().map(|d| json!({"id": d.id, "kind": d.kind, "title": crate::dialogs::title(d), "fields": d.fields})).collect();
@@ -856,8 +856,8 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         "notices": app.ui.notices,
         "gpuFallbackNotice": app.ui.gpu_fallback_notice,
         "frame": app.frame,
-        "session": photocraft_engine::inspect::session(&app.session),
-        "document": app.session.active().map(photocraft_engine::inspect::document),
+        "session": niveta_engine::inspect::session(&app.session),
+        "document": app.session.active().map(niveta_engine::inspect::document),
         "perf": {"fps": app.fps, "timings": app.perf},
         "brush": {"size": app.session.tools.brush.size, "hardness": app.session.tools.brush.hardness, "opacity": app.session.tools.brush.opacity},
         "distort": app.distort.describe(),
@@ -866,7 +866,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
     })
 }
 
-pub fn save_screenshot(app: &mut PhotocraftApp, image: &egui::ColorImage, path: Option<&str>) -> Value {
+pub fn save_screenshot(app: &mut NivetaApp, image: &egui::ColorImage, path: Option<&str>) -> Value {
     let [w, h] = image.size;
     let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
     let png = match app.services.encode_png.as_ref() {
@@ -901,7 +901,7 @@ pub fn save_screenshot(app: &mut PhotocraftApp, image: &egui::ColorImage, path: 
 mod tests {
     use super::*;
 
-    fn call(app: &mut PhotocraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
+    fn call(app: &mut NivetaApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
         let (req, _rx) = ControlRequest::new(method, params);
         match handle(app, ctx, &req) {
             Outcome::Done(v) => v,
@@ -913,9 +913,9 @@ mod tests {
     fn shell_dialogs_are_listed_and_driven_through_ui_dialog() {
         // #1004: Window › Workspace and View dialogs live in `ui.shell.dialog`, and ui.inspect and
         // ui.dialog.* only knew `ui.dialogs`.
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
-        let shell = |app: &mut PhotocraftApp| {
+        let shell = |app: &mut NivetaApp| {
             let v = call(app, &ctx, "ui.inspect", json!({}));
             v["result"]["dialogs"].as_array().unwrap().iter().find(|d| d["id"] == "shell").cloned()
         };
@@ -949,7 +949,7 @@ mod tests {
     #[test]
     fn expired_queued_edit_does_not_run_and_a_live_retry_runs_once() {
         use std::time::{Duration, Instant};
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
         let before = app.session.active().unwrap();
         let layers = before.doc.layers.len();
@@ -972,7 +972,7 @@ mod tests {
 
     #[test]
     fn deadline_free_requests_run_even_after_the_receiver_is_dropped() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
         let layers = app.session.active().unwrap().doc.layers.len();
         let (tx, rx) = std::sync::mpsc::channel();
@@ -987,7 +987,7 @@ mod tests {
 
     #[test]
     fn right_pointer_opens_agent_visible_selection_menu() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
         app.run("select.rect", json!({"x": 1, "y": 1, "width": 8, "height": 8})).unwrap();
@@ -1009,7 +1009,7 @@ mod tests {
 
     #[test]
     fn agent_can_inspect_and_choose_pen_make_selection_from_full_context_menu() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
         app.run("path.set", json!({"name":"work","path":{"subpaths":[{"closed":true,"knots":[[2,2],[20,2],[20,20]]}]}})).unwrap();
@@ -1038,7 +1038,7 @@ mod tests {
 
     #[test]
     fn ui_inspect_reports_the_view_preferences() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         let before = call(&mut app, &ctx, "ui.inspect", json!({}));
         assert_eq!(before.pointer("/result/view/show/selection_edges"), Some(&json!(true)));
@@ -1051,7 +1051,7 @@ mod tests {
 
     #[test]
     fn engine_execute_runs_with_defaults_but_menu_invoke_opens_the_dialog() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
         app.run("edit.fill", json!({"color": "#808080"})).unwrap();
@@ -1067,7 +1067,7 @@ mod tests {
 
     #[test]
     fn menu_invoke_cannot_edit_document_behind_an_open_dialog() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
 
@@ -1100,7 +1100,7 @@ mod tests {
     #[test]
     fn ui_set_rejects_unknown_fields_before_changing_anything() {
         use crate::theme::ThemeKind;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         app.set_theme(&ctx, ThemeKind::StudioLight);
         // `dark` was advertised to MCP clients but never read; a typo looked like success too.
@@ -1121,11 +1121,11 @@ mod tests {
 
     #[test]
     fn ui_set_gradient_blend_mode_validates_and_updates_options() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         let good = call(&mut app, &ctx, "ui.set", json!({"tool": "gradient", "gradientBlendMode": "Difference", "gradientClassic": true}));
         assert_eq!(good["ok"], true, "{good}");
-        assert_eq!(app.ui.tool_options.gradient_blend_mode, photocraft_color::BlendMode::Difference);
+        assert_eq!(app.ui.tool_options.gradient_blend_mode, niveta_color::BlendMode::Difference);
         assert!(app.ui.tool_options.gradient_classic);
         let bad = call(&mut app, &ctx, "ui.set", json!({"gradientBlendMode": "nonsense", "gradientClassic": false}));
         assert_eq!(bad["ok"], false, "{bad}");
@@ -1134,7 +1134,7 @@ mod tests {
 
     #[test]
     fn ui_set_drives_the_eyedropper_options() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         let good = call(
             &mut app,
@@ -1165,7 +1165,7 @@ mod tests {
 
     #[test]
     fn ui_set_opens_the_brush_preset_picker_and_sets_its_view() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         assert_eq!(app.ui.brush_picker_list.view, crate::brush_panel::BrushesView::Grid, "tip thumbnails by default");
         let r = call(&mut app, &ctx, "ui.set", json!({"tool": "brush", "brushPicker": [120, 80], "brushPickerView": "list"}));
@@ -1182,7 +1182,7 @@ mod tests {
 
     #[test]
     fn ui_inspect_tracks_brush_picker_open_and_closed() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         app.run("file.new", json!({"width": 128, "height": 128})).unwrap();
 
@@ -1216,7 +1216,7 @@ mod tests {
 
     #[test]
     fn ui_set_applies_all_fields_or_none() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         let before = app.ui.tool;
         let panels_before = serde_json::to_value(&app.ui.panels).unwrap_or_default();
@@ -1251,7 +1251,7 @@ mod tests {
 
     #[test]
     fn ui_set_color_panel_picks_the_edited_chip() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         assert_eq!(call(&mut app, &ctx, "ui.set", json!({"colorPanel": {"background": true}}))["ok"], true);
         assert!(app.ui.color_panel.background);
@@ -1262,7 +1262,7 @@ mod tests {
     #[test]
     fn ui_set_unknown_theme_error_names_every_theme_and_each_name_works() {
         use crate::theme::ThemeKind;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         let r = call(&mut app, &ctx, "ui.set", json!({"theme": "nope"}));
         assert_eq!(r["ok"], false);
@@ -1277,7 +1277,7 @@ mod tests {
 
     #[test]
     fn ui_window_open_rejects_an_unknown_document_index() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
         // An out-of-range index must error instead of silently switching the active document
@@ -1293,7 +1293,7 @@ mod tests {
 
     #[test]
     fn ui_set_brush_size_dispatches_a_journaled_brush_command() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
 
         let r = call(&mut app, &ctx, "ui.set", json!({"brushSize": 42.5}));
@@ -1334,7 +1334,7 @@ mod tests {
 
     #[test]
     fn preferences_apply_is_available_over_control_without_closing() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         let r = call(&mut app, &ctx, "ui.menu.invoke", json!({"id": "edit.preferences.interface"}));
         let id = r["result"]["dialog"].as_u64().unwrap();
@@ -1342,10 +1342,10 @@ mod tests {
         values["interface"]["uiScale"] = json!("200");
         assert_eq!(call(&mut app, &ctx, "ui.dialog.set", json!({"dialog": id, "field": "values", "value": values}))["ok"], true);
         assert_eq!(call(&mut app, &ctx, "ui.dialog.apply", json!({"dialog": id}))["ok"], true);
-        assert_eq!(app.session.prefs().interface.ui_scale, photocraft_engine::prefs::UiScale::P200);
+        assert_eq!(app.session.prefs().interface.ui_scale, niveta_engine::prefs::UiScale::P200);
         assert!(app.ui.dialog_mut(id).is_some());
         assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": id}))["ok"], true);
-        assert_eq!(app.session.prefs().interface.ui_scale, photocraft_engine::prefs::UiScale::P200);
+        assert_eq!(app.session.prefs().interface.ui_scale, niveta_engine::prefs::UiScale::P200);
         for params in [json!({}), json!({"dialog": "invalid"}), json!({"dialog": u64::MAX})] {
             assert_eq!(call(&mut app, &ctx, "ui.dialog.apply", params)["ok"], false);
         }
@@ -1357,7 +1357,7 @@ mod tests {
             automation_command: Some(Box::new(|id, _| if id == "prefs.set" { Err("preference changes denied".into()) } else { Ok(()) })),
             ..Default::default()
         };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), services);
         let ctx = egui::Context::default();
         let before = app.session.prefs().to_json();
         let id = crate::prefs_ui::open_preferences(&mut app, "interface");
@@ -1375,7 +1375,7 @@ mod tests {
             automation_command: Some(Box::new(|id, _| if id.starts_with("file.") { Err("filesystem command denied".into()) } else { Ok(()) })),
             ..Default::default()
         };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), services);
         let ctx = egui::Context::default();
         app.automation_input = true;
         let error = crate::menus::invoke(&mut app, &ctx, "file.open", json!({})).unwrap_err();
@@ -1384,9 +1384,9 @@ mod tests {
 
     #[test]
     fn automation_open_and_save_use_the_roots_and_reply_with_warnings() {
-        use photocraft_color::{ColorMode, SampleType};
-        use photocraft_doc::Document;
-        use photocraft_geom::Size;
+        use niveta_color::{ColorMode, SampleType};
+        use niveta_doc::Document;
+        use niveta_geom::Size;
         use std::cell::RefCell;
         use std::rc::Rc;
 
@@ -1396,7 +1396,7 @@ mod tests {
             write: Some(Box::new(|_p: &str, _b: &[u8]| Err("ambient writer used".into()))),
             ..Default::default()
         };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), services);
         let ctx = egui::Context::default();
         let r = call(&mut app, &ctx, "app.open", json!({"path": "in/warn.psd"}));
         assert!(r.to_string().contains("automation read authority is not configured"), "{r}");
@@ -1418,7 +1418,7 @@ mod tests {
             })),
             ..Default::default()
         };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), services);
         let r = call(&mut app, &ctx, "app.open", json!({"path": "in/warn.psd"}));
         assert_eq!(r["result"]["warnings"], json!(["Adjustment layer flattened"]), "{r}");
         assert_eq!(r["result"]["name"], "warn.psd");
@@ -1444,42 +1444,42 @@ mod tests {
         assert!(r["error"].as_str().unwrap().contains("pass `path`"), "{r}");
     }
 
-    fn deny_ambient_file(id: &str, _: &serde_json::Value) -> photocraft_engine::Result<()> {
+    fn deny_ambient_file(id: &str, _: &serde_json::Value) -> niveta_engine::Result<()> {
         if id.starts_with("file.") && id != "file.new" {
-            Err(photocraft_engine::EngineError::Other(format!("automation command `{id}` is disabled")))
+            Err(niveta_engine::EngineError::Other(format!("automation command `{id}` is disabled")))
         } else {
             Ok(())
         }
     }
 
-    fn deny_smart_object_paths(id: &str, params: &Value) -> photocraft_engine::Result<()> {
+    fn deny_smart_object_paths(id: &str, params: &Value) -> niveta_engine::Result<()> {
         // The production policy lives in the automation crate. This gate exercises the control
         // session's state-derived path check without adding that dependency to the UI crate.
         if matches!(id, "layer.smartObjects.editContents" | "layer.smartObjects.convertToLayers" | "layer.smartObjects.saveContents")
             && params.get("path").and_then(Value::as_str).is_some()
         {
-            Err(photocraft_engine::EngineError::Other("ambient smart-object path denied".into()))
+            Err(niveta_engine::EngineError::Other("ambient smart-object path denied".into()))
         } else {
             Ok(())
         }
     }
 
-    fn smart_control_app() -> (PhotocraftApp, egui::Context, photocraft_doc::LayerId) {
+    fn smart_control_app() -> (NivetaApp, egui::Context, niveta_doc::LayerId) {
         let services = crate::Services {
             automation_authorize: Some(deny_smart_object_paths),
             automation_command: Some(Box::new(|id, params| deny_smart_object_paths(id, params).map_err(|e| e.to_string()))),
             ..Default::default()
         };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), services);
         app.run("file.new", json!({"width": 8, "height": 6, "background": "transparent"})).unwrap();
         app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
         let id = app.run("layer.smartObjects.convertToSmartObject", json!({})).unwrap()["layer"].as_u64().unwrap();
-        (app, egui::Context::default(), photocraft_doc::LayerId(id))
+        (app, egui::Context::default(), niveta_doc::LayerId(id))
     }
 
     #[test]
     fn control_edits_nested_embedded_smart_objects_and_converts_an_explicit_target() {
-        use photocraft_doc::{LayerContent, SmartSource};
+        use niveta_doc::{LayerContent, SmartSource};
         use std::cell::RefCell;
         use std::rc::Rc;
         use std::sync::Arc;
@@ -1487,7 +1487,7 @@ mod tests {
         let (mut app, ctx, smart) = smart_control_app();
         // Embed this one-smart-layer document inside the outer object: two Edit Contents
         // requests must reach the raster layer, as in a nested product-photo template.
-        let nested = photocraft_engine::smart_cmds::encode_source(&app.session.active().unwrap().doc).unwrap();
+        let nested = niveta_engine::smart_cmds::encode_source(&app.session.active().unwrap().doc).unwrap();
         app.session
             .edit("Nested fixture", |doc, _| {
                 let LayerContent::Smart(sm) = &mut doc.layer_mut(smart).unwrap().content else { panic!("smart fixture") };
@@ -1513,17 +1513,17 @@ mod tests {
             assert_eq!(r["ok"], true, "{r}");
             assert_eq!(app.session.documents().len(), expected_documents);
         }
-        assert_eq!(app.session.active().unwrap().active_layer, Some(photocraft_doc::LayerId(other)));
-        assert_eq!(photocraft_compose::flatten(&app.session.active().unwrap().doc).px[0], [0.0, 0.0, 1.0, 1.0]);
+        assert_eq!(app.session.active().unwrap().active_layer, Some(niveta_doc::LayerId(other)));
+        assert_eq!(niveta_compose::flatten(&app.session.active().unwrap().doc).px[0], [0.0, 0.0, 1.0, 1.0]);
         let r = call(&mut app, &ctx, "engine.execute", json!({"command": "layer.smartObjects.convertToLayers", "params": {"layer": smart.0}}));
         assert_eq!(r["ok"], true, "{r}");
-        assert!(app.session.active().unwrap().doc.layer(photocraft_doc::LayerId(other)).is_some(), "the unrelated active layer remains");
+        assert!(app.session.active().unwrap().doc.layer(niveta_doc::LayerId(other)).is_some(), "the unrelated active layer remains");
         assert!(app.session.authorize.is_none());
 
         let written = Rc::new(RefCell::new(Vec::new()));
         let output = written.clone();
         app.services.export =
-            Some(Box::new(|doc, _, _| photocraft_engine::smart_cmds::encode_source(doc).map(|bytes| (bytes, Vec::new())).map_err(|e| e.to_string())));
+            Some(Box::new(|doc, _, _| niveta_engine::smart_cmds::encode_source(doc).map(|bytes| (bytes, Vec::new())).map_err(|e| e.to_string())));
         app.services.automation_write = Some(Box::new(move |path, bytes| {
             output.borrow_mut().push((path.to_string(), bytes.to_vec()));
             Ok(())
@@ -1534,13 +1534,13 @@ mod tests {
         let written = written.borrow();
         assert_eq!(written.len(), 1);
         assert_eq!(written[0].0, "out/template.pcraft");
-        let saved = photocraft_engine::smart_cmds::decode_source(&written[0].0, &written[0].1).unwrap();
-        assert_eq!(photocraft_compose::flatten(&saved).px[0], [0.0, 0.0, 1.0, 1.0]);
+        let saved = niveta_engine::smart_cmds::decode_source(&written[0].0, &written[0].1).unwrap();
+        assert_eq!(niveta_compose::flatten(&saved).px[0], [0.0, 0.0, 1.0, 1.0]);
     }
 
     #[test]
     fn control_refuses_linked_smart_objects_in_commands_and_actions_but_local_editing_still_works() {
-        use photocraft_doc::{LayerContent, SmartSource};
+        use niveta_doc::{LayerContent, SmartSource};
         use std::sync::Arc;
 
         let (mut app, ctx, smart) = smart_control_app();
@@ -1564,7 +1564,7 @@ mod tests {
             assert_eq!(r["ok"], false, "{r}");
             assert!(r["error"].as_str().unwrap().contains("ambient smart-object path denied"), "{r}");
             app.session.actions.list =
-                vec![photocraft_engine::actions_cmds::Action { name: "Linked contents".into(), steps: vec![(command.into(), json!({"layer": smart.0}))] }];
+                vec![niveta_engine::actions_cmds::Action { name: "Linked contents".into(), steps: vec![(command.into(), json!({"layer": smart.0}))] }];
             let r = call(&mut app, &ctx, "engine.execute", json!({"command": "actions.play", "params": {"action": "Linked contents"}}));
             assert_eq!(r["ok"], true, "{r}");
             assert_eq!(r["result"]["ran"], 0, "{r}");
@@ -1582,15 +1582,15 @@ mod tests {
         app.automation_input = false;
         app.run("layer.smartObjects.editContents", json!({"layer": smart.0})).unwrap();
         assert_eq!(app.session.documents().len(), 2, "a human can still open the existing linked file");
-        assert_eq!(photocraft_compose::flatten(&app.session.active().unwrap().doc).px[0], [1.0, 0.0, 0.0, 1.0]);
+        assert_eq!(niveta_compose::flatten(&app.session.active().unwrap().doc).px[0], [1.0, 0.0, 0.0, 1.0]);
         std::fs::remove_file(path).unwrap();
     }
 
     #[test]
     fn actions_play_checks_each_step_over_control() {
         let services = crate::Services { automation_authorize: Some(deny_ambient_file), ..Default::default() };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-        app.session.actions.list.push(photocraft_engine::actions_cmds::Action {
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), services);
+        app.session.actions.list.push(niveta_engine::actions_cmds::Action {
             name: "Open".into(),
             steps: vec![("file.open".into(), json!({"path": "/etc/passwd"})), ("layer.new.layer".into(), json!({}))],
         });
@@ -1607,8 +1607,8 @@ mod tests {
     #[test]
     fn actions_play_checks_each_step_for_synthetic_input() {
         let services = crate::Services { automation_authorize: Some(deny_ambient_file), ..Default::default() };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-        app.session.actions.list.push(photocraft_engine::actions_cmds::Action {
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), services);
+        app.session.actions.list.push(niveta_engine::actions_cmds::Action {
             name: "Open".into(),
             steps: vec![("file.open".into(), json!({"path": "/etc/passwd"})), ("layer.new.layer".into(), json!({}))],
         });
@@ -1628,7 +1628,7 @@ mod tests {
 
     #[test]
     fn huge_click_count_is_rejected() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         let ctx = egui::Context::default();
         // #982: a huge count used to queue a press and a release per click before replying.
         for count in [json!(MAX_CLICKS + 1), json!(1_000_000_000u64), json!(u64::MAX)] {

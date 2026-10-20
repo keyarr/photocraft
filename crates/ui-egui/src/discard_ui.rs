@@ -6,10 +6,10 @@
 //! tracked by id, not tab index, so closing one elsewhere while the prompt is up can't retarget it.
 
 use egui::Key;
-use photocraft_doc::DocId;
+use niveta_doc::DocId;
 use serde_json::{Value, json};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 use crate::widgets::{ButtonRole, DialogButton};
 
 const EXIT: &str = "file.exit";
@@ -23,7 +23,7 @@ pub struct Prompt {
     docs: Vec<DocId>,
 }
 
-fn index_of(app: &PhotocraftApp, id: DocId) -> Option<usize> {
+fn index_of(app: &NivetaApp, id: DocId) -> Option<usize> {
     app.session.documents().iter().position(|d| d.doc.id == id)
 }
 
@@ -46,7 +46,7 @@ const DISCARDING: &[(&str, Reach)] = &[
 
 /// The command's target document and the unsaved documents it would discard (empty for commands
 /// that discard nothing).
-fn discarded(app: &PhotocraftApp, id: &str, params: &Value) -> (Option<DocId>, Vec<DocId>) {
+fn discarded(app: &NivetaApp, id: &str, params: &Value) -> (Option<DocId>, Vec<DocId>) {
     let docs = app.session.documents();
     let target = params.get("document").and_then(Value::as_u64).map(|i| i as usize).or(app.session.active_index());
     let affected: Vec<usize> = match DISCARDING.iter().find(|(c, _)| *c == id) {
@@ -60,7 +60,7 @@ fn discarded(app: &PhotocraftApp, id: &str, params: &Value) -> (Option<DocId>, V
 }
 
 /// Park `id` behind a prompt if it would discard unsaved work. Returns whether it did.
-pub fn intercept(app: &mut PhotocraftApp, id: &str, params: &Value) -> bool {
+pub fn intercept(app: &mut NivetaApp, id: &str, params: &Value) -> bool {
     let (target, docs) = discarded(app, id, params);
     if docs.is_empty() {
         return false;
@@ -80,7 +80,7 @@ pub fn intercept(app: &mut PhotocraftApp, id: &str, params: &Value) -> bool {
     true
 }
 
-impl PhotocraftApp {
+impl NivetaApp {
     /// Whether closing now would lose work: a document has unsaved changes and closing wasn't
     /// confirmed. The web build has the browser ask before leaving the page while this holds (#1380).
     pub fn has_unsaved_work(&self) -> bool {
@@ -91,7 +91,7 @@ impl PhotocraftApp {
 /// Called once per frame: holds back a window close request while there is unsaved work. Every
 /// way of leaving (File › Exit / Quit, the close button, the OS's quit event, `app.quit`) ends up
 /// here as a close request.
-pub fn guard_window_close(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn guard_window_close(app: &mut NivetaApp, ctx: &egui::Context) {
     if !ctx.input(|i| i.viewport().close_requested()) {
         return;
     }
@@ -116,7 +116,7 @@ pub fn guard_window_close(app: &mut PhotocraftApp, ctx: &egui::Context) {
 }
 
 /// Moves on to the next document, or runs the parked action once none are left.
-fn advance(app: &mut PhotocraftApp, ctx: &egui::Context) {
+fn advance(app: &mut NivetaApp, ctx: &egui::Context) {
     let Some(p) = app.discard.as_mut() else { return };
     if !p.docs.is_empty() {
         p.docs.remove(0);
@@ -143,7 +143,7 @@ fn advance(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 /// Saves `doc`; true once it is saved. A document without a file to write back to asks where in
 /// the save dialog: the prompt then hides until it is answered, and moves on only if it saved.
-fn save(app: &mut PhotocraftApp, ctx: &egui::Context, doc: DocId) -> bool {
+fn save(app: &mut NivetaApp, ctx: &egui::Context, doc: DocId) -> bool {
     let Some(i) = index_of(app, doc) else { return false };
     app.session.set_active(i);
     let saved = crate::menus::invoke_unguarded(app, ctx, "file.save", json!({}));
@@ -170,7 +170,7 @@ fn save(app: &mut PhotocraftApp, ctx: &egui::Context, doc: DocId) -> bool {
 
 /// A completed save may release the close prompt. Choosing a path only starts a layered TIFF
 /// save; TIFF Options calls this after the write. Copies and failed writes leave the doc dirty.
-pub(crate) fn saved_document(app: &mut PhotocraftApp, ctx: &egui::Context, doc: DocId) {
+pub(crate) fn saved_document(app: &mut NivetaApp, ctx: &egui::Context, doc: DocId) {
     // Still the prompt that asked (quitting may have replaced it meanwhile).
     if app.tiff_options.is_none()
         && app.discard.as_ref().and_then(|p| p.docs.first()) == Some(&doc)
@@ -185,7 +185,7 @@ fn couldnt_save(e: String) -> String {
     if e == crate::file_dialog::CANCELLED { e } else { format!("Couldn't save: {e}") }
 }
 
-pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut NivetaApp, ctx: &egui::Context) {
     // Save can ask for a path and then TIFF Options. Wait for both; cancellation brings us back.
     if app.file_dialog_open() || app.tiff_options.is_some() {
         return;
@@ -277,8 +277,8 @@ fn mnemonic(label: &str, key: Key) -> String {
 mod tests {
     use super::*;
 
-    fn app_with_docs(n: usize) -> PhotocraftApp {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    fn app_with_docs(n: usize) -> NivetaApp {
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         for _ in 0..n {
             app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
         }
@@ -286,12 +286,12 @@ mod tests {
         app
     }
 
-    fn make_dirty(app: &mut PhotocraftApp, doc: usize) {
+    fn make_dirty(app: &mut NivetaApp, doc: usize) {
         app.session.set_active(doc);
         app.run("layer.new.layer", json!({})).unwrap();
     }
 
-    fn doc_id(app: &PhotocraftApp, i: usize) -> DocId {
+    fn doc_id(app: &NivetaApp, i: usize) -> DocId {
         app.session.documents()[i].doc.id
     }
 
@@ -391,11 +391,11 @@ mod tests {
         assert_eq!(mnemonic("保存", Key::S), "保存 (S)");
     }
 
-    type Prompted = egui_kittest::Harness<'static, PhotocraftApp>;
+    type Prompted = egui_kittest::Harness<'static, NivetaApp>;
 
     /// The unsaved-changes prompt for `command` over `app`'s dirty documents, as `os` draws it (with
     /// the file dialogs shown and answered at the end of each frame, as the app does).
-    fn prompt_for(app: PhotocraftApp, command: &str, os: egui::os::OperatingSystem) -> Prompted {
+    fn prompt_for(app: NivetaApp, command: &str, os: egui::os::OperatingSystem) -> Prompted {
         let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).build_ui_state(
             |ui, app| {
                 show(app, ui.ctx());
@@ -403,7 +403,7 @@ mod tests {
             },
             app,
         );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+        NivetaApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
         h.ctx.set_os(os);
         assert!(intercept(h.state_mut(), command, &Value::Null));
         h.run_steps(2);
@@ -511,7 +511,7 @@ mod tests {
         let held = waiting.clone();
         let mut app = app_with_docs(1);
         make_dirty(&mut app, 0);
-        app.services.export = Some(Box::new(|_: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"out".to_vec(), Vec::new()))));
+        app.services.export = Some(Box::new(|_: &niveta_doc::Document, _: &str, _: &crate::ExportSettings| Ok((b"out".to_vec(), Vec::new()))));
         app.services.write = Some(Box::new(move |p: &str, _: &[u8]| {
             w.borrow_mut().push(p.to_string());
             Ok(())
@@ -545,7 +545,7 @@ mod tests {
     mod tiff_tests;
 
     /// One frame with the window's close button pressed; the commands the guard sent.
-    fn window_close_commands(app: &mut PhotocraftApp) -> Vec<egui::ViewportCommand> {
+    fn window_close_commands(app: &mut NivetaApp) -> Vec<egui::ViewportCommand> {
         let mut info = egui::ViewportInfo::default();
         info.events.push(egui::ViewportEvent::Close);
         let mut input = egui::RawInput::default();
@@ -556,7 +556,7 @@ mod tests {
     }
 
     /// One frame with the window's close button pressed; whether the guard cancelled the close.
-    fn press_window_close(app: &mut PhotocraftApp) -> bool {
+    fn press_window_close(app: &mut NivetaApp) -> bool {
         let commands = &window_close_commands(app);
         let cancelled = commands.iter().any(|c| matches!(c, egui::ViewportCommand::CancelClose));
         assert_eq!(commands.iter().any(|c| matches!(c, egui::ViewportCommand::Focus)), cancelled);
@@ -581,7 +581,7 @@ mod tests {
         let saved: Rc<RefCell<Vec<(u64, u64)>>> = Rc::default();
         let log = saved.clone();
         app.services.autosave_blocking =
-            Some(Box::new(move |doc: &std::sync::Arc<photocraft_doc::Document>, rev: u64, _path: Option<&str>| {
+            Some(Box::new(move |doc: &std::sync::Arc<niveta_doc::Document>, rev: u64, _path: Option<&str>| {
                 log.borrow_mut().push((doc.id.0, rev));
                 Ok(())
             }));
@@ -613,7 +613,7 @@ mod tests {
             let saved: Rc<RefCell<Vec<(u64, u64)>>> = Rc::default();
             let log = saved.clone();
             app.services.autosave_blocking =
-                Some(Box::new(move |doc: &std::sync::Arc<photocraft_doc::Document>, rev: u64, _path: Option<&str>| {
+                Some(Box::new(move |doc: &std::sync::Arc<niveta_doc::Document>, rev: u64, _path: Option<&str>| {
                     log.borrow_mut().push((doc.id.0, rev));
                     Ok(())
                 }));

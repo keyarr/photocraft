@@ -1,4 +1,4 @@
-//! Snapping in the shell: builds [`photocraft_engine::snap`] targets from View › Snap To and the
+//! Snapping in the shell: builds [`niveta_engine::snap`] targets from View › Snap To and the
 //! document, snaps tool gestures (Move tool, marquees, crop, shapes, pen anchors, Free Transform
 //! handles and guides), and draws smart guides (magenta alignment lines) while layers move.
 //!
@@ -7,10 +7,10 @@
 //! tool to other layers' edges and centres. The threshold is 8 screen pixels at the current zoom.
 
 use egui::{Color32, Stroke, pos2};
-use photocraft_doc::LayerId;
-use photocraft_engine::snap::{SnapKind, SnapLine, SnapOptions, SnapTargets, layer_rect, union};
+use niveta_doc::LayerId;
+use niveta_engine::snap::{SnapKind, SnapLine, SnapOptions, SnapTargets, layer_rect, union};
 
-use crate::PhotocraftApp;
+use crate::NivetaApp;
 use crate::canvas::{ToolEvent, ViewXform};
 use crate::state::Tool;
 
@@ -42,7 +42,7 @@ pub struct ActiveSnap {
 }
 
 /// Snap To options from the View menu and the Guides/Grid preferences.
-pub fn options(app: &PhotocraftApp) -> SnapOptions {
+pub fn options(app: &NivetaApp) -> SnapOptions {
     let st = &app.ui.view.snap_to;
     let e = &app.ui.extras;
     let grid_step = app.session.active().map_or(18.0, |d| {
@@ -54,20 +54,20 @@ pub fn options(app: &PhotocraftApp) -> SnapOptions {
 }
 
 /// Snap tolerance in document pixels at the current zoom.
-pub fn tolerance(app: &PhotocraftApp) -> f64 {
+pub fn tolerance(app: &NivetaApp) -> f64 {
     SNAP_PX / app.current_zoom().max(0.01) as f64
 }
 
-fn smart_on(app: &PhotocraftApp) -> bool {
+fn smart_on(app: &NivetaApp) -> bool {
     app.ui.view.shows(app.ui.view.show.smart_guides)
 }
 
-fn snap_on(app: &PhotocraftApp) -> bool {
+fn snap_on(app: &NivetaApp) -> bool {
     app.ui.extras.snap
 }
 
 /// Targets of the active document (smart = layer alignments only).
-fn build(app: &PhotocraftApp, exclude: &[LayerId], smart: bool) -> SnapTargets {
+fn build(app: &NivetaApp, exclude: &[LayerId], smart: bool) -> SnapTargets {
     let Some(st) = app.session.active() else { return SnapTargets::default() };
     let opts = if smart { SnapOptions { guides: false, grid: false, layers: true, document: true, selection: false, grid_step: 0.0 } } else { options(app) };
     let t = SnapTargets::from_document(&st.doc, &opts, exclude);
@@ -76,10 +76,10 @@ fn build(app: &PhotocraftApp, exclude: &[LayerId], smart: bool) -> SnapTargets {
 
 /// What the Move tool drags: the selection's bounds where its pixels float (`move_ui`), else the
 /// union of the selected layers' bounds.
-fn moving_rect(app: &PhotocraftApp) -> Option<[f64; 4]> {
+fn moving_rect(app: &NivetaApp) -> Option<[f64; 4]> {
     let st = app.session.active()?;
     if crate::move_ui::moves_selected_pixels(app) {
-        let (dx, dy) = photocraft_engine::float_cmds::floating(st).map_or((0, 0), |f| f.offset);
+        let (dx, dy) = niveta_engine::float_cmds::floating(st).map_or((0, 0), |f| f.offset);
         let r = st.doc.selection.as_ref()?.content_bounds().translate(dx, dy);
         return (!r.is_empty()).then(|| [r.x0, r.y0, r.x1, r.y1].map(f64::from));
     }
@@ -139,7 +139,7 @@ fn override_held(mods: egui::Modifiers) -> bool {
 }
 
 /// Start snapping for a drag beginning at `p` (called on pointer down).
-fn begin(app: &mut PhotocraftApp, p: [f64; 2]) {
+fn begin(app: &mut NivetaApp, p: [f64; 2]) {
     app.prefs_rt.snap = None;
     app.prefs_rt.snap_lines.clear();
     if app.session.active().is_none() {
@@ -193,7 +193,7 @@ fn begin(app: &mut PhotocraftApp, p: [f64; 2]) {
 
 /// Round to whole pixels when Preferences › Tools asks vector tools and transforms to snap to
 /// the pixel grid.
-fn pixel_round(app: &PhotocraftApp, p: [f64; 2]) -> [f64; 2] {
+fn pixel_round(app: &NivetaApp, p: [f64; 2]) -> [f64; 2] {
     if app.session.prefs().tools.snap_vector_tools_and_transforms_to_pixel_grid
         && matches!(app.ui.tool, Tool::Pen | Tool::Rectangle | Tool::EllipseShape | Tool::Triangle | Tool::Polygon | Tool::Line)
     {
@@ -204,7 +204,7 @@ fn pixel_round(app: &PhotocraftApp, p: [f64; 2]) -> [f64; 2] {
 }
 
 /// Snap one pointer position for the active gesture; records the alignment lines.
-fn apply(app: &mut PhotocraftApp, p: [f64; 2]) -> [f64; 2] {
+fn apply(app: &mut NivetaApp, p: [f64; 2]) -> [f64; 2] {
     let tol = tolerance(app);
     let Some(snap) = app.prefs_rt.snap.as_ref() else { return p };
     if snap.disabled {
@@ -226,7 +226,7 @@ fn apply(app: &mut PhotocraftApp, p: [f64; 2]) -> [f64; 2] {
 }
 
 /// Snap a tool event's coordinates (called by `canvas::tool_event` before the tools see it).
-pub fn filter_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) -> ToolEvent {
+pub fn filter_event(app: &mut NivetaApp, ev: ToolEvent, mods: egui::Modifiers) -> ToolEvent {
     match ev {
         ToolEvent::Down { x, y, pressure } => {
             begin(app, [x, y]);
@@ -268,7 +268,7 @@ pub fn filter_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifier
 }
 
 /// Snap a guide being dragged out of a ruler (`vertical` guides snap their x).
-pub fn snap_guide(app: &mut PhotocraftApp, vertical: bool, pos: f64) -> f64 {
+pub fn snap_guide(app: &mut NivetaApp, vertical: bool, pos: f64) -> f64 {
     if !snap_on(app) {
         return pos;
     }
@@ -284,11 +284,11 @@ pub fn snap_guide(app: &mut PhotocraftApp, vertical: bool, pos: f64) -> f64 {
 }
 
 fn hex_color(s: &str, fallback: Color32) -> Color32 {
-    photocraft_engine::prefs::parse_hex(s).map_or(fallback, |c| Color32::from_rgb(c[0], c[1], c[2]))
+    niveta_engine::prefs::parse_hex(s).map_or(fallback, |c| Color32::from_rgb(c[0], c[1], c[2]))
 }
 
 /// Draw smart guides (and the moving bounds) for the drag in progress.
-pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) {
+pub fn draw(app: &NivetaApp, painter: &egui::Painter, xf: &ViewXform) {
     let Some(snap) = &app.prefs_rt.snap else { return };
     let smart_color = hex_color(&app.session.prefs().guides_grid_and_slices.smart_guide_color, Color32::from_rgb(255, 0, 255));
     // The moved layers' bounds follow the Move tool (Free Transform draws its own box).
@@ -326,8 +326,8 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn app_with_box() -> PhotocraftApp {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    fn app_with_box() -> NivetaApp {
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
         app.sync_views();
         app.ui.views[0].zoom = 1.0;
@@ -343,7 +343,7 @@ mod tests {
         app
     }
 
-    fn mover_bounds(app: &PhotocraftApp) -> photocraft_geom::Rect {
+    fn mover_bounds(app: &NivetaApp) -> niveta_geom::Rect {
         let st = app.session.active().unwrap();
         st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().content_bounds()
     }

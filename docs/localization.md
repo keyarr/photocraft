@@ -61,7 +61,7 @@ The native-only, pinned `sys-locale` dependency provides safe Rust access to the
   or depending on a particular `.plist` representation.
 - **Linux/BSD:** the platform's standard locale environment, including `LANGUAGE` lists.
 
-`PHOTOCRAFT_LOCALE` is an optional single-tag override for reproducible launches; an unsupported
+`NIVETA_LOCALE` is an optional single-tag override for reproducible launches; an unsupported
 override falls back to English. Empty overrides use the system. Unix locale variables do not
 override Windows/macOS UI-language preferences. Tags are read once per process (at most 64,
 128 bytes each) and matched against the supported language registry. Changes to the
@@ -108,8 +108,8 @@ detection remain separate outstanding work. Switching catalogs does not supply m
    attribution for translation assets, then run the catalog and shell tests.
 
 ```sh
-cargo test -p photocraft-ui-egui --locked
-cargo clippy -p photocraft-ui-egui --all-targets --locked -- -D warnings
+cargo test -p niveta-ui-egui --locked
+cargo clippy -p niveta-ui-egui --all-targets --locked -- -D warnings
 cargo xtask i18n-coverage
 cargo xtask layers
 cargo xtask wasm

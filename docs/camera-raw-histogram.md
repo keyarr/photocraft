@@ -63,8 +63,8 @@ acceptance check.
 
 ## Layering and bounds
 
-Analysis lives in L2 `photocraft-algo` (`histogram`, `vectorscope`), colour transforms in L0
-`photocraft-cms`, view state in `state.rs`, interaction and painting in `camera_raw_scope_ui.rs`
+Analysis lives in L2 `niveta-algo` (`histogram`, `vectorscope`), colour transforms in L0
+`niveta-cms`, view state in `state.rs`, interaction and painting in `camera_raw_scope_ui.rs`
 and `rgb_histogram.rs`. No engine commands or document fields were added.
 
 - The preview and histogram use the existing proxy, capped at 900 px on the longest side. Each

@@ -2,11 +2,11 @@
 //! Home button at the start of the options bar.
 
 use egui::{RichText, Sense, Stroke, vec2};
-use photocraft_doc::{Document, LayerContent};
+use niveta_doc::{Document, LayerContent};
 use serde::{Deserialize, Serialize};
 
 use crate::theme::Tokens;
-use crate::{PhotocraftApp, icons, widgets};
+use crate::{NivetaApp, icons, widgets};
 
 /// Shell-only chrome state (serialised with the UI state, so `ui.inspect` reports it).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -105,10 +105,10 @@ fn profile_name(doc: &Document) -> String {
     let Some(bytes) = doc.icc_profile.as_ref() else {
         return crate::i18n::fmt(tl!("Untagged {mode}"), &[("mode", tl!(mode))]);
     };
-    let Ok(profile) = photocraft_engine::color_cmds::profile_from_bytes(bytes) else {
+    let Ok(profile) = niveta_engine::color_cmds::profile_from_bytes(bytes) else {
         return crate::i18n::fmt(tl!("Invalid {mode} profile"), &[("mode", tl!(mode))]);
     };
-    if profile.color_space != photocraft_engine::color_cmds::mode_space(doc.mode) {
+    if profile.color_space != niveta_engine::color_cmds::mode_space(doc.mode) {
         return crate::i18n::fmt(tl!("Invalid {mode} profile"), &[("mode", tl!(mode))]);
     }
     let name: String = profile.description.chars().filter(|c| !c.is_control()).take(128).collect();
@@ -120,7 +120,7 @@ fn profile_name(doc: &Document) -> String {
 }
 
 /// Status bar body (Pro): zoom %, the chosen info field and its ">" menu, then status messages.
-pub fn status_bar_pro(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn status_bar_pro(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     let (Some(st), Some(i)) = (app.session.active(), app.session.active_index()) else {
         ui.label(RichText::new(tl!("No document")).color(t.text_dim));
@@ -156,7 +156,7 @@ pub fn status_bar_pro(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 }
 
 /// The latest status message after a separator, in the warning colour when it is an error.
-fn status_message(app: &PhotocraftApp, ui: &mut egui::Ui, t: &Tokens) {
+fn status_message(app: &NivetaApp, ui: &mut egui::Ui, t: &Tokens) {
     if app.ui.status.is_empty() {
         return;
     }
@@ -168,7 +168,7 @@ fn status_message(app: &PhotocraftApp, ui: &mut egui::Ui, t: &Tokens) {
 
 /// Home button at the very start of Photoshop 2026's options bar: toggles the Home (start)
 /// screen over the open documents, which stay open.
-pub fn home_button(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn home_button(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let n = app.session.documents().len();
     let auto = app.session.prefs().general.auto_show_home_screen;
     let on = app.ui.chrome.shows_home(n, auto);
@@ -232,7 +232,7 @@ mod tests {
     use serde_json::json;
 
     fn doc() -> Document {
-        let mut s = photocraft_engine::Session::new();
+        let mut s = niveta_engine::Session::new();
         s.execute("file.new", json!({"width": 2400, "height": 1500, "resolution": 72, "background": "white"})).unwrap();
         (*s.active().unwrap().doc).clone()
     }
@@ -250,21 +250,21 @@ mod tests {
     #[test]
     fn status_profile_describes_rgb_gray_and_custom_profiles_without_mutating_the_document() {
         let mut rgb = doc();
-        rgb.icc_profile = Some(photocraft_engine::color_cmds::working_profile(rgb.mode).to_bytes());
+        rgb.icc_profile = Some(niveta_engine::color_cmds::working_profile(rgb.mode).to_bytes());
         let before = rgb.icc_profile.clone();
         assert_eq!(profile_name(&rgb), "sRGB IEC61966-2.1");
         assert_eq!(status_info_text(&rgb, "profile", "", &profile_name(&rgb)), "sRGB IEC61966-2.1 (8bpc)");
         assert_eq!(rgb.icc_profile, before);
 
         let mut gray = doc();
-        gray.mode = photocraft_doc::ColorMode::Grayscale;
-        gray.icc_profile = Some(photocraft_engine::color_cmds::working_profile(gray.mode).to_bytes());
+        gray.mode = niveta_doc::ColorMode::Grayscale;
+        gray.icc_profile = Some(niveta_engine::color_cmds::working_profile(gray.mode).to_bytes());
         assert_eq!(profile_name(&gray), "sGray (sRGB tone curve, Photocraft)");
 
-        let mut custom = (*photocraft_engine::color_cmds::working_profile(photocraft_doc::ColorMode::Cmyk)).clone();
+        let mut custom = (*niveta_engine::color_cmds::working_profile(niveta_doc::ColorMode::Cmyk)).clone();
         custom.description = "PhotoCraft Studio CMYK".into();
         let mut custom_doc = doc();
-        custom_doc.mode = photocraft_doc::ColorMode::Cmyk;
+        custom_doc.mode = niveta_doc::ColorMode::Cmyk;
         custom_doc.icc_profile = Some(custom.with_encoded_bytes().to_bytes());
         assert_eq!(profile_name(&custom_doc), "PhotoCraft Studio CMYK");
     }
@@ -275,16 +275,16 @@ mod tests {
         malformed.icc_profile = Some(std::sync::Arc::new(vec![1, 2, 3]));
         assert_eq!(profile_name(&malformed), "Invalid RGB profile");
 
-        let mut unnamed_profile = (*photocraft_engine::color_cmds::working_profile(photocraft_doc::ColorMode::Cmyk)).clone();
+        let mut unnamed_profile = (*niveta_engine::color_cmds::working_profile(niveta_doc::ColorMode::Cmyk)).clone();
         unnamed_profile.description.clear();
         let mut unnamed = doc();
-        unnamed.mode = photocraft_doc::ColorMode::Cmyk;
+        unnamed.mode = niveta_doc::ColorMode::Cmyk;
         unnamed.icc_profile = Some(unnamed_profile.with_encoded_bytes().to_bytes());
         assert_eq!(profile_name(&unnamed), "Unnamed CMYK profile");
 
         let mut mismatched = doc();
-        mismatched.mode = photocraft_doc::ColorMode::Grayscale;
-        mismatched.icc_profile = Some(photocraft_engine::color_cmds::working_profile(photocraft_doc::ColorMode::Rgb).to_bytes());
+        mismatched.mode = niveta_doc::ColorMode::Grayscale;
+        mismatched.icc_profile = Some(niveta_engine::color_cmds::working_profile(niveta_doc::ColorMode::Rgb).to_bytes());
         assert_eq!(profile_name(&mismatched), "Invalid Gray profile");
     }
 
@@ -312,14 +312,14 @@ mod tests {
     fn home_button_snapshots_without_a_picker() {
         use egui_kittest::Harness;
         use std::{cell::RefCell, rc::Rc};
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
         app.run("layer.new.layer", json!({})).unwrap();
         assert!(app.session.active().unwrap().is_dirty());
         let saved: Rc<RefCell<Vec<(u64, u64)>>> = Rc::default();
         let log = saved.clone();
         app.services.autosave_blocking =
-            Some(Box::new(move |doc: &std::sync::Arc<photocraft_doc::Document>, rev: u64, _path: Option<&str>| {
+            Some(Box::new(move |doc: &std::sync::Arc<niveta_doc::Document>, rev: u64, _path: Option<&str>| {
                 log.borrow_mut().push((doc.id.0, rev));
                 Ok(())
             }));
@@ -369,7 +369,7 @@ mod tests {
     fn status_message_shows_with_no_document_open() {
         // #1567: File › Automate › Batch with no recorded action and no document answered nothing.
         use egui_kittest::{Harness, kittest::Queryable};
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut app = NivetaApp::new(niveta_engine::Session::new(), crate::Services::default());
         app.session.actions.list.clear();
         let e = crate::menus::invoke(&mut app, &egui::Context::default(), "file.automate.batch", json!({})).unwrap_err();
         app.ui.status = e.clone();

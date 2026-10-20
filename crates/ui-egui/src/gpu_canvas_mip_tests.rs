@@ -3,9 +3,9 @@
 //! test devices), and use synthetic pixels instead of event photographs.
 
 use super::*;
-use photocraft_compose::Buffer;
-use photocraft_doc::SampleType;
-use photocraft_geom::Rect;
+use niveta_compose::Buffer;
+use niveta_doc::SampleType;
+use niveta_geom::Rect;
 
 fn read_mips(gpu: &GpuCanvas, key: u64) -> Vec<Vec<[f32; 4]>> {
     let renderer = gpu.rs.renderer.read();

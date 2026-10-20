@@ -1,5 +1,5 @@
 [package]
-name = "photocraft-plugin-invert"
+name = "niveta-plugin-invert"
 description = "Example PhotoCraft WebAssembly filter plug-in: Invert"
 version = "1.0.0"
 edition = "2024"

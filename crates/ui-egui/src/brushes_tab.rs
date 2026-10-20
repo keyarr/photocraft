@@ -10,7 +10,7 @@
 //! both show, pick and organise presets the same way; each keeps its own view state.
 
 use egui::{Color32, RichText, Sense, Stroke, pos2, vec2};
-use photocraft_engine::paint::{BrushPreset, MAX_BRUSH_SIZE};
+use niveta_engine::paint::{BrushPreset, MAX_BRUSH_SIZE};
 use serde_json::json;
 
 use crate::brush_panel::{
@@ -18,7 +18,7 @@ use crate::brush_panel::{
 };
 use crate::brush_preview;
 use crate::theme::{self, Tokens};
-use crate::{PhotocraftApp, icons, widgets};
+use crate::{NivetaApp, icons, widgets};
 
 /// What a drag in the Brushes tab carries.
 #[derive(Clone, Debug, PartialEq)]
@@ -111,14 +111,14 @@ fn view_actions(st: &mut BrushesPanelState, acts: Vec<Action>) -> Vec<Action> {
 }
 
 /// Turn a preset list's actions into commands.
-pub fn apply(app: &mut PhotocraftApp, acts: Vec<Action>) {
+pub fn apply(app: &mut NivetaApp, acts: Vec<Action>) {
     for a in acts {
         match a {
             Action::Select(name) => run_or_status(app, "tools.setBrush", json!({ "preset": name })),
             Action::Choose(name) => {
                 // The double-click's first click already picked it.
                 let picked =
-                    photocraft_engine::paint::presets::find(&app.session.tools.presets, &name).is_some_and(|p| is_current(&p.brush, &app.session.tools.brush));
+                    niveta_engine::paint::presets::find(&app.session.tools.presets, &name).is_some_and(|p| is_current(&p.brush, &app.session.tools.brush));
                 if !picked {
                     run_or_status(app, "tools.setBrush", json!({ "preset": name }));
                 }
@@ -369,7 +369,7 @@ fn rename_bar(ui: &mut egui::Ui, st: &mut BrushesPanelState, acts: &mut Vec<Acti
 pub fn preset_list(
     ui: &mut egui::Ui,
     presets: &[BrushPreset],
-    brush: &photocraft_engine::BrushSettings,
+    brush: &niveta_engine::BrushSettings,
     st: &mut BrushesPanelState,
     layout: ListLayout,
 ) -> Vec<Action> {
@@ -444,7 +444,7 @@ pub fn preset_list(
 }
 
 /// The Brushes tab.
-pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub fn show(app: &mut NivetaApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     // Size of the current brush (Photoshop's Brushes panel slider). The slider takes the width
     // the panel gives it, so a phone sheet and the desktop window lay out the same way.

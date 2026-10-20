@@ -1,7 +1,7 @@
-use photocraft_color::{ColorMode, PixelFormat, SampleType};
-use photocraft_doc::{Document, LayerId, Pattern};
-use photocraft_geom::Rect;
-use photocraft_raster::Surface;
+use niveta_color::{ColorMode, PixelFormat, SampleType};
+use niveta_doc::{Document, LayerId, Pattern};
+use niveta_geom::Rect;
+use niveta_raster::Surface;
 use serde_json::{Value, json};
 
 use crate::Session;
